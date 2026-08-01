@@ -73,14 +73,28 @@ Clone originally used recursive submodules (`git clone --recursive`). Lua is bun
 
 Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system-wide install, unless the user asks otherwise.
 
+## Working copy
+
+Editable Z80 work lives under **`src/`** (e.g. `src/mspac.asm`). That is a working copy derived from the read-only master; transform and assemble that tree, not `./mspac.asm`.
+
+## Python helpers (`py/`)
+
+**All Python helper scripts must be saved under `py/` before they are executed.**
+
+- Do not run one-off `python3 <<'PY' ...` transforms as the only copy of important logic.
+- Write (or update) a script in `py/` first, then run that file.
+- Keep helpers reusable and documented with a short module docstring / usage line.
+- Existing example: `py/label_control_flow.py` (assigns `j_xxxx` labels to control-flow targets in the working copy).
+
 ## Working conventions for agents
 
 1. **Never modify** `mspac.asm`, `boot1`–`boot6`, or other golden ROM binaries unless the user explicitly requests it.
-2. New assemblable source, tools, Makefiles, and IIgs port code go in new paths — do not overwrite master artifacts.
-3. Reassembly verification: assemble → emit six 4KB images (or one map that is split) → CRC/byte-compare to `boot1`–`boot6`.
-4. Listing hex in `mspac.asm` is a useful cross-check but is incomplete / has known mismatches (hacks, bugfix notes, typos). **Golden ROMs win** for byte identity; `mspac.asm` wins for intent and documentation.
-5. Keep changes focused; do not expand into IIgs port work until the Z80 rebuild pipeline is solid, unless the user asks to move on.
-6. Do not commit unless asked. Do not treat `sjasmplus/` third-party tree as something to casually edit.
+2. New assemblable source, tools, Makefiles, and IIgs port code go in new paths — do not overwrite master artifacts. Prefer `src/` for asm work and `py/` for Python helpers.
+3. **Save Python helpers to `py/` before running them** (see above).
+4. Reassembly verification: assemble → emit six 4KB images (or one map that is split) → CRC/byte-compare to `boot1`–`boot6`.
+5. Listing hex in `mspac.asm` is a useful cross-check but is incomplete / has known mismatches (hacks, bugfix notes, typos). **Golden ROMs win** for byte identity; `mspac.asm` wins for intent and documentation.
+6. Keep changes focused; do not expand into IIgs port work until the Z80 rebuild pipeline is solid, unless the user asks to move on.
+7. Do not commit unless asked. Do not treat `sjasmplus/` third-party tree as something to casually edit.
 
 ## Useful layout
 
@@ -89,6 +103,9 @@ mspacman/
   AGENTS.md           ← this file
   Rom.Files.md        ← hardware / ROM map notes
   mspac.asm           ← READ-ONLY master disassembly listing
+  src/mspac.asm       ← working copy (editable)
+  py/                 ← Python helpers (save here before running)
+  Makefile
   boot1 … boot6       ← golden mspacmab CPU ROMs
   mspacmab.zip
   mspacman-orig/      ← original mspacman ROM set (reference)
