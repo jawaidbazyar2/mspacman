@@ -18,7 +18,11 @@ ERR       := $(BUILD_DIR)/mspac.err
 # Golden mspacmab ROMs at repo root
 BOOTS     := boot1 boot2 boot3 boot4 boot5 boot6
 
-.PHONY: all clean verify sjasmplus-check
+GFX_DIR   := $(BUILD_DIR)/gfx
+TILE_ROM  := mspacman-orig/5e
+SPRITE_ROM := mspacman-orig/5f
+
+.PHONY: all clean verify sjasmplus-check gfx gfx-ppm
 
 all: $(BIN)
 
@@ -47,6 +51,14 @@ sjasmplus-check:
 # Map: 0000/1000/2000/3000/8000/9000 → boot1..boot6
 verify: $(BIN)
 	python3 py/verify_boots.py $(BIN)
+
+# Scale arcade 5e/5f graphics to IIgs 6x6 tiles / 14x12 even sprites.
+gfx: $(TILE_ROM) $(SPRITE_ROM)
+	python3 py/gen_shr_gfx.py --tiles $(TILE_ROM) --sprites $(SPRITE_ROM) --out $(GFX_DIR)
+
+# Same as gfx, plus PPM contact sheets under build/gfx/ppm/ for eyeballing.
+gfx-ppm: $(TILE_ROM) $(SPRITE_ROM)
+	python3 py/gen_shr_gfx.py --tiles $(TILE_ROM) --sprites $(SPRITE_ROM) --out $(GFX_DIR) --ppm
 
 clean:
 	rm -rf $(BUILD_DIR)

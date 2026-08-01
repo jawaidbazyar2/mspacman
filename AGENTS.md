@@ -6,11 +6,27 @@ Guidance for AI agents working in this repository.
 
 Port arcade Ms. Pac-Man to the **Apple IIgs**.
 
-Near-term milestone: establish a trustworthy Z80 source pipeline that can be reassembled into **byte-identical** known-good ROMs, then evolve that codebase toward an IIgs target (65816 / IIgs hardware, graphics, sound, input).
+**Z80 reassembly milestone: complete.** Working source under `src/` assembles with SjASMPlus to a mapped image that byte-matches golden `boot1`–`boot6` (`make verify`). Near-term work is the **IIgs port** (65816 / SHR graphics, sound, input) guided by `docs/IIgs-Design.md`, using the locked Z80 listing and source as behavioral reference.
 
-## Prime directive: assemble real Z80
+## LOCKED: `mspac.asm` and Z80 rebuild artifacts
 
-**The working source must remain real Z80 instructions** (`ld`, `jp`, `call`, `djnz`, …), not an ASCII hex dump of the ROMs.
+**Do not edit these unless the user explicitly requests it:**
+
+| Path | Role |
+|------|------|
+| `mspac.asm` | **LOCKED** — read-only master annotated disassembly (Scott Lawrence listing). Documentation + commentary ground truth. |
+| `src/mspac.asm` | **LOCKED** — verified assemblable Z80 working source (real instructions + author comments). |
+| `boot1` … `boot6` | **LOCKED** — golden `mspacmab` CPU ROMs (byte truth). |
+| Other golden ROM binaries | **LOCKED** unless explicitly requested. |
+
+- Do **not** reformat, “fix,” regenerate, or overwrite locked `mspac.asm` / `src/mspac.asm` as part of casual IIgs work.
+- When comments, labels, or behavior are unclear, **read** the locked sources — do not invent semantics or “correct” them to match new code.
+- If IIgs work needs assemblable Z80 changes, **ask first**; do not silently unlock or re-pipeline the Z80 tree.
+- `mspac.asm` (repo root) is a **listing-format** annotated disassembly (address + hex + mnemonic + comments), not assemblable as-is. The assemblable tree is `src/`; both are locked.
+
+## Prime directive: assemble real Z80 (maintenance)
+
+If the user explicitly unlocks Z80 work, the working source must remain **real Z80 instructions** (`ld`, `jp`, `call`, `djnz`, …), not an ASCII hex dump of the ROMs.
 
 1. **Assemble actual instructions.** Edit and fix mnemonics, operands, labels, and symbols until the assembled output matches `boot1`–`boot6`.
 2. **`boot1`–`boot6` are the byte source of truth.** The disassembly listing can be wrong in places. When listing and boots disagree, fix the working source so the **instruction stream** emits the boot bytes — do not “solve” mismatches by replacing large regions with `db`.
@@ -21,18 +37,6 @@ Near-term milestone: establish a trustworthy Z80 source pipeline that can be rea
 ### Forbidden anti-pattern (do not repeat)
 
 In a prior session, a helper rebuilt the body as golden-ROM `db` lines so verify passed. That was a **step backward**: an ASCII ROM dump with bookmarks, not a reassembled program. **Never do that again.**
-
-## Read-only master source
-
-**`mspac.asm` is the read-only master source.**
-
-- Do **not** edit, reformat, “fix,” or overwrite `mspac.asm`.
-- Treat it as documentation + ground-truth commentary from Scott Lawrence’s annotated disassembly of the bootleg set.
-- All assemblable / regenerated source must live in **other** files (under `src/`).
-- When comments, labels, or behavior are unclear, prefer reading `mspac.asm` over inventing semantics.
-- If generated source disagrees with `mspac.asm`, investigate — do not “correct” `mspac.asm` to match generated output.
-
-`mspac.asm` is a **listing-format** annotated disassembly (address + hex + mnemonic + comments), **not** assemblable as-is. The author’s own header notes it may *eventually* become reassemblable; that work must produce **new** files — never mutate the master listing in place.
 
 ## Golden ROMs (build truth)
 
@@ -56,9 +60,9 @@ These files live at the repo root. `mspacmab.zip` is the archive they came from.
 - **`mspacman`**: original hardware — Pac-Man main board + GCC aux daughterboard; encrypted `u5`/`u6`/`u7`; runtime patch/decode.
 - **`mspacmab`**: bootleg — decrypted Ms. Pac code permanently merged into plain `boot1`–`boot6`; no aux board. This matches `mspac.asm` and is the right base for an IIgs port.
 
-Hardware / ROM map notes: `Rom.Files.md`.
+Hardware / ROM map notes: `Rom.Files.md`. Design notes for the IIgs target: `docs/IIgs-Design.md`.
 
-### When listing and boots disagree
+### When listing and boots disagree (Z80 maintenance only)
 
 1. Prefer fixing the **instruction** (typo’d opcode, wrong immediate, bad label target, missing/extra insn).
 2. If the listing documents a hack/bugfix that is *not* in `mspacmab`, keep the bootleg bytes (match boots) and leave a short comment pointing at the listing note.
@@ -95,9 +99,14 @@ Clone originally used recursive submodules (`git clone --recursive`). Lua is bun
 
 Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system-wide install, unless the user asks otherwise.
 
-## Working copy
+## Working tree (post-rebuild)
 
-Editable Z80 work lives under **`src/`** (e.g. `src/mspac.asm`). That is a working copy derived from the read-only master; transform and assemble that tree, not `./mspac.asm`.
+| Path | Status |
+|------|--------|
+| `mspac.asm`, `src/mspac.asm` | **LOCKED** — reference only for IIgs work |
+| `src/ram.inc` | Generated RAM/I/O symbols; treat as Z80-side support (avoid drive-by edits) |
+| `docs/IIgs-Design.md` | IIgs display / render / input decisions |
+| New IIgs code | New paths (e.g. under `iigs/` or as agreed) — do not overwrite locked Z80 artifacts |
 
 ## Python helpers (`py/`)
 
@@ -106,7 +115,7 @@ Editable Z80 work lives under **`src/`** (e.g. `src/mspac.asm`). That is a worki
 - Do not run one-off `python3 <<'PY' ...` transforms as the only copy of important logic.
 - Write (or update) a script in `py/` first, then run that file.
 - Keep helpers reusable and documented with a short module docstring / usage line.
-- Helpers must **preserve instructions and author comments**. Gap-fill helpers may insert `db` only for missing address ranges.
+- Helpers that touch Z80 source must **preserve instructions and author comments**. Gap-fill helpers may insert `db` only for missing address ranges. Do not run Z80 transform pipelines against locked sources unless the user explicitly unlocks that work.
 - Existing helpers:
   - `py/label_control_flow.py` — `j_xxxx` labels for control-flow targets
   - `py/ram_symbols.py` — curated documented RAM/I/O symbol table
@@ -124,15 +133,16 @@ Editable Z80 work lives under **`src/`** (e.g. `src/mspac.asm`). That is a worki
   - `py/fix_mangled_prefixes.py` — comment `--HHHH` / `...` overlay artifacts (do not promote to opcodes)
   - `py/fix_boot_mismatches.py` — targeted instruction/stub fixes where listing ≠ boots
   - `py/verify_boots.py` — compare `build/mspac.bin` slices to `boot1`–`boot6`
+  - `py/gen_shr_gfx.py` — scale `5e`/`5f` → IIgs 6×6 tiles / 14×12 sprites (+ optional PPM previews)
 
 ## Working conventions for agents
 
-1. **Never modify** `mspac.asm`, `boot1`–`boot6`, or other golden ROM binaries unless the user explicitly requests it.
-2. New assemblable source, tools, Makefiles, and IIgs port code go in new paths — do not overwrite master artifacts. Prefer `src/` for asm work and `py/` for Python helpers.
+1. **Never modify** locked `mspac.asm`, `src/mspac.asm`, `boot1`–`boot6`, or other golden ROM binaries unless the user explicitly requests it.
+2. IIgs port code, tools, and docs go in new or agreed paths — do not overwrite locked Z80 artifacts. Prefer `docs/` for design, `py/` for helpers, and a dedicated IIgs tree for 65816 work.
 3. **Save Python helpers to `py/` before running them** (see above).
-4. Reassembly verification: assemble → mapped image → byte-compare to `boot1`–`boot6` (`make verify` / `py/verify_boots.py`).
-5. Listing hex is a useful cross-check but incomplete / has typos. **Boots win for bytes**; **listing wins for comments and intent**. Resolve conflicts by fixing instructions, not by dumping ROMs into `db`.
-6. Keep changes focused; do not expand into IIgs port work until the Z80 rebuild pipeline is solid, unless the user asks to move on.
+4. Z80 verification (when touching unlocked Z80): assemble → mapped image → byte-compare to `boot1`–`boot6` (`make verify` / `py/verify_boots.py`).
+5. For arcade behavior: **boots win for bytes**; **listing / locked source wins for comments and intent**.
+6. IIgs port work is in scope; follow `docs/IIgs-Design.md`. Keep changes focused on the asked task.
 7. Do not commit unless asked. Do not treat `sjasmplus/` third-party tree as something to casually edit.
 
 ## Useful layout
@@ -141,8 +151,9 @@ Editable Z80 work lives under **`src/`** (e.g. `src/mspac.asm`). That is a worki
 mspacman/
   AGENTS.md           ← this file
   Rom.Files.md        ← hardware / ROM map notes
-  mspac.asm           ← READ-ONLY master disassembly listing
-  src/mspac.asm       ← working copy (editable) — real Z80 + comments
+  docs/IIgs-Design.md ← IIgs port design decisions
+  mspac.asm           ← LOCKED master disassembly listing
+  src/mspac.asm       ← LOCKED assemblable Z80 (verify-clean)
   src/ram.inc         ← documented RAM/I/O EQU symbols (generated)
   py/                 ← Python helpers (save here before running)
   Makefile
@@ -154,8 +165,7 @@ mspacman/
 
 ## Out of scope until asked
 
-- Editing `mspac.asm` “to make it assemble”
+- Editing locked `mspac.asm` / `src/mspac.asm` (including “to make it assemble” or re-running the transform pipeline)
 - Targeting encrypted `mspacman` `u5`/`u6`/`u7` as the build output
 - Installing sjasmplus system-wide
-- Broad IIgs scaffolding before ROM-identical Z80 rebuild works
 - Flattening source into a golden-ROM `db` image to force verify

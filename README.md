@@ -100,15 +100,18 @@ mspacman/
   src/ram.inc        # RAM / I/O EQU symbols
   boot1 … boot6      # golden mspacmab CPU ROMs
   py/                # Python helpers (labeling, gap fill, verify, …)
+  docs/              # IIgs port design notes
   sjasmplus/         # vendored SjASMPlus
   Makefile
   Rom.Files.md       # hardware / ROM map notes
   AGENTS.md          # conventions for AI agents working in this repo
 ```
 
+IIgs display / tile-scale decisions: [docs/IIgs-Design.md](docs/IIgs-Design.md).
+
 ## Status
 
-`make` + `make verify` currently produce a byte-identical rebuild of `boot1`–`boot6`. The Apple IIgs port itself is not started yet; the Z80 reassembly pipeline is the foundation for that work.
+`make` + `make verify` currently produce a byte-identical rebuild of `boot1`–`boot6`. The Apple IIgs port itself is not started yet; the Z80 reassembly pipeline is the foundation for that work. Early IIgs design notes (tile scale, HUD layout) live in `docs/IIgs-Design.md`.
 
 ## Disclaimer
 
