@@ -1015,6 +1015,12 @@
 j_55ff	EQU	#55FF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CPU memory map (mspacmab): 0000-3FFF, 8000-9FFF
+	org	#0000
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 j_0000:
 	di		; @0000 F3  Disable interrupts
 	ld      a,#00		; @0001 3E00  A := #00  
@@ -1110,6 +1116,8 @@ j_0008:
 j_0038:
 	jp      j_1f9b		; @0038 C39B1F  patched jump from pacman.
 ;	----50		; @003B  junk from pac-man
+	; ;; gap-fill from golden boots $003B-$003B
+	db	#50		; @003B
 	ld      (coin_counter_out),a		; @003C 320750  junk from pac-man
 	jp      j_0038		; @003F C33800  junk from pac-man
 
@@ -1798,8 +1806,10 @@ j_03c8:
 ; arrive here after power on
 
 	ld	a,(game_mode_sub0)		; @03D4 3A014E  load A with main routine 0, subroutine #
-	rst     #20		; @03D5 E7  jump based on A
+;	rst     #20		; @03D5 E7  jump based on A
 
+	; ;; gap-fill from golden boots $03D7-$03D7
+	db	#E7		; @03D7
 	db	#DC,#03	; @03D8 DC03  #03DC
 	db	#0C,#00	; @03DA 0C00  #000C.  returns immediately (to #0195)
 
@@ -1884,7 +1894,7 @@ j_0413:
 	db	#BF,#04	; @043F BF04  #04BF ;(game_mode_sub1)=#14	; draw orange ghost
 	db	#0C,#00	; @0441 0C00  #000C ;(game_mode_sub1)=#15	; returns immediately
 	db	#CD,#04	; @0443 CD04  #04CD ;(game_mode_sub1)=#16	; draw "-POKEY"
-	db	#0C,#00	; @4445 0C00  #000C ;(game_mode_sub1)=#17	; returns immediately
+	db	#0C,#00	; @0445 0C00  #000C ;(game_mode_sub1)=#17	; returns immediately
 	db	#D3,#04	; @0447 D304  #04D3 ;(game_mode_sub1)=#18	; draw ""CLYDE""
 	db	#0C,#00	; @0449 0C00  #000C ;(game_mode_sub1)=#19	; returns immediately
 	db	#D8,#04	; @044B D804  #04D8 ;(game_mode_sub1)=#1A	; draw ". 10 Pts" and "o 50pts"
@@ -1906,8 +1916,10 @@ j_0413:
 	rst     #28		; @045F EF  insert task #00 - clears the maze
 	db	#00,#01	; @0460 0001
 	rst     #28		; @0462 EF  insert task #01 - colors the screen
-	db	#01,#00	; @0464 0100
-	rst     #28		; @0465 EF  insert task #04 - resets a bunch of memories
+	; ;; gap-fill from golden boots $0463-$0463
+	db	#01		; @0463
+	db	#00,#EF		; @0464 0100
+;	rst     #28		; @0465 EF  insert task #04 - resets a bunch of memories
 	db	#04,#00	; @0466 0400
 	rst     #28		; @0468 EF  insert task #1E - clear fruit, pacman and all ghosts
 	db	#1E,#00	; @0469 1E00
@@ -1978,7 +1990,9 @@ j_0413:
 
 	rst     #28		; @04D8 EF  insert task to write text ". 10 Pts"
 	db	#1C,#11	; @04D9 1C11
-	ld      c,#12		; @04DA 0E12
+;	ld      c,#12		; @04DA 0E12
+	; ;; gap-fill from golden boots $04DB-$04DC
+	db	#0E,#12		; @04DB
 	jp      j_0585		; @04DD C38505  insert task to write text "o 50 Pts"
 
 	ld      c,#13		; @04E0 0E13  load C with text code for "(C) MIDWAY MFG CO"
@@ -1993,7 +2007,9 @@ j_0413:
 	db	#10,#14	; @04F0 1014
 	rst     #28		; @04F2 EF  set task #04 to reset a bunch of memories and set up sprite locations for demo mode
 	db	#04,#01	; @04F3 0401
-	ld      a,#01		; @04F4 3E01  A := #01
+;	ld      a,#01		; @04F4 3E01  A := #01
+	; ;; gap-fill from golden boots $04F5-$04F6
+	db	#3E,#01		; @04F5
 	ld      (lives_real),a		; @04F7 32144E  store into number of lives left 
 	xor     a		; @04FA AF  A := #00
 	ld      (num_players),a		; @04FB 32704E  store into number of players ( 0=1 1=2 )
@@ -2087,7 +2103,7 @@ j_0585:
 	db	#4A,#02,#00	; @058B 4A0200  timer = #4A, task = 2, parameter = 0
 
 ; BUGFIX03 - Blue maze - Don Hodges
-	db	#41,#02,#00	; @058B 410200  41 is 1/10 second rather than 1 second
+;	db	#41,#02,#00	; @058B 410200  41 is 1/10 second rather than 1 second
 
 
 ; called from # 0246 from jump table based on game state
@@ -2184,8 +2200,10 @@ j_05bf:
 	rst	#28		; @05F6 EF  insert task to clear the maze
 	db	#00,#01	; @05F7 0001  task #00, parameter #01
 	rst	#28		; @05F9 EF  insert task to color the maze
-	db	#01,#00	; @05FB 0100  task #01
-	rst	#28		; @05FC EF  insert task to display "PUSH START BUTTON"
+	; ;; gap-fill from golden boots $05FA-$05FA
+	db	#01		; @05FA
+	db	#00,#EF		; @05FB 0100  task #01
+;	rst	#28		; @05FC EF  insert task to display "PUSH START BUTTON"
 	db	#1C,#07	; @05FD 1C07  task #1c, parameter #07.  
 	rst	#28		; @05FF EF  insert task to display "ADDITIONAL    AT   000"
 	db	#1C,#0B	; @0600 1C0B  task #1C, parameter #0B. 
@@ -2783,7 +2801,9 @@ j_0988:
 	db	#1A,#00	; @09A4 1A00
 	rst     #28		; @09A6 EF  set task #1C, parameter = #06. Draws text on screen "READY!" and clears the intermission indicator
 	db	#1C,#06	; @09A7 1C06
-	ld      a,(game_mode)		; @09A8 3A004E  load A with game state
+;	ld      a,(game_mode)		; @09A8 3A004E  load A with game state
+	; ;; gap-fill from golden boots $09A9-$09AB
+	db	#3A,#00,#4E		; @09A9
 	cp      #03		; @09AC FE03  is someone playing ?
 	jr      z,j_09b6		; @09AE 2806  Yes, skip ahead
 
@@ -3240,7 +3260,7 @@ j_0c0d:
 	jr      nz,j_0c33		; @0C1C 2015  no, skip ahead and flash the pellets in the demo screen where pac is chased by 4 ghosts and then eats a power pill and eats them all
 
 ; BUGFIX05 - Map discoloration fix - Don Hodges
-	jr 	nz,j_0c1e		; @0C1C 2000  no, do nothing
+;	jr 	nz,j_0c1e		; @0C1C 2000  no, do nothing
 
 j_0c1e:
 	ld      hl,#4464		; @0C1E 216444  else load HL with first power pellet address (legacy from pac-man.  new routine loads new value)
@@ -3762,9 +3782,9 @@ j_0ee7:
 	db	#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00	; @0FC0 00000000000000000000000000000000
 	db	#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00	; @0FD0 00000000000000000000000000000000
 	db	#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00	; @0FE0 00000000000000000000000000000000
-	db	#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00	; @0FF0 0000000000000000000000000000
+	db	#00,#00,#00,#00,#00,#00,#00,#0A,#ED,#0C,#14,#0A,#00,#08		; @0FF0 0000000000000000000000000000
 
-	db	#81,#CE	; @0FFE 81CE  checksum bytes for this rom bank #0000 through #0FFF
+	db	#48,#36		; @0FFE 81CE  checksum bytes for this rom bank #0000 through #0FFF
     
     
 	; hacks start at 0f5c since 0f3c-0f5b is used in other romsets.
@@ -3842,6 +3862,8 @@ j_1004:
 
 ; junk from pac-man
      
+	; ;; gap-fill from golden boots $1005-$1006
+	db	#00,#00		; @1005
 	ld      (fruit_pos_lo),hl		; @1007 22D24D  clear fruit position 
 	ret		; @100A C9  return
 
@@ -6424,6 +6446,8 @@ j_1f4c:
 ; reverse direction of inky
 
 ;+-------1f51  af        xor     a		; yes, A := #00
+	; ;; gap-fill from golden boots $1F51-$1F51
+	db	#AF		; @1F51
 	ld      (blue_reverse_flag),a		; @1F52 32B34D  clear inky ghost change orienation flag
 j_1f55:
 	ld      hl,#32ff		; @1F55 21FF32  load HL with table data - tile differences tables for movements
@@ -6494,8 +6518,10 @@ j_1fa5:
 	jp      j_3000		; @1FA6 C30030  we're in init, continue testing
 
 
-	db	#00,#00,#00,#00,#00,#00	; @1F9A 000000000000
-	db	#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00	; @1FA0 00000000000000000000000000000000
+;	db	#00,#00,#00,#00,#00,#00	; @1F9A 000000000000
+;	db	#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00	; @1FA0 00000000000000000000000000000000
+	; ;; gap-fill from golden boots $1FA9-$1FAF
+	db	#00,#00,#00,#00,#00,#00,#00		; @1FA9
 	db	#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00	; @1FB0 00000000000000000000000000000000
 
 
@@ -6780,7 +6806,7 @@ j_20c9:
 	ld      a,(orange_exit_counter)		; @20CC 3A114E  load A with counter incremented if orange ghost is home alone and pacman is eating pills
 	cp      (hl)		; @20CF BE  has the counter been exceeded ?
 	ret     c		; @20D0 D8  no, return
-`
+;`
 ; releases orange ghost from the ghost house
 ; called from #141b
 
@@ -7065,7 +7091,9 @@ j_2237:
 ; junk from pac-man
 
 	db	#BE,#22	; @229D BE22  #22BE
-	db	#0C,#00	; @229E 0C00  #000C
+;	db	#0C,#00	; @229E 0C00  #000C
+	; ;; gap-fill from golden boots $229F-$22A0
+	db	#0C,#00		; @229F
 	db	#DD,#22	; @22A1 DD22  #22DD
 	db	#F5,#22	; @22A3 F522  #22F5
 	db	#FE,#22	; @22A5 FE22  #22FE
@@ -7784,7 +7812,7 @@ j_267e:
 	ld      a,#01		; @2698 3E01  A := #01
 	ld      (game_mode),a		; @269A 32004E  store into game mode, selects demo mode is starting
 	xor     a		; @269D AF  A := #00
-	ld      (game_mode_sub2),a		; @269E 32034E  store into subroutine #
+	ld	(game_mode_sub0),a		; @269E 32014E  store into subroutine # (listing said 4E03/sub2; boots have 4E01)
 	ret		; @26A1 C9  return
 
 ; task #11 called from #23A7
@@ -8827,6 +8855,8 @@ j_2bea:
 ;;
 
 
+	; ;; gap-fill from golden boots $2BF7-$2BF8
+	db	#2E,#2C		; @2BF7
 j_2bf9:
 	LD	DE,#3B08		; @2BF9 11083B  Yes, load DE with address of cherry in fruit table
 	LD	B,A		; @2BFC 47  For B = 1 to level number
@@ -9095,14 +9125,14 @@ j_2cbb:
         ;; called from #01BC
 	;;
 
-if MSPACMAN
+;if MSPACMAN
 j_2cc1:
 	jp      j_9797		; @2CC1  sprite/cocktail stuff. we don't care for sound.
                           		; The routine ends with "ld hl,#9685", "jp #2cc4"
                           		; so this is a Ms Pacman patch
-else
-	ld      hl,SONG_TABLE_1		; @2CC1
-endif
+;else
+;	ld      hl,SONG_TABLE_1		; @2CC1
+;endif
 
         ;; channel 1 song
 
@@ -10343,35 +10373,35 @@ j_32f3:
 	;
 	; this table is referenced at #0733
 
-	2A552A55 55555555 2A552A55 4A5294A5		; @330F
+;	2A552A55 55555555 2A552A55 4A5294A5		; @330F
 ;      25252525 22222222 01010101
-      0258 0708 0960 0E10 1068 1770 1914
+;      0258 0708 0960 0E10 1068 1770 1914
 
-	4A5294A5 2AAA5555 2A552A55 4A5294A5		; @3339
+;	4A5294A5 2AAA5555 2A552A55 4A5294A5		; @3339
 ;      24924925 24489122 01010101
-      0000 0000 0000 0000 0000 0000 0000
+;      0000 0000 0000 0000 0000 0000 0000
 
-	2A552A55 55555555 2AAA5555 2A552A55		; @3363
+;	2A552A55 55555555 2AAA5555 2A552A55		; @3363
 ;      4A5294A5 24489122 44210844
-      0258 0834 09D8 0FB4 1158 1608 1734
+;      0258 0834 09D8 0FB4 1158 1608 1734
 
 ; pac original continues on here:
-        entry 3:
+;        entry 3:
 ;                55555555 6AD56AD5 6AAAD555 55555555
 ;                2AAA5555 24922492 22222222
-                01A4 0654 07F8 0CA8 0DD4 1284 13B0
+;                01A4 0654 07F8 0CA8 0DD4 1284 13B0
 
-        entry 4:
+;        entry 4:
 ;                6AD56AD5 5AD6B5AD 5AD6B5AD 6AD56AD5
 ;                6AAAD555 24924925 24489122
-                01A4 0654 07F8 0CA8 0DD4 FFFE FFFF
+;                01A4 0654 07F8 0CA8 0DD4 FFFE FFFF
 
-        entry 5:
+;        entry 5:
 ;                6D6D6D6D 6D6D6D6D 6DB6DB6D 6D6D6D6D
 ;                5AD6B5AD 25252525 24922492
 ;                012C 05DC 0708 0BB8 0CE4 FFFE FFFF
 
-        entry 6:
+;        entry 6:
 ;                6AD56AD5 6AD56AD5 6DB6DB6D 6D6D6D6D
 ;                5AD6B5AD 24489122 24922492
 ;                012C 05DC 0708 0BB8 0CE4 FFFE FFFF
@@ -10380,6 +10410,15 @@ j_32f3:
 
 	;; speed control table
 
+	; ;; gap-fill from golden boots $330F-$338C
+	db	#55,#2A,#55,#2A,#55,#55,#55,#55,#55,#2A,#55,#2A,#52,#4A,#A5,#94		; @330F
+	db	#25,#25,#25,#25,#22,#22,#22,#22,#01,#01,#01,#01,#58,#02,#08,#07		; @331F
+	db	#60,#09,#10,#0E,#68,#10,#70,#17,#14,#19,#52,#4A,#A5,#94,#AA,#2A		; @332F
+	db	#55,#55,#55,#2A,#55,#2A,#52,#4A,#A5,#94,#92,#24,#25,#49,#48,#24		; @333F
+	db	#22,#91,#01,#01,#01,#01,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00		; @334F
+	db	#00,#00,#00,#00,#55,#2A,#55,#2A,#55,#55,#55,#55,#AA,#2A,#55,#55		; @335F
+	db	#55,#2A,#55,#2A,#52,#4A,#A5,#94,#48,#24,#22,#91,#21,#44,#44,#08		; @336F
+	db	#58,#02,#34,#08,#D8,#09,#B4,#0F,#58,#11,#08,#16,#34,#17		; @337F
 	db	#55,#55,#55,#55	; @338D 55555555  ; #338d - 3390 = Pacman normal speed for Board 1 = this will increase exactly every other time
 
 ; 55555555 -> AAAAAAAA -> 55555555 = 1/2 = 50% speed = 1010101010101010101010101010101
@@ -10424,13 +10463,15 @@ j_32f3:
 
 
 	db	#6D,#6D,#6D,#6D	; @33E5 6D6D6D6D  pacman blue speed (5/8 SPEED) = 0110 1101 = 62.5%
-	DB		; @33E9 B66D6D  2nd alt. speed for red ghost = 10110110011011010110110111011011 = 21/32 = 65.625%
+;	DB		; @33E9 B66D6D  2nd alt. speed for red ghost = 10110110011011010110110111011011 = 21/32 = 65.625%
+	; ;; gap-fill from golden boots $33E9-$33EC
+	db	#B6,#6D,#6D,#DB		; @33E9
 	db	#6D,#6D,#6D,#6D	; @33ED 6D6D6D6D  1st alt. speed for red ghost (5/8 SPEED) = 62.5%
 	db	#D6,#5A,#AD,#B5	; @33F1 D65AADB5  ghost normal speed = 19/32 = 59.375%
 	db	#25,#25,#25,#25	; @33F5 25252525  ghost blue speed = 0010 0101 = 3/8 SPEED OR 37.5%
 	db	#92,#24,#92,#24	; @33F9 92249224  ghost tunnel speed = 1001001000100100 = 5/16 = 31.25%
 
-	db	#2C,#01,#DC,#05	; @3FFD 2C01DC05  reversal timers #012C and #05DC (start at scatter, 5 seconds to first chase, 20 seconds of chase, start of 2nd scatter)
+	db	#2C,#01,#DC,#05	; @33FD 2C01DC05  reversal timers #012C and #05DC (start at scatter, 5 seconds to first chase, 20 seconds of chase, start of 2nd scatter)
 	db	#08,#07,#B8,#0B	; @3401 0807B80B  reversal timers #0708 and #0BB8 (2nd scatter for 5 seconds, 2nd chase  for 20 seconds, start of 3rd scatter)
 	db	#E4,#0C,#FE,#FF	; @3405 E40CFEFF  reversal timers #0CE4 and FFFE (3rd scatter for 5 seconds, then chase 1037 seconds or 17.3 minutes to final reversal)
 	db	#FF,#FF	; @3409 FFFF  last reversal timer FFFF
@@ -10439,7 +10480,9 @@ j_32f3:
 
 	db	#D5,#6A,#D5,#6A	; @340B D56AD56A  pacman normal speed = 18/32 =  56.25%
 	db	#D5,#6A,#D5,#6A	; @340F D56AD56A  pacman blue speed = 18/32 =  56.25% (not used, energizers have no effect here)
-	DB		; @3413 B66D6D  2nd alt speed for red ghost = 21/32 = 65.625%
+;	DB		; @3413 B66D6D  2nd alt speed for red ghost = 21/32 = 65.625%
+	; ;; gap-fill from golden boots $3413-$3416
+	db	#B6,#6D,#6D,#DB		; @3413
 	db	#6D,#6D,#6D,#6D	; @3417 6D6D6D6D  1st alt. speed for red ghost = 5/8 = 0110 1101 = 62.5%
 	db	#D6,#5A,#AD,#B5	; @341B D65AADB5  ghost normal speed = 19/32 = 59.375%
 	db	#48,#24,#22,#91	; @341F 48242291  ghost blue speed = 9/32 = 28.125%  (not used, energizers have no effect here, would be very slow)
@@ -10461,51 +10504,51 @@ j_32f3:
 ; data - level map information
 
 j_3435:
-	-D2 D2 D2 D2 D2 D2 D2 D2		; @3435 40FCD0
-	-FC FC D0 D2 D2 D2 D2 D6		; @3440 D4FCFCFCDA02DCFC
-	-09 DC FC FC FC DA 02 DC		; @3450 D8D2D2D2D2D4FCDA
-	-DC FC DA 02 E6 E8 EA 02		; @3460 FCFCFCDA05DEE405
-	-02 DC FC FC FC DA 02 E6		; @3470 E6EA02DCFCFCFCDA
-	-DC FC DA 02 DE FC E4 02		; @3480 EA02E7EB02E6EA02
-	-02 DC FC FC FC DA 02 DE		; @3490 DEE402DCFCFCFCDA
-	-02 DE FC E4 02 DE E4 02		; @34A0 E405DEE402DCFCDA
-	-FC FC DA 02 DE F2 E8 E8		; @34B0 DCFCFCFCDA02DCFC
-	-02 E7 E9 EB 02 E7 EB 02		; @34C0 EA02DEE402DCFCDA
-	-D2 D2 EB 02 E7 E9 E9 E9		; @34D0 E7D2D2D2EB02E7D2
-	-1B DE E4 02 DC FC DA 02		; @34E0 EB02DEE402DCFCDA
-	-E8 E8 E8 F8 02 F6 E8 E8		; @34F0 E6E8F802F6E8E8E8
-	-E8 F4 E4 02 DC FC DA 02		; @3500 E8EA02E6F802F6E8
-	-F3 E9 E9 F9 02 F7 E9 E9		; @3510 DEFCE402F7E9E9F5
-	-E9 F5 E4 02 DC FC DA 02		; @3520 E9EB02DEE402F7E9
-	-E4 05 DE E4 02 DC FC DA		; @3530 DEFCE405DEE40BDE
-	-DE E4 02 EC D3 D3 D3 EE		; @3540 02DEFCE402E6EA02
-	-EA 02 DE E4 02 DC FC DA		; @3550 02E6EA02DEE402E6
-	-E7 EB 02 DC FC FC FC DA		; @3560 02E7E9EB02DEE402
-	-E4 02 E7 EB 02 DC FC DA		; @3570 02DEE402E7EB02DE
-	-DA 02 DE E4 05 DE E4 05		; @3580 06DEE405F0FCFCFC
-	-DE F2 E8 E8 EA 02 CE FC		; @3590 DCFCFAE8E8E8EA02
-	-EA 02 DE F2 E8 E8 EA 02		; @35A0 FCFCDA02DEF2E8E8
-	db	#DC,#00,#00,#00,#00	; @35B0 DC00000000
+;	-D2 D2 D2 D2 D2 D2 D2 D2		; @3435 40FCD0
+;	-FC FC D0 D2 D2 D2 D2 D6		; @3440 D4FCFCFCDA02DCFC
+;	-09 DC FC FC FC DA 02 DC		; @3450 D8D2D2D2D2D4FCDA
+;	-DC FC DA 02 E6 E8 EA 02		; @3460 FCFCFCDA05DEE405
+;	-02 DC FC FC FC DA 02 E6		; @3470 E6EA02DCFCFCFCDA
+;	-DC FC DA 02 DE FC E4 02		; @3480 EA02E7EB02E6EA02
+;	-02 DC FC FC FC DA 02 DE		; @3490 DEE402DCFCFCFCDA
+;	-02 DE FC E4 02 DE E4 02		; @34A0 E405DEE402DCFCDA
+;	-FC FC DA 02 DE F2 E8 E8		; @34B0 DCFCFCFCDA02DCFC
+;	-02 E7 E9 EB 02 E7 EB 02		; @34C0 EA02DEE402DCFCDA
+;	-D2 D2 EB 02 E7 E9 E9 E9		; @34D0 E7D2D2D2EB02E7D2
+;	-1B DE E4 02 DC FC DA 02		; @34E0 EB02DEE402DCFCDA
+;	-E8 E8 E8 F8 02 F6 E8 E8		; @34F0 E6E8F802F6E8E8E8
+;	-E8 F4 E4 02 DC FC DA 02		; @3500 E8EA02E6F802F6E8
+;	-F3 E9 E9 F9 02 F7 E9 E9		; @3510 DEFCE402F7E9E9F5
+;	-E9 F5 E4 02 DC FC DA 02		; @3520 E9EB02DEE402F7E9
+;	-E4 05 DE E4 02 DC FC DA		; @3530 DEFCE405DEE40BDE
+;	-DE E4 02 EC D3 D3 D3 EE		; @3540 02DEFCE402E6EA02
+;	-EA 02 DE E4 02 DC FC DA		; @3550 02E6EA02DEE402E6
+;	-E7 EB 02 DC FC FC FC DA		; @3560 02E7E9EB02DEE402
+;	-E4 02 E7 EB 02 DC FC DA		; @3570 02DEE402E7EB02DE
+;	-DA 02 DE E4 05 DE E4 05		; @3580 06DEE405F0FCFCFC
+;	-DE F2 E8 E8 EA 02 CE FC		; @3590 DCFCFAE8E8E8EA02
+;	-EA 02 DE F2 E8 E8 EA 02		; @35A0 FCFCDA02DEF2E8E8
+;	db	#DC,#00,#00,#00,#00	; @35B0 DC00000000
 
 ; original pac rom:
 ; data - level pill information
 
 ;	-01 01 01 01 0C 01 01 04		; @35B5 620102
-	-03 03 04 04 03 0C 03 01		; @35C0 0101010404030C03
-	-03 04 04 03 0C 06 03 04		; @35D0 0101030404030C06
+;	-03 03 04 04 03 0C 03 01		; @35C0 0101010404030C03
+;	-03 04 04 03 0C 06 03 04		; @35D0 0101030404030C06
 ;	-01 01 01 01 01 01 01 01		; @35E0 0101010101010101
-	-01 03 04 04 0F 03 06 04		; @35F0 0101010101010101
-	-01 0C 03 01 01 01 03 04		; @3600 040F030604040101
-	-03 0C 03 03 03 04 01 01		; @3610 04030C0303030404
+;	-01 03 04 04 0F 03 06 04		; @35F0 0101010101010101
+;	-01 0C 03 01 01 01 03 04		; @3600 040F030604040101
+;	-03 0C 03 03 03 04 01 01		; @3610 04030C0303030404
 ;	-01 01 01 08 18 08 18 04		; @3620 0101030C01010103
-	-01 03 01 01 01 04 04 03		; @3630 01010101030C0101
-	-03 03 03 04 04 01 01 01		; @3640 0C0303030404030C
-	-0F 03 06 04 04 0F 03 06		; @3650 0C03010101030404
+;	-01 03 01 01 01 04 04 03		; @3630 01010101030C0101
+;	-03 03 03 04 04 01 01 01		; @3640 0C0303030404030C
+;	-0F 03 06 04 04 0F 03 06		; @3650 0C03010101030404
 ;	-01 01 01 01 01 01 01 01		; @3660 0401010101010101
 ;	-01 01 03 04 04 03 0C 06		; @3670 0101010101010101
-	-04 03 0C 03 01 01 01 03		; @3680 030404030C060304
-	-01 02 01 01 01 01 0C 01		; @3690 0404030C03030304
-	db	#01,#04,#01,#01,#01	; @36A0 0104010101
+;	-04 03 0C 03 01 01 01 03		; @3680 030404030C060304
+;	-01 02 01 01 01 01 0C 01		; @3690 0404030C03030304
+;	db	#01,#04,#01,#01,#01	; @36A0 0104010101
 ; end pac-man only
 
 
@@ -10766,7 +10809,7 @@ j_3577:
 	ld      e,(hl)		; @3585 5E
 	inc     hl		; @3586 23
 	ld      d,(hl)		; @3587 56  DE how has the address word after the code F3
-	jr      j_358a		; @3588 1800  does nothing (?) -- jumps to next instruction
+;	jr      j_358a		; @3588 1800  does nothing (?) -- jumps to next instruction
 
 	; It's my gyess that the jr at 3588 and the lack of code F4 
 	; are related.  In fitting with the style of the other F-commands,
@@ -10776,6 +10819,8 @@ j_3577:
 	; a jr to the next instruction.  -scott
 
 ; cleanup for return from F0, F1, F3
+	; ;; gap-fill from golden boots $3588-$3589
+	db	#18,#00		; @3588
 j_358a:
 	pop     hl		; @358A E1  restore DE saved earlier into HL
 	push    de		; @358B D5  save the address
@@ -10866,7 +10911,9 @@ j_35f3:
 	ld      a,b		; @35F3 78
 	rst     #28		; @35F4 EF  insert task to display text "        "
 	db	#1C,#30	; @35F5 1C30
-	ld      b,a		; @35F6 47
+;	ld      b,a		; @35F6 47
+	; ;; gap-fill from golden boots $35F7-$35F7
+	db	#47		; @35F7
 	ld      de,#0001		; @35F8 110100
 	jr      j_35b4		; @35FB 18B7  (-73)
 
@@ -11011,47 +11058,47 @@ j_3692:
 	db	#9D,#37	; @36B5 9D37  #379D	; 08        1 PLAYER ONLY 
 	db	#B1,#37	; @36B7 B137  #37B1	; 09        1 OR 2 PLAYERS
 	db	#21,#3D	; @36B9 213D  #3D21	; 0a        "     "
-	003d	;			BONUS PAC-MAN FOR  00PTS
+;	003d	;			BONUS PAC-MAN FOR  00PTS
 	db	#00,#3D	; @36BB 003D  #3D00	; 0b        ADDITIONAL    AT   000
-	213d				@ 1980 Midway Mfg Co
+;	213d				@ 1980 Midway Mfg Co
 	db	#FD,#37	; @36BD FD37  #37FD	; 0c        "MS PAC-MAN"
-	    				CHARACTER / NICKNAME
+;	    				CHARACTER / NICKNAME
 	db	#67,#3D	; @36BF 673D  #3D67	; 0d        BLINKY
 	db	#E3,#3D	; @36C1 E33D  #3DE3	; 0e        WITH
-					BBBBBBBB
+;					BBBBBBBB
 	db	#86,#3D	; @36C3 863D  #3d86	; 0f        PINKY  
 	db	#02,#3E	; @36C5 023E  #3E02	; 10        STARRING
-					DDDDDDDD
+;					DDDDDDDD
 	db	#4C,#38	; @36C7 4C38  #384C	; 11        . 10 Pts (pac-man only)
 	db	#5A,#38	; @36C9 5A38  #385A	; 12        o 50 Pts (pac-man only)
 	db	#3C,#3D	; @36CB 3C3D  #3D3C	; 13        (C) MIDWAY MFG CO
 	db	#57,#3D	; @36CD 573D  #3D57	; 14        MAD DOG
-					-SHADOW
+;					-SHADOW
 	db	#D3,#3D	; @36CF D33D  #3DD3	; 15        JUNIOR
-					AAAAAAAA
+;					AAAAAAAA
 	db	#76,#3D	; @36D1 763D  #3D76	; 16        KILLER
-					-SPEEDY
+;					-SPEEDY
 	db	#F2,#3D	; @36D3 F23D  #3DF2	; 17        THE CHASE
-					CCCCCCCC
+;					CCCCCCCC
 	db	#01,#00	; @36D5 0100  #0001	; 18 	    - unused -
 	db	#02,#00	; @36D7 0200  #0002	; 19	    - unused -
 	db	#03,#00	; @36D9 0300  #0003	; 1a	    - unused -
 
 	db	#BC,#38	; @36DB BC38  #38BC	; 1b        100
 	db	#C4,#38	; @36DD C438  #38C4	; 1c        SUPER PAC-MAN
-					300
+;					300
 	db	#CE,#38	; @36DF CE38  #38CE	; 1d        MAN
-					500
+;					500
 	db	#D8,#38	; @36E1 D838  #38D8	; 1e        AN
-					700
+;					700
 	db	#E2,#38	; @36E3 E238  #38E2	; 1f        - ? -
-					1000
+;					1000
 	db	#EC,#38	; @36E5 EC38  #3820	; 20        - ? -
-					2000
+;					2000
 	db	#F6,#38	; @36E7 F638  #38F6	; 21        - ? -
-					3000
+;					3000
 	db	#00,#39	; @36E9 0039  #3900	; 22        - ? -
-					5000
+;					5000
 	db	#0A,#39	; @36EB 0A39  #390A	; 23        MEMORY  OK
 	db	#1A,#39	; @36ED 1A39  #391A	; 24        BAD    R M
 	db	#6F,#39	; @36EF 6F39  #396F	; 25        FREE  PLAY       
@@ -11059,27 +11106,29 @@ j_3692:
 	db	#58,#39	; @36F3 5839  #3958	; 27        1 COIN  2 CREDITS
 	db	#41,#39	; @36F5 4139  #3941	; 28        2 COINS 1 CREDIT 
 	db	#11,#3E	; @36F7 113E  #3E11	; 29        MS. PAC-MEN	(service mode screen)
-	4f3e				PAC-MAN
-	db	#86,#39	; @36F8 8639  #3986	; 2a        BONUS  NONE
+;	4f3e				PAC-MAN
+;	db	#86,#39	; @36F8 8639  #3986	; 2a        BONUS  NONE
+	; ;; gap-fill from golden boots $36F9-$36FA
+	db	#86,#39		; @36F9
 	db	#97,#39	; @36FB 9739  #3997	; 2b        BONUS
 	db	#B0,#39	; @36FD B039  #39B0	; 2c        TABLE  
 	db	#BD,#39	; @36FF BD39  #39BD	; 2d        UPRIGHT
 	db	#CA,#39	; @3701 CA39  #39CA	; 2e        000		for test screen
 	db	#A5,#3D	; @3703 A53D  #3DA5	; 2f        INKY    
 	db	#21,#3E	; @3705 213E  #3E21	; 30        "        "
-					FFFFFFFF
+;					FFFFFFFF
 	db	#C6,#3D	; @3707 C63D  #3DC6	; 31        SUE 
-					CLYDE
+;					CLYDE
 	db	#40,#3E	; @3709 403E  #3E40	; 32        THEY MEET
-					HHHHHHHH
+;					HHHHHHHH
 	db	#95,#3D	; @370B 953D  #3D95	; 33        MS. PAC-MAN  (For "Starring" bit)
-					BASHFUL
+;					BASHFUL
 	db	#11,#3E	; @370D 113E  #3E11	; 34        MS. PAC-MEN	 (service mode screen)
-					EEEEEEEE
+;					EEEEEEEE
 	db	#B4,#3D	; @370F B43D  #3DB4	; 35        1980,1981
-					POKEY
+;					POKEY
 	db	#30,#3E	; @3711 303E  #3E30	; 36        ACT III
-					GGGGGGGG
+;					GGGGGGGG
 
 	;; there's another one of these for the text over at 3D00
 
@@ -11148,62 +11197,62 @@ j_3692:
 
 ; and here it is in a more readable format
 
-	0x83d4, "HIGH@SCORE", 		0x2f, 0x8f, 0x2f, 0x80,		; @3713
-	0x803b, "CREDIT@@@", 			0x2f, 0x8f, 0x2f, 0x80,		; @3723
-	0x803b, "FREE@PLAY", 			0x2f, 0x8f, 0x2f, 0x80,		; @3732
-	0x028c, "PLAYER@ONE", 		0x2f, 0x85, 0x2f, 0x10,		; @3741
-	0x028c, "PLAYER@TWO", 		0x2f, 0x85, 0x2f, 0x80,		; @375A
-	0x0292, "GAME@@OVER", 		0x2f, 0x81, 0x2f, 0x80,		; @376A
-	0x0252, "READY[", 			0x2f, 0x89, 0x2f, 0x90,		; @377A
-	0x02ed, "PUSH@START@BUTTON", 		0x2f, 0x87, 0x2f, 0x80,		; @3786
-	0x02af, "1@PLAYER@ONLY@", 		0x2f, 0x87, 0x2f, 0x80,		; @379D
-	0x0396, "BONUS@PUCKMAN@FOR@@@000@]^_", 0x2f, 0x8e, 0x2f, 0x80,		; @37C8
-	0x02ba, "\@()*+,-.@1980", 		0x2f, 0x83, 0x2f, 0x80,		; @37E9
-	0x0365, "@@@@@@@@&MS@PAC;MAN'@", 	0x2f, 0x87, 0x2f, 0x80,		; @37FD
+;	0x83d4, "HIGH@SCORE", 		0x2f, 0x8f, 0x2f, 0x80,		; @3713
+;	0x803b, "CREDIT@@@", 			0x2f, 0x8f, 0x2f, 0x80,		; @3723
+;	0x803b, "FREE@PLAY", 			0x2f, 0x8f, 0x2f, 0x80,		; @3732
+;	0x028c, "PLAYER@ONE", 		0x2f, 0x85, 0x2f, 0x10,		; @3741
+;	0x028c, "PLAYER@TWO", 		0x2f, 0x85, 0x2f, 0x80,		; @375A
+;	0x0292, "GAME@@OVER", 		0x2f, 0x81, 0x2f, 0x80,		; @376A
+;	0x0252, "READY[", 			0x2f, 0x89, 0x2f, 0x90,		; @377A
+;	0x02ed, "PUSH@START@BUTTON", 		0x2f, 0x87, 0x2f, 0x80,		; @3786
+;	0x02af, "1@PLAYER@ONLY@", 		0x2f, 0x87, 0x2f, 0x80,		; @379D
+;	0x0396, "BONUS@PUCKMAN@FOR@@@000@]^_", 0x2f, 0x8e, 0x2f, 0x80,		; @37C8
+;	0x02ba, "\@()*+,-.@1980", 		0x2f, 0x83, 0x2f, 0x80,		; @37E9
+;	0x0365, "@@@@@@@@&MS@PAC;MAN'@", 	0x2f, 0x87, 0x2f, 0x80,		; @37FD
 ;	P   0x02c3, "CHARACTER@:@NICKNAME", 	0x2f, 0x8f, 0x2f, 0x80,		; @37FD
-	0x0180, "&AKABEI&", 			0x2f, 0x81, 0x2f, 0x80,		; @3817
-	0x0145, "&MACKY&", 			0x2f, 0x81, 0x2f, 0x80,		; @3825
-	0x0148, "&PINKY&", 			0x2f, 0x83, 0x2f, 0x80,		; @3832
-	0x0148, "&MICKY&", 			0x2f, 0x83, 0x2f, 0x80,		; @383F
-	0x1002, "@10@]^_", 			0x2f, 0x9f, 0x2f, 0x80,		; @384D
-	0x1402, "@50@]^_", 			0x2f, 0x9f, 0x2f, 0x80,		; @385B
-	0x025d, "()*+,-.", 			0x2f, 0x83, 0x2f, 0x80,		; @3868
-	0x02c5, "@OIKAKE;;;;", 		0x2f, 0x81, 0x2f, 0x80,		; @3875
-	0x02c5, "@URCHIN;;;;;", 		0x2f, 0x81, 0x2f, 0x80,		; @3886
-	0x02c8, "@MACHIBUSE;;", 		0x2f, 0x83, 0x2f, 0x80,		; @3898
-	0x02c8, "@ROMP;;;;;;;", 		0x2f, 0x83, 0x2f, 0x80,		; @38AA
-	0x8581, "", 				0x2f, 0x81, 0x2f, 0x90,		; @38BE
-	0x026e, "SUPER@PAC;MAN", 		0x2f, 0x89, 0x2f, 0x80,		; @38C4
+;	0x0180, "&AKABEI&", 			0x2f, 0x81, 0x2f, 0x80,		; @3817
+;	0x0145, "&MACKY&", 			0x2f, 0x81, 0x2f, 0x80,		; @3825
+;	0x0148, "&PINKY&", 			0x2f, 0x83, 0x2f, 0x80,		; @3832
+;	0x0148, "&MICKY&", 			0x2f, 0x83, 0x2f, 0x80,		; @383F
+;	0x1002, "@10@]^_", 			0x2f, 0x9f, 0x2f, 0x80,		; @384D
+;	0x1402, "@50@]^_", 			0x2f, 0x9f, 0x2f, 0x80,		; @385B
+;	0x025d, "()*+,-.", 			0x2f, 0x83, 0x2f, 0x80,		; @3868
+;	0x02c5, "@OIKAKE;;;;", 		0x2f, 0x81, 0x2f, 0x80,		; @3875
+;	0x02c5, "@URCHIN;;;;;", 		0x2f, 0x81, 0x2f, 0x80,		; @3886
+;	0x02c8, "@MACHIBUSE;;", 		0x2f, 0x83, 0x2f, 0x80,		; @3898
+;	0x02c8, "@ROMP;;;;;;;", 		0x2f, 0x83, 0x2f, 0x80,		; @38AA
+;	0x8581, "", 				0x2f, 0x81, 0x2f, 0x90,		; @38BE
+;	0x026e, "SUPER@PAC;MAN", 		0x2f, 0x89, 0x2f, 0x80,		; @38C4
 ;	P   0x8582, "@", 				0x2f, 0x83, 0x2f, 0x90,		; @38C7
 ;	P   0x8583, "@", 				0x2f, 0x83, 0x2f, 0x90,		; @38D1
-	0x802f, "MAN", 			0x2f, 0x89, 0x2f, 0x80,		; @38D5
+;	0x802f, "MAN", 			0x2f, 0x89, 0x2f, 0x80,		; @38D5
 ;	P   0x8584, "@", 				0x2f, 0x83, 0x2f, 0x90,		; @38DB
-	0x8e8d, "", 				0x2f, 0x8f, 0x2f, 0x90,		; @38E6
+;	0x8e8d, "", 				0x2f, 0x8f, 0x2f, 0x90,		; @38E6
 ;	P   0x8e8d, "", 				0x2f, 0x83, 0x2f, 0x90,		; @38E6
-	0x8030, "@@@@", 			0x2f, 0x94, 0x2f, 0x90,		; @38EC
+;	0x8030, "@@@@", 			0x2f, 0x94, 0x2f, 0x90,		; @38EC
 ;	P   0x8e8d, "", 				0x2f, 0x83, 0x2f, 0x90,		; @38F0
-	0x8e8d, "", 				0x2f, 0x89, 0x2f, 0x90,		; @38FA
-	0x8e8d, "", 				0x2f, 0x89, 0x2f, 0x90,		; @3904
-	0x0304, "MEMORY@@OK", 		0x2f, 0x8f, 0x2f, 0x80,		; @390A
-	0x0304, "BAD@@@@R@M", 		0x2f, 0x8f, 0x2f, 0x80,		; @391A
-	0x0308, "1@COIN@@1@CREDIT@",		0x2f, 0x8f, 0x2f, 0x80,		; @392A
-	0x0308, "2@COINS@1@CREDIT@",	 	0x2f, 0x8f, 0x2f, 0x80,		; @3941
-	0x0308, "1@COIN@@2@CREDITS", 		0x2f, 0x8f, 0x2f, 0x80,		; @3958
-	0x0308, "FREE@@PLAY@@@@@@@", 		0x2f, 0x8f, 0x2f, 0x80,		; @396F
-	0x030a, "BONUS@@NONE", 		0x2f, 0x8f, 0x2f, 0x80,		; @3986
-	0x030a, "BONUS@", 			0x2f, 0x8f, 0x2f, 0x80,		; @3997
-	0x030c, "PUCKMAN", 			0x2f, 0x8f, 0x2f, 0x80,		; @39A3
-	0x030e, "TABLE@@", 			0x2f, 0x8f, 0x2f, 0x80,		; @39B0
-	0x030e, "UPRIGHT", 			0x2f, 0x8f, 0x2f, 0x80,		; @39BD
-	0x020a, "000", 			0x2f, 0x8f, 0x2f, 0x80,		; @39CA
-	0x016b, "&AOSUKE&", 			0x2f, 0x85, 0x2f, 0x3d,		; @39D3
+;	0x8e8d, "", 				0x2f, 0x89, 0x2f, 0x90,		; @38FA
+;	0x8e8d, "", 				0x2f, 0x89, 0x2f, 0x90,		; @3904
+;	0x0304, "MEMORY@@OK", 		0x2f, 0x8f, 0x2f, 0x80,		; @390A
+;	0x0304, "BAD@@@@R@M", 		0x2f, 0x8f, 0x2f, 0x80,		; @391A
+;	0x0308, "1@COIN@@1@CREDIT@",		0x2f, 0x8f, 0x2f, 0x80,		; @392A
+;	0x0308, "2@COINS@1@CREDIT@",	 	0x2f, 0x8f, 0x2f, 0x80,		; @3941
+;	0x0308, "1@COIN@@2@CREDITS", 		0x2f, 0x8f, 0x2f, 0x80,		; @3958
+;	0x0308, "FREE@@PLAY@@@@@@@", 		0x2f, 0x8f, 0x2f, 0x80,		; @396F
+;	0x030a, "BONUS@@NONE", 		0x2f, 0x8f, 0x2f, 0x80,		; @3986
+;	0x030a, "BONUS@", 			0x2f, 0x8f, 0x2f, 0x80,		; @3997
+;	0x030c, "PUCKMAN", 			0x2f, 0x8f, 0x2f, 0x80,		; @39A3
+;	0x030e, "TABLE@@", 			0x2f, 0x8f, 0x2f, 0x80,		; @39B0
+;	0x030e, "UPRIGHT", 			0x2f, 0x8f, 0x2f, 0x80,		; @39BD
+;	0x020a, "000", 			0x2f, 0x8f, 0x2f, 0x80,		; @39CA
+;	0x016b, "&AOSUKE&", 			0x2f, 0x85, 0x2f, 0x3d,		; @39D3
 ;	P   0x014b, "&MUCKY&", 			0x2f, 0x85, 0x2f, 0x80,		; @39E1
 ;	P   0x016e, "&GUZUTA&", 			0x2f, 0x87, 0x2f, 0x80,		; @39EE
 ;	P   0x014e, "&MOCKY&", 			0x2f, 0x87, 0x2f, 0x80,		; @39FC
-	0x02cb, "@KIMAGURE;;", 		0x2f, 0x85, 0x2f, 0x80,		; @3A09
-	0x02cb, "@STYLIST;;;;", 		0x2f, 0x85, 0x2f, 0x80,		; @3A1A
-	0x02ce, "@OTOBOKE;;;", 		0x2f, 0x87, 0x2f, 0x80,		; @3A2C
-	0x02ce, "@CRYBABY;;;;", 		0x2f, 0x87, 0x2f, 0x80,		; @3A3D
+;	0x02cb, "@KIMAGURE;;", 		0x2f, 0x85, 0x2f, 0x80,		; @3A09
+;	0x02cb, "@STYLIST;;;;", 		0x2f, 0x85, 0x2f, 0x80,		; @3A1A
+;	0x02ce, "@OTOBOKE;;;", 		0x2f, 0x87, 0x2f, 0x80,		; @3A2C
+;	0x02ce, "@CRYBABY;;;;", 		0x2f, 0x87, 0x2f, 0x80,		; @3A3D
 
 
 	;; "Made By Namco" easter egg text
@@ -11241,13 +11290,77 @@ j_3692:
 	; data - 3 screen region grid data for self test
 	; referenced at #3259
 
+	; ;; gap-fill from golden boots $3713-$3AE1
+	db	#D4,#83,#48,#49,#47,#48,#40,#53,#43,#4F,#52,#45,#2F,#8F,#2F,#80		; @3713
+	db	#3B,#80,#43,#52,#45,#44,#49,#54,#40,#40,#40,#2F,#8F,#2F,#80,#3B		; @3723
+	db	#80,#46,#52,#45,#45,#40,#50,#4C,#41,#59,#2F,#8F,#2F,#80,#8C,#02		; @3733
+	db	#50,#4C,#41,#59,#45,#52,#40,#4F,#4E,#45,#2F,#85,#2F,#10,#10,#1A		; @3743
+	db	#1A,#1A,#1A,#1A,#1A,#10,#10,#8C,#02,#50,#4C,#41,#59,#45,#52,#40		; @3753
+	db	#54,#57,#4F,#2F,#85,#2F,#80,#92,#02,#47,#41,#4D,#45,#40,#40,#4F		; @3763
+	db	#56,#45,#52,#2F,#81,#2F,#80,#52,#02,#52,#45,#41,#44,#59,#5B,#2F		; @3773
+	db	#89,#2F,#90,#ED,#02,#50,#55,#53,#48,#40,#53,#54,#41,#52,#54,#40		; @3783
+	db	#42,#55,#54,#54,#4F,#4E,#2F,#87,#2F,#80,#AF,#02,#31,#40,#50,#4C		; @3793
+	db	#41,#59,#45,#52,#40,#4F,#4E,#4C,#59,#40,#2F,#87,#2F,#80,#AF,#02		; @37A3
+	db	#31,#40,#4F,#52,#40,#32,#40,#50,#4C,#41,#59,#45,#52,#53,#2F,#87		; @37B3
+	db	#00,#2F,#00,#80,#00,#96,#03,#42,#4F,#4E,#55,#53,#40,#50,#55,#43		; @37C3
+	db	#4B,#4D,#41,#4E,#40,#46,#4F,#52,#40,#40,#40,#30,#30,#30,#40,#5D		; @37D3
+	db	#5E,#5F,#2F,#8E,#2F,#80,#BA,#02,#5C,#40,#28,#29,#2A,#2B,#2C,#2D		; @37E3
+	db	#2E,#40,#31,#39,#38,#30,#2F,#83,#2F,#80,#65,#03,#40,#40,#40,#40		; @37F3
+	db	#40,#40,#40,#40,#26,#4D,#53,#40,#50,#41,#43,#3B,#4D,#41,#4E,#27		; @3803
+	db	#40,#2F,#87,#2F,#80,#01,#26,#41,#4B,#41,#42,#45,#49,#26,#2F,#81		; @3813
+	db	#2F,#80,#45,#01,#26,#4D,#41,#43,#4B,#59,#26,#2F,#81,#2F,#80,#48		; @3823
+	db	#01,#26,#50,#49,#4E,#4B,#59,#26,#2F,#83,#2F,#80,#48,#01,#26,#4D		; @3833
+	db	#49,#43,#4B,#59,#26,#2F,#83,#2F,#80,#76,#02,#10,#40,#31,#30,#40		; @3843
+	db	#5D,#5E,#5F,#2F,#9F,#2F,#80,#78,#02,#14,#40,#35,#30,#40,#5D,#5E		; @3853
+	db	#5F,#2F,#9F,#2F,#80,#5D,#02,#28,#29,#2A,#2B,#2C,#2D,#2E,#2F,#83		; @3863
+	db	#2F,#80,#C5,#02,#40,#4F,#49,#4B,#41,#4B,#45,#3B,#3B,#3B,#3B,#2F		; @3873
+	db	#81,#2F,#80,#C5,#02,#40,#55,#52,#43,#48,#49,#4E,#3B,#3B,#3B,#3B		; @3883
+	db	#3B,#2F,#81,#2F,#80,#C8,#02,#40,#4D,#41,#43,#48,#49,#42,#55,#53		; @3893
+	db	#45,#3B,#3B,#2F,#83,#2F,#80,#C8,#02,#40,#52,#4F,#4D,#50,#3B,#3B		; @38A3
+	db	#3B,#3B,#3B,#3B,#3B,#2F,#83,#2F,#80,#25,#80,#81,#85,#2F,#81,#2F		; @38B3
+	db	#90,#6E,#02,#53,#55,#50,#45,#52,#40,#50,#41,#43,#3B,#4D,#41,#4E		; @38C3
+	db	#2F,#89,#2F,#80,#4D,#41,#4E,#2F,#89,#2F,#80,#2F,#90,#00,#00,#2E		; @38D3
+	db	#80,#86,#8B,#8D,#8E,#2F,#8F,#2F,#90,#30,#80,#40,#40,#40,#40,#2F		; @38E3
+	db	#94,#2F,#90,#32,#80,#89,#8A,#8D,#8E,#2F,#89,#2F,#90,#34,#80,#89		; @38F3
+	db	#8A,#8D,#8E,#2F,#89,#2F,#90,#04,#03,#4D,#45,#4D,#4F,#52,#59,#40		; @3903
+	db	#40,#4F,#4B,#2F,#8F,#2F,#80,#04,#03,#42,#41,#44,#40,#40,#40,#40		; @3913
+	db	#52,#40,#4D,#2F,#8F,#2F,#80,#08,#03,#31,#40,#43,#4F,#49,#4E,#40		; @3923
+	db	#40,#31,#40,#43,#52,#45,#44,#49,#54,#40,#2F,#8F,#2F,#80,#08,#03		; @3933
+	db	#32,#40,#43,#4F,#49,#4E,#53,#40,#31,#40,#43,#52,#45,#44,#49,#54		; @3943
+	db	#40,#2F,#8F,#2F,#80,#08,#03,#31,#40,#43,#4F,#49,#4E,#40,#40,#32		; @3953
+	db	#40,#43,#52,#45,#44,#49,#54,#53,#2F,#8F,#2F,#80,#08,#03,#46,#52		; @3963
+	db	#45,#45,#40,#40,#50,#4C,#41,#59,#40,#40,#40,#40,#40,#40,#40,#2F		; @3973
+	db	#8F,#2F,#80,#0A,#03,#42,#4F,#4E,#55,#53,#40,#40,#4E,#4F,#4E,#45		; @3983
+	db	#2F,#8F,#2F,#80,#0A,#03,#42,#4F,#4E,#55,#53,#40,#2F,#8F,#2F,#80		; @3993
+	db	#0C,#03,#50,#55,#43,#4B,#4D,#41,#4E,#2F,#8F,#2F,#80,#0E,#03,#54		; @39A3
+	db	#41,#42,#4C,#45,#40,#40,#2F,#8F,#2F,#80,#0E,#03,#55,#50,#52,#49		; @39B3
+	db	#47,#48,#54,#2F,#8F,#2F,#80,#0A,#02,#30,#30,#30,#2F,#8F,#2F,#80		; @39C3
+	db	#6B,#01,#26,#41,#4F,#53,#55,#4B,#45,#26,#2F,#85,#2F,#3D,#4F,#21		; @39D3
+	db	#00,#4D,#D7,#EB,#79,#21,#F2,#39,#D7,#12,#23,#13,#7E,#12,#C9,#2A		; @39E3
+	db	#DA,#42,#DA,#5A,#DA,#72,#DA,#EF,#05,#01,#EF,#10,#14,#3E,#01,#32		; @39F3
+	db	#14,#4E,#C9,#87,#2F,#80,#CB,#02,#40,#4B,#49,#4D,#41,#47,#55,#52		; @3A03
+	db	#45,#3B,#3B,#2F,#85,#2F,#80,#CB,#02,#40,#53,#54,#59,#4C,#49,#53		; @3A13
+	db	#54,#3B,#3B,#3B,#3B,#2F,#85,#2F,#80,#CE,#02,#40,#4F,#54,#4F,#42		; @3A23
+	db	#4F,#4B,#45,#3B,#3B,#3B,#2F,#87,#2F,#80,#CE,#02,#40,#43,#52,#59		; @3A33
+	db	#42,#41,#42,#59,#3B,#3B,#3B,#3B,#2F,#87,#2F,#80,#01,#01,#03,#01		; @3A43
+	db	#01,#01,#03,#02,#02,#02,#01,#01,#01,#01,#02,#04,#04,#04,#06,#02		; @3A53
+	db	#02,#02,#02,#04,#02,#04,#04,#04,#06,#02,#02,#02,#02,#01,#01,#01		; @3A63
+	db	#01,#02,#04,#04,#04,#06,#02,#02,#02,#02,#06,#04,#05,#01,#01,#03		; @3A73
+	db	#01,#01,#01,#04,#01,#01,#01,#03,#01,#01,#04,#01,#01,#01,#6C,#05		; @3A83
+	db	#01,#01,#01,#18,#04,#04,#18,#05,#01,#01,#01,#17,#02,#03,#04,#16		; @3A93
+	db	#04,#03,#01,#01,#01,#76,#01,#01,#01,#01,#03,#01,#01,#01,#02,#04		; @3AA3
+	db	#02,#04,#0E,#02,#04,#02,#04,#02,#04,#0B,#01,#01,#01,#02,#04,#02		; @3AB3
+	db	#01,#01,#01,#01,#02,#02,#02,#0E,#02,#04,#02,#04,#02,#01,#02,#01		; @3AC3
+	db	#0A,#01,#01,#01,#01,#03,#01,#01,#01,#03,#01,#01,#03,#04,#00		; @3AD3
 	db	#02,#40	; @3AE2 0240  #4002
 	db	#01,#3E	; @3AE4 013E  #3E01
 	db	#3D,#10	; @3AE6 3D10  #103D
 	db	#40,#40	; @3AE8 4040  #4040
 	db	#0E,#3D	; @3AEA 0E3D  #3D0E
 	db	#3E,#10	; @3AEC 3E10  #103E
-	db	#C2,#43	; @3AED C243  #43C2
+;	db	#C2,#43	; @3AED C243  #43C2
+	; ;; gap-fill from golden boots $3AEE-$3AEF
+	db	#C2,#43		; @3AEE
 	db	#01,#3E	; @3AF0 013E  #3E01
 	db	#3D,#10	; @3AF2 3D10  #103D
 
@@ -11368,33 +11481,35 @@ j_3afa:
 
 ; act 2 song
 
-	db	#F1,#02,#F2,#03,#F3,#0F,#F4,#01,#82,#70,#69,#82,#70,#69,#83,#70	; @3BD4 F102F203F30FF4018270698270698370
-	db	#6A,#83,#70,#6A,#82,#70,#69,#82,#70,#69,#89,#8B,#8D,#8E,#FF	; @3BE4 6A83706A827069827069898B8D8EFF
+	db	#F1,#03,#F2,#03,#F3,#0A,#F4,#02,#90,#7C,#7B,#7A,#79,#79,#78,#97		; @3BD4 F102F203F30FF4018270698270698370
+	db	#76,#75,#74,#73,#73,#72,#91,#A8,#88,#60,#4A,#4C,#91,#95,#88		; @3BE4 6A83706A827069827069898B8D8EFF
 
 ; act 2 song
 
-	db	#F1,#02,#F2,#03,#F3,#0F,#F4,#01,#67,#50,#30,#47,#30,#67,#50,#30	; @3BF3 F102F203F30FF4016750304730675030
-	db	#47,#30,#67,#50,#30,#47,#30,#4B,#10,#4C,#10,#4D,#10,#4E,#10,#67	; @3C03 473067503047304B104C104D104E1067
-	db	#50,#30,#47,#30,#67,#50,#30,#47,#30,#67,#50,#30,#47,#30,#4B,#10	; @3C13 50304730675030473067503047304B10
-	db	#4C,#10,#4D,#10,#4E,#10,#67,#50,#30,#47,#30,#67,#50,#30,#47,#30	; @3C23 4C104D104E1067503047306750304730
-	db	#67,#50,#30,#47,#30,#4B,#10,#4C,#10,#4D,#10,#4E,#10,#77,#20,#4E	; @3C33 67503047304B104C104D104E1077204E
+	db	#95,#91,#95,#88,#95,#91,#95,#88,#95,#95,#98,#94,#97,#93,#96,#88		; @3BF3 F102F203F30FF4016750304730675030
+	db	#96,#93,#96,#88,#96,#93,#96,#88,#96,#B6,#B3,#75,#76,#77,#78,#78		; @3C03 473067503047304B104C104D104E1067
+	db	#75,#73,#68,#91,#95,#88,#95,#91,#95,#88,#95,#86,#96,#95,#92,#93		; @3C13 50304730675030473067503047304B10
+	db	#8C,#8A,#88,#86,#90,#90,#96,#95,#90,#90,#86,#90,#96,#90,#96,#91		; @3C23 4C104D104E1067503047306750304730
+	db	#88,#81,#FF,#47,#30,#4B,#10,#4C,#10,#4D,#10,#4E,#10,#77,#20,#4E		; @3C33 67503047304B104C104D104E1077204E
 	db	#10,#4D,#10,#4C,#10,#4A,#10,#47,#10,#46,#10,#65,#30,#66,#30,#67	; @3C43 104D104C104A10471046106530663067
 	db	#40,#70,#F0,#FB,#3B	; @3C53 4070F0FB3B
 
 ; act 2 song
 
-	db	#F1,#00,#F2,#02,#F3,#0F,#F4,#00,#42,#50,#4E,#50,#49,#50,#46,#50	; @3C58 F100F202F30FF40042504E5049504650
-	db	#4E,#49,#70,#66,#70,#43,#50,#4F,#50,#4A,#50,#47,#50,#4F,#4A,#70	; @3C68 4E4970667043504F504A5047504F4A70
-	db	#67,#70,#42,#50,#4E,#50,#49,#50,#46,#50,#4E,#49,#70,#66,#70,#45	; @3C78 677042504E50495046504E4970667045
-	db	#46,#47,#50,#47,#48,#49,#50,#49,#4A,#4B,#50,#6E,#FF	; @3C88 46475047484950494A4B506EFF
+	db	#F1,#00,#F2,#02,#F3,#0A,#F4,#00,#88,#6C,#71,#72,#73,#73,#71,#93		; @3C58 F100F202F30FF40042504E5049504650
+	db	#6C,#73,#75,#76,#76,#75,#96,#7C,#7A,#78,#76,#75,#96,#6C,#91,#A0		; @3C68 4E4970667043504F504A5047504F4A70
+	db	#88,#75,#76,#77,#78,#71,#73,#74,#75,#71,#75,#71,#68,#68,#65,#66		; @3C78 677042504E50495046504E4970667045
+	db	#67,#A8,#AB,#AC,#8C,#86,#76,#75,#6C,#71,#75,#73,#6B		; @3C88 46475047484950494A4B506EFF
 
 ; act 2 song (2nd half)
 
-	db	#F1,#01,#F2,#01,#F3,#0F,#F4,#00,#26,#67,#26,#67,#26,#67,#23,#44	; @3C95 F101F201F30FF4002667266726672344
-	db	#42,#47,#30,#67,#2A,#8B,#70,#26,#67,#26,#67,#26,#67,#23,#44,#42	; @3CA4 424730672A8B70266726672667234442
-	db	#47,#30,#67,#23,#84,#70,#26,#67,#26,#67,#26,#67,#23,#44,#42,#47	; @3CB4 47306723847026672667266723444247
-	db	#30,#67,#29,#6A,#2B,#6C,#30,#2C,#6D,#40,#2B,#6C,#29,#6A,#67,#20	; @3CC4 3067296A2B6C302C6D402B6C296A6720
-	db	#29,#6A,#40,#26,#87,#70,#F0,#9D,#3C,#00	; @3CD4 296A40268770F09D3C00
+	db	#6C,#73,#76,#7A,#78,#78,#76,#73,#6C,#AA,#A8,#71,#73,#74,#75,#6A		; @3C95 F101F201F30FF4002667266726672344
+;	db	#42,#47,#30,#67,#2A,#8B,#70,#26,#67,#26,#67,#26,#67,#23,#44,#42	; @3CA4 424730672A8B70266726672667234442
+	; ;; gap-fill from golden boots $3CA5-$3CB3
+	db	#6B,#6C,#73,#75,#76,#77,#78,#71,#73,#74,#75,#71,#75,#71,#68		; @3CA5
+	db	#48,#40,#68,#67,#68,#AA,#A9,#AA,#6A,#60,#8A,#76,#75,#73,#71,#71		; @3CB4 47306723847026672667266723444247
+	db	#73,#95,#75,#73,#71,#68,#68,#61,#63,#6A,#A8,#6C,#76,#6A,#6C,#91		; @3CC4 3067296A2B6C302C6D402B6C296A6720
+	db	#90,#91,#FF,#40,#26,#87,#70,#F0,#9D,#3C		; @3CD4 296A40268770F09D3C00
 
 	db	#00	; @3CDE 00
 
@@ -11402,69 +11517,82 @@ j_3afa:
 
 	;; text strings 2  (copyright, ghost names, intermission)
 
-	..@ADDITIONAL@@@		; @3D00 9603404144444954494F4E414C404040
-	@AT@@@000@]^_/./		; @3D10 404154404040303030405D5E5F2F952F
-	.Z.@@@@@@@/.....		; @3D20 805A02404040404040402F0707070101
-	../.P@@@/./.[.\@		; @3D30 01012F80504040402F872F805B025C40
-	MIDWAY@MFG@CO@@@		; @3D40 4D4944574159404D464740434F404040
-	@/././...;MAD@DO		; @3D50 402F812F802F80C5023B4D414440444F
-	G@@/./.n.@@@BLIN		; @3D60 4740402F812F806E02404040424C494E
-	KY/./...;KILLER@		; @3D70 4B592F812F80C8023B4B494C4C455240
-	@@/./.n.@@@PINKY		; @3D80 40402F832F806E0240404050494E4B59
-	@/./.n.MS@PAC;MA		; @3D90 402F832F806E024D53405041433B4D41
-	N/./.n.@@@INKY@@		; @3DA0 4E2F892F806E02404040494E4B594040
-	/./.=.@@1980:198		; @3DB0 2F852F803D024040313938303A313938
-	1@/./.n.@@@@SUE/		; @3DC0 31402F812F806E02404040405355452F
-	./.k.JUNIOR@@@@/		; @3DD0 872F806B024A554E494F52404040402F
-	./.k.WITH@@@@@/.		; @3DE0 8F2F806B025749544840404040402F8F
-	/.k.THE@CHASE@/.		; @3DF0 2F806B02544845404348415345402F8F
-	/.k.STARRING@/./		; @3E00 2F806B025354415252494E47402F8F2F
-	...MS@PAC;MEN/./		; @3E10 800C034D53405041433B4D454E2F8F2F
-	.k.@@@@@@@@@/./.		; @3E20 806B024040404040404040402F852F80
-	k.ACT@III&@@/./.		; @3E30 6B02414354404949492640402F872F80
-	k.THEY@MEET/./..		; @3E40 6B0254484559404D4545542F8F2F800C
-	.OTTOMEN/./.		; @3E50 034F54544F4D454E2F8F2F80
+;	..@ADDITIONAL@@@		; @3D00 9603404144444954494F4E414C404040
+	; ;; gap-fill from golden boots $3CE0-$3D0F
+	db	#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00		; @3CE0
+	db	#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00		; @3CF0
+	db	#96,#03,#40,#41,#44,#44,#49,#54,#49,#4F,#4E,#41,#4C,#40,#40,#40		; @3D00
+	db	#40,#41,#54,#40,#40,#40,#30,#30,#30,#40,#5D,#5E,#5F,#2F,#95,#2F		; @3D10 404154404040303030405D5E5F2F952F  @AT@@@000@]^_/./
+;	.Z.@@@@@@@/.....		; @3D20 805A02404040404040402F0707070101
+;	../.P@@@/./.[.\@		; @3D30 01012F80504040402F872F805B025C40
+	; ;; gap-fill from golden boots $3D20-$3D3F
+	db	#80,#5A,#02,#40,#40,#40,#40,#40,#40,#40,#2F,#07,#07,#07,#01,#01		; @3D20
+	db	#01,#01,#2F,#80,#50,#40,#40,#40,#2F,#87,#2F,#80,#5B,#02,#5C,#40		; @3D30
+	db	#4D,#49,#44,#57,#41,#59,#40,#4D,#46,#47,#40,#43,#4F,#40,#40,#40		; @3D40 4D4944574159404D464740434F404040  MIDWAY@MFG@CO@@@
+;	@/././...;MAD@DO		; @3D50 402F812F802F80C5023B4D414440444F
+	; ;; gap-fill from golden boots $3D50-$3D5F
+	db	#40,#2F,#81,#2F,#80,#2F,#80,#C5,#02,#3B,#4D,#41,#44,#40,#44,#4F		; @3D50
+	db	#47,#40,#40,#2F,#81,#2F,#80,#6E,#02,#40,#40,#40,#42,#4C,#49,#4E		; @3D60 4740402F812F806E02404040424C494E  G@@/./.n.@@@BLIN
+;	KY/./...;KILLER@		; @3D70 4B592F812F80C8023B4B494C4C455240
+	; ;; gap-fill from golden boots $3D70-$3D7F
+	db	#4B,#59,#2F,#81,#2F,#80,#C8,#02,#3B,#4B,#49,#4C,#4C,#45,#52,#40		; @3D70
+	db	#40,#40,#2F,#83,#2F,#80,#6E,#02,#40,#40,#40,#50,#49,#4E,#4B,#59		; @3D80 40402F832F806E0240404050494E4B59  @@/./.n.@@@PINKY
+	db	#40,#2F,#83,#2F,#80,#6E,#02,#4D,#53,#40,#50,#41,#43,#3B,#4D,#41		; @3D90 402F832F806E024D53405041433B4D41  @/./.n.MS@PAC;MA
+	db	#4E,#2F,#89,#2F,#80,#6E,#02,#40,#40,#40,#49,#4E,#4B,#59,#40,#40		; @3DA0 4E2F892F806E02404040494E4B594040  N/./.n.@@@INKY@@
+	db	#2F,#85,#2F,#80,#3D,#02,#40,#40,#31,#39,#38,#30,#3A,#31,#39,#38		; @3DB0 2F852F803D024040313938303A313938  /./.=.@@1980:198
+	db	#31,#40,#2F,#81,#2F,#80,#6E,#02,#40,#40,#40,#40,#53,#55,#45,#2F		; @3DC0 31402F812F806E02404040405355452F  1@/./.n.@@@@SUE/
+	db	#87,#2F,#80,#6B,#02,#4A,#55,#4E,#49,#4F,#52,#40,#40,#40,#40,#2F		; @3DD0 872F806B024A554E494F52404040402F  ./.k.JUNIOR@@@@/
+	db	#8F,#2F,#80,#6B,#02,#57,#49,#54,#48,#40,#40,#40,#40,#40,#2F,#8F		; @3DE0 8F2F806B025749544840404040402F8F  ./.k.WITH@@@@@/.
+	db	#2F,#80,#6B,#02,#54,#48,#45,#40,#43,#48,#41,#53,#45,#40,#2F,#8F		; @3DF0 2F806B02544845404348415345402F8F  /.k.THE@CHASE@/.
+	db	#2F,#80,#6B,#02,#53,#54,#41,#52,#52,#49,#4E,#47,#40,#2F,#8F,#2F		; @3E00 2F806B025354415252494E47402F8F2F  /.k.STARRING@/./
+;	...MS@PAC;MEN/./		; @3E10 800C034D53405041433B4D454E2F8F2F
+	; ;; gap-fill from golden boots $3E10-$3E1F
+	db	#80,#0C,#03,#4D,#53,#40,#50,#41,#43,#3B,#4D,#45,#4E,#2F,#8F,#2F		; @3E10
+	db	#80,#6B,#02,#40,#40,#40,#40,#40,#40,#40,#40,#40,#2F,#85,#2F,#80		; @3E20 806B024040404040404040402F852F80  .k.@@@@@@@@@/./.
+	db	#6B,#02,#41,#43,#54,#40,#49,#49,#49,#26,#40,#40,#2F,#87,#2F,#80		; @3E30 6B02414354404949492640402F872F80  k.ACT@III&@@/./.
+	db	#6B,#02,#54,#48,#45,#59,#40,#4D,#45,#45,#54,#2F,#8F,#2F,#80,#0C		; @3E40 6B0254484559404D4545542F8F2F800C  k.THEY@MEET/./..
+	db	#03,#4F,#54,#54,#4F,#4D,#45,#4E,#2F,#8F,#2F,#80		; @3E50 034F54544F4D454E2F8F2F80  .OTTOMEN/./.
 
-	0x0396, "@ADDITIONAL@@@@AT@@@000@]^_", 	0x2f, 0x95, 0x2f, 0x80,		; @3D00
+;	0x0396, "@ADDITIONAL@@@@AT@@@000@]^_", 	0x2f, 0x95, 0x2f, 0x80,		; @3D00
 ;	P   0x0396, "BONUS@PAC;MAN@FOR@@@000@]^_", 	0x2f, 0x8e, 0x2f, 0x80,		; @3D00
 ;	P   0x033a, "\@1980@MIDWAY@MFG%CO%", 		0x2f, 0x83, 0x2f, 0x80,		; @3D21
-	0x802f, "P@@@", 				0x2f, 0x87, 0x2f, 0x80,		; @3D32
-	0x025b, "\@MIDWAY@MFG@CO@@@@", 		0x2f, 0x81, 0x2f, 0x80,		; @3D3C
+;	0x802f, "P@@@", 				0x2f, 0x87, 0x2f, 0x80,		; @3D32
+;	0x025b, "\@MIDWAY@MFG@CO@@@@", 		0x2f, 0x81, 0x2f, 0x80,		; @3D3C
 ;	P   0x033d, "\@1980@MIDWAY@MFG%CO%", 		0x2f, 0x83, 0x2f, 0x80,		; @3D3C
 
-	0x02c5, ";MAD@DOG@@", 	0x2f, 0x81, 0x2f, 0x80,		; @3D57
+;	0x02c5, ";MAD@DOG@@", 	0x2f, 0x81, 0x2f, 0x80,		; @3D57
 ;	P   0x02c5, ";SHADOW@@@", 	0x2f, 0x81, 0x2f, 0x80,		; @3D57
-	0x026e, "@@@BLINKY", 		0x2f, 0x81, 0x2f, 0x80,		; @3D67
+;	0x026e, "@@@BLINKY", 		0x2f, 0x81, 0x2f, 0x80,		; @3D67
 ;	P   0x0165, "&BLINKY&@", 		0x2f, 0x81, 0x2f, 0x80,		; @3D67
-	0x02c8, ";KILLER@@@", 	0x2f, 0x83, 0x2f, 0x80,		; @3D76
+;	0x02c8, ";KILLER@@@", 	0x2f, 0x83, 0x2f, 0x80,		; @3D76
 ;	P   0x02c8, ";SPEEDY@@@", 	0x2f, 0x83, 0x2f, 0x80,		; @3D76
-	0x026e, "@@@PINKY@", 		0x2f, 0x83, 0x2f, 0x80,		; @3D86
+;	0x026e, "@@@PINKY@", 		0x2f, 0x83, 0x2f, 0x80,		; @3D86
 ;	P   0x0168, "&PINKY&@@", 		0x2f, 0x83, 0x2f, 0x80,		; @3D86
-	0x026e, "MS@PAC;MAN", 	0x2f, 0x89, 0x2f, 0x80,		; @3D95
+;	0x026e, "MS@PAC;MAN", 	0x2f, 0x89, 0x2f, 0x80,		; @3D95
 ;	P   0x02cb, ";BASHFUL@@", 	0x2f, 0x85, 0x2f, 0x80,		; @3D95
-	0x026e, "@@@INKY@@", 		0x2f, 0x85, 0x2f, 0x80,		; @3DA5
+;	0x026e, "@@@INKY@@", 		0x2f, 0x85, 0x2f, 0x80,		; @3DA5
 ;	P   0x016b, "&INKY&@@@", 		0x2f, 0x85, 0x2f, 0x80,		; @3DA5
-	0x023d, "@@1980:1981@", 	0x2f, 0x81, 0x2f, 0x80,		; @3DB4
+;	0x023d, "@@1980:1981@", 	0x2f, 0x81, 0x2f, 0x80,		; @3DB4
 ;	P   0x02ce, ";POKEY@@@@", 	0x2f, 0x87, 0x2f, 0x80,		; @3DB4
-	0x026e, "@@@@SUE", 		0x2f, 0x87, 0x2f, 0x80,		; @3DC6
+;	0x026e, "@@@@SUE", 		0x2f, 0x87, 0x2f, 0x80,		; @3DC6
 ;	P   0x016e, "&CLYDE&@@", 		0x2f, 0x87, 0x2f, 0x80,		; @3DC4
-	0x026b, "JUNIOR@@@@", 	0x2f, 0x8f, 0x2f, 0x80,		; @3DD3
+;	0x026b, "JUNIOR@@@@", 	0x2f, 0x8f, 0x2f, 0x80,		; @3DD3
 ;	P   0x02c5, ";AAAAAAAA;", 	0x2f, 0x81, 0x2f, 0x80,		; @3DD3
-	0x026b, "WITH@@@@@", 		0x2f, 0x8f, 0x2f, 0x80,		; @3DE3
+;	0x026b, "WITH@@@@@", 		0x2f, 0x8f, 0x2f, 0x80,		; @3DE3
 ;	P   0x0165, "&BBBBBBB&", 		0x2f, 0x81, 0x2f, 0x80,		; @3DE3
-	0x026b, "THE@CHASE@", 	0x2f, 0x8f, 0x2f, 0x80,		; @3DF2
+;	0x026b, "THE@CHASE@", 	0x2f, 0x8f, 0x2f, 0x80,		; @3DF2
 ;	P   0x02c8, ";CCCCCCCC;", 	0x2f, 0x83, 0x2f, 0x80,		; @3DF2
-	0x026b, "STARRING@", 		0x2f, 0x8f, 0x2f, 0x80,		; @3E02
+;	0x026b, "STARRING@", 		0x2f, 0x8f, 0x2f, 0x80,		; @3E02
 ;	P   0x0168, "&DDDDDDD&", 		0x2f, 0x83, 0x2f, 0x80,		; @3E02
-	0x030c, "MS@PAC;MEN", 	0x2f, 0x8f, 0x2f, 0x80,		; @3E11
+;	0x030c, "MS@PAC;MEN", 	0x2f, 0x8f, 0x2f, 0x80,		; @3E11
 ;	P   0x02cb, ";EEEEEEEE;", 	0x2f, 0x85, 0x2f, 0x80,		; @3E11
-	0x026b, "@@@@@@@@@", 		0x2f, 0x85, 0x2f, 0x80,		; @3E21
+;	0x026b, "@@@@@@@@@", 		0x2f, 0x85, 0x2f, 0x80,		; @3E21
 ;	P   0x016b, "&FFFFFFF&", 		0x2f, 0x85, 0x2f, 0x80,		; @3E21
-	0x026b, "ACT@III&@@", 	0x2f, 0x87, 0x2f, 0x80,		; @3E30
+;	0x026b, "ACT@III&@@", 	0x2f, 0x87, 0x2f, 0x80,		; @3E30
 ;	P   0x02ce, ";GGGGGGGG;", 	0x2f, 0x87, 0x2f, 0x80,		; @3E30
-	0x026b, "THEY@MEET", 		0x2f, 0x8f, 0x2f, 0x80,		; @3E40
+;	0x026b, "THEY@MEET", 		0x2f, 0x8f, 0x2f, 0x80,		; @3E40
 ;	P   0x016e, "&HHHHHHH&", 		0x2f, 0x87, 0x2f, 0x80,		; @3E40
-	0x030c, "OTTOMEN", 		0x2f, 0x8f, 0x2f, 0x80,		; @3E4F
+;	0x030c, "OTTOMEN", 		0x2f, 0x8f, 0x2f, 0x80,		; @3E4F
 ;	P   0x030c, "PAC;MAN", 		0x2f, 0x8f, 0x2f, 0x80,		; @3E4F
 
 	    ;; new code for ms-pacman.  used during demo mode, when there are no credits
@@ -11496,6 +11624,8 @@ j_3e5c:
 
 ; arrive here from #3E67 when sub# == 2
 
+	; ;; gap-fill from golden boots $3E8A-$3E8A
+	db	#C9		; @3E8A
 	rst     #28		; @3E8B EF  insert task to display text "MS Pac Man"
 	db	#1C,#0C	; @3E8C 1C0C
 
@@ -11514,7 +11644,9 @@ j_3e5c:
 
 	rst     #28		; @3EA2 EF  insert task to display text "       " [clears "with"]
 	db	#1C,#30	; @3EA3 1C30
-	rst     #28		; @3EA4 EF  insert task to display text "Pinky"
+;	rst     #28		; @3EA4 EF  insert task to display text "Pinky"
+	; ;; gap-fill from golden boots $3EA5-$3EA5
+	db	#EF		; @3EA5
 	db	#1C,#0F	; @3EA6 1C0F
 	jp      j_058e		; @3EA8 C38E05
 
@@ -11532,8 +11664,10 @@ j_3e5c:
 
 	rst     #28		; @3EBD EF  insert task to display text "with"
 	db	#1C,#0E	; @3EBE 1C0E
-	jp      j_058e		; @3EBF C38E05
+;	jp      j_058e		; @3EBF C38E05
 
+	; ;; gap-fill from golden boots $3EC0-$3EC2
+	db	#C3,#8E,#05		; @3EC0
 	rst     #28		; @3EC3 EF  insert task to display text "starring"
 	db	#1C,#10	; @3EC4 1C10
 	jp      j_058e		; @3EC6 C38E05
@@ -11625,7 +11759,7 @@ j_3f21:
 	ld      (hl),#83		; @3F7C 3683  BUG.  Spot stays red.  SHOULD BE #85, not #83, to color spot white
 
 ; BUGFIX04 - Marquee left side animation fix - Don Hodges
-	db	#36,#85	; @3F7C 3685
+;	db	#36,#85	; @3F7C 3685
 
 
 	ret		; @3F7E C9  return
@@ -11674,6 +11808,13 @@ j_3f21:
 
 ; - OVERLAY - 0x2418
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Pad through 4000-7FFF (RAM/IO hole), then aux/high ROM
+	ds	#8000 - $
+	org	#8000
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 	ret		; @8000 C9
 	ld      hl,#4000		; @8001 210040
 	call    j_946a		; @8004 CD6A94
@@ -11700,7 +11841,9 @@ j_3f21:
 
 ; - OVERLAY - 0x1008
 
-	--d24d    ld      (fruit_pos_lo),hl		; @8010
+;	--d24d    ld      (fruit_pos_lo),hl		; @8010
+	; ;; gap-fill from golden boots $8010-$8011
+	db	#D2,#4D		; @8010
 	ret		; @8012 C9
 	jp      j_3678		; @8013 C37836
 	db	#3A,#00	; @8016 3A00
@@ -11723,12 +11866,16 @@ j_3f21:
 
 ; - OVERLAY - 0x2800
 
+	; ;; gap-fill from golden boots $8027-$8027
+	db	#22		; @8027
 	ld      hl,(orange_tile_y)		; @8028 2A104D
 	call    j_955e		; @802B CD5E95
 ;	1140--    ld      de,#--40		; @802E
 
 ; - unused -
 
+	; ;; gap-fill from golden boots $802E-$802F
+	db	#11,#40		; @802E
 	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @8030 FFFFFFFFFFFFFFFF
 	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @8038 FFFFFFFFFFFFFFFF
 	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @8040 FFFFFFFFFFFFFFFF
@@ -11736,6 +11883,8 @@ j_3f21:
 ; - OVERLAY - 0x3148
 
 ;	----4e    ld hl,CH3_E_NUM		; @8048
+	; ;; gap-fill from golden boots $8048-$8048
+	db	#4E		; @8048
 	ld      (hl),#00		; @8049 3600
 	ld      a,#3e		; @804B 3E3E
 	ld      de,#0159		; @804D 115901
@@ -11744,10 +11893,12 @@ j_3f21:
 
 	ld      a,(red_dir)		; @8050 3A2C4D
 	call    j_9561		; @8053 CD6195
-	cd66--    call    #--66		; @8056
+;	cd66--    call    #--66		; @8056
 
 ; - OVERLAY - 0x2448
 
+	; ;; gap-fill from golden boots $8056-$8057
+	db	#CD,#66		; @8056
 	ld      hl,#4000		; @8058 210040
 	jp      j_947c		; @805B C37C94
 	ld      c,(hl)		; @805E 4E
@@ -11762,41 +11913,55 @@ j_3f21:
 
 ; - OVERLAY - 0x2488
 
-	--0040    ld      hl,#4000		; @8080
+;	--0040    ld      hl,#4000		; @8080
+	; ;; gap-fill from golden boots $8080-$8081
+	db	#00,#40		; @8080
 	jp      j_9481		; @8082 C38194
 	ld      c,(hl)		; @8085 4E
 	db	#FD,#21	; @8086 FD21
 
 ; - OVERLAY - 0x1688
 
-	--360d1e  ld      (ix+#0d),#1e		; @8088
-	ret		; @808A C9
+;	--360d1e  ld      (ix+#0d),#1e		; @8088
+	; ;; gap-fill from golden boots $8088-$8089
+	db	#36,#0D,#1E,#C9		; @8088 360D1EC9  overlay stub (listing: ld (ix+#0d),#1e / ret)
+;	ret		; @808A C9
+	; ;; gap-fill from golden boots $808B-$808B
+;	db	#C9		; @808B
 	jp      j_869c		; @808C C39C86
 	ret		; @808F C9
 
 ; - OVERLAY - 0x274a
 
 ;	----4d    ld      a,(red_dir)		; @2748
+	; ;; gap-fill from golden boots $8090-$8090
+	db	#4D		; @8090
 	call    j_9561		; @8091 CD6195
 	call    j_2966		; @8094 CD6629
-	---	ld      ...		; @8097 22
+;	---	ld      ...		; @8097 22
 
 ; - OVERLAY - 0x1288
 
+	; ;; gap-fill from golden boots $8097-$8097
+	db	#22		; @8097
 	ld      (killed_ghost_anim),a		; @8098 32D14D
 	ld hl,CH2_E_NUM		; @809B 21AC4E
 	set  6,(hl)		; @809E CBF6
 
 ; - OVERLAY - 0x2298
 
-	--084e    ld      a,(cutscene3_state)		; @80A0
+;	--084e    ld      a,(cutscene3_state)		; @80A0
+	; ;; gap-fill from golden boots $80A0-$80A1
+	db	#08,#4E		; @80A0
 	jp      j_3469		; @80A2 C36934
 	cp      (hl)		; @80A5 BE
-	ld	...		; @80A6 220C
+;	ld	...		; @80A6 220C
 
 ; - OVERLAY - 0x19a8
 
-	--084d    ld      hl,(pac_y)		; @80A8
+;	--084d    ld      hl,(pac_y)		; @80A8
+	; ;; gap-fill from golden boots $80A6-$80A9
+	db	#22,#0C,#08,#4D		; @80A6
 	ld      de,#8094		; @80AA 119480
 	jp      j_8818		; @80AD C31888
 
@@ -11815,52 +11980,68 @@ j_3f21:
 ; - OVERLAY - 0x16d8
 
 ;	----4d    ld      a,(pac_x)		; @80C8
+	; ;; gap-fill from golden boots $80C8-$80C8
+	db	#4D		; @80C8
 	jp      j_86c5		; @80C9 C3C586
-	ret		; @80CC C9
-	jr      c, +#08		; @80CD 3808
-	--      ld      e,#--		; @80CF 1E
+	db	#C9,#38,#08,#1E,#D2		; @80CC C938081ED2  overlay stub
+;	jr      c, +#08		; @80CD 3808
+;	--      ld      e,#--		; @80CF 1E
 
 ; - OVERLAY - 0x2bc0
 
-	--d2      jr      #2c93		; @80D0
+;	--d2      jr      #2c93		; @80D0
+	; ;; gap-fill from golden boots $80CF-$80D0
+;	db	#1E,#D2		; @80CF
 	jp      j_9797		; @80D1 C39797
 	ld ix,CH1_W_NUM		; @80D4 DD21CC4E
 
 ; - OVERLAY - 0x0bd0
 
 ;	----0907  ld      (ix+#09),#07		; @80D8
+	; ;; gap-fill from golden boots $80D8-$80D9
+	db	#09,#07		; @80D8
 	dec     (iy+#00)		; @80DA FD3500
 	ret		; @80DD C9
 	ld      b,#19		; @80DE 0619
 
 ; - OVERLAY - 0x2cd8
 
-	--914e    ld      (CH1_VOL),a		; @80E0
+;	--914e    ld      (CH1_VOL),a		; @80E0
+	; ;; gap-fill from golden boots $80E0-$80E1
+	db	#91,#4E		; @80E0
 	ld hl,SONG_TABLE_2		; @80E2 217D96
-	dd21dc--  ld      ix,#E3DC		; @80E5
+;	dd21dc--  ld      ix,#E3DC		; @80E5
 
 ; - OVERLAY - 0x23e0
 
 ;	----e3    jp      pe,e32b		; @80E5
+	; ;; gap-fill from golden boots $80E5-$80E8
+	db	#DD,#21,#DC,#E3		; @80E5
 	sub     l		; @80E9 95
 	and     c		; @80EA A1
 	dec     hl		; @80EB 2B
 	ld      (hl),l		; @80EC 75
 	ld      h,#B2		; @80ED 26B2
-	--      ld      h,#--		; @80EF 26
+;	--      ld      h,#--		; @80EF 26
 
 ; - unused -
+	; ;; gap-fill from golden boots $80EF-$80EF
+	db	#26		; @80EF
 	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @80F0 FFFFFFFFFFFFFFFF
 	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @80F8 FFFFFFFFFFFFFFFF
 
 ; - OVERLAY - 0x2b20  (scoring table)
-	--08		; @8100
+;	--08		; @8100
+	; ;; gap-fill from golden boots $8100-$8100
+	db	#08		; @8100
 	db	#00,#16	; @8101 0016
 	db	#00,#01	; @8103 0001
 	db	#00,#02	; @8105 0002
-	--		; @8107 00
+;	--		; @8107 00
 
 ; - unused -
+	; ;; gap-fill from golden boots $8107-$8107
+	db	#00		; @8107
 	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @8108 FFFFFFFFFFFFFFFF
 
 ; - OVERLAY - 0x2B30 (scoring table)
@@ -11872,19 +12053,27 @@ j_3f21:
 	ld      l,e		; @8114 6B
 	ld      h,d		; @8115 62
 	dec     de		; @8116 1B
-	--		; @8117 CB
+;	--		; @8117 CB
 
 ; - OVERLAY - 0x0a30
 
+	; ;; gap-fill from golden boots $8117-$8117
+	db	#CB		; @8117
 	ld      (CH3_E_NUM),a		; @8118 32BC4E
-	jr      #.+06		; @811B 1806
+;	jr      #.+06		; @811B 1806
+	; ;; gap-fill from golden boots $811B-$811C
+	db	#18,#06		; @811B
 	ld      (CH1_W_NUM),a		; @811D 32CC4E
 
 ; - OVERLAY - 0x0c20
 
 ;	----44    ld      hl,#4464		; @8120
+	; ;; gap-fill from golden boots $8120-$8120
+	db	#44		; @8120
 	jp      j_9524		; @8121 C32495
-	jr      nz,#.+02		; @8124 2002
+;	jr      nz,#.+02		; @8124 2002
+	; ;; gap-fill from golden boots $8124-$8125
+	db	#20,#02		; @8124
 	ld      a,#00		; @8126 3E00
 
 ; - unused -
@@ -11895,15 +12084,21 @@ j_3f21:
 
 ; - OVERLAY - 0x2470
 
-	--344e    ld hl,power_pill_data		; @8140
+;	--344e    ld hl,power_pill_data		; @8140
+	; ;; gap-fill from golden boots $8140-$8141
+	db	#34,#4E		; @8140
 	jp      j_94ec		; @8142 C3EC94
 	ldi		; @8145 EDA0
 ;	----    ld      de,#6fc3		; @8147 11
 
 ; - OVERLAY - 0x2060
 
+	; ;; gap-fill from golden boots $8147-$8147
+	db	#11		; @8147
 	jp      j_366f		; @8148 C36F36
-	nop		; @2063 00
+;	nop		; @2063 00
+	; ;; gap-fill from golden boots $814B-$814B
+	db	#00		; @814B
 	ld      (bc),a		; @814C 02
 	ret		; @814D C9
 	xor     a		; @814E AF
@@ -11912,17 +12107,23 @@ j_3f21:
 ; - unused - 
 
 	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @8150 FFFFFFFFFFFFFFFF
-	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @8159 FFFFFFFFFFFFFFFF
+	; ;; gap-fill from golden boots $8158-$8158
+	db	#FF		; @8158
+	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#73		; @8159 FFFFFFFFFFFFFFFF
 
 ; - OVERLAY - 0x2d60
 
-	--7302    ld      (ix+#02),e		; @8160
+;	--7302    ld      (ix+#02),e		; @8160
+	; ;; gap-fill from golden boots $8161-$8161
+	db	#02		; @8161
 	jp      j_364e		; @8162 C34E36
 	inc     c		; @8165 0C
-	dd35--    dec     (ix-#59)		; @8166
+;	dd35--    dec     (ix-#59)		; @8166
 
 ; - OVERLAY - 0x0e58
 
+	; ;; gap-fill from golden boots $8166-$8167
+	db	#DD,#35		; @8166
 	and     a		; @8168 A7
 	sbc     hl,de		; @8169 ED52
 	ret     nz		; @816B C0
@@ -11933,19 +12134,26 @@ j_3f21:
 
 ; - unused -
 
+	; ;; gap-fill from golden boots $816F-$816F
+	db	#32		; @816F
 	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @8170 FFFFFFFFFFFFFFFF
 	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @8178 FFFFFFFFFFFFFFFF
 
 ; - OVERLAY - 0x24b0
 
-	--e5      jr      nz,#2496		; @8180  (-27)
+;	--e5      jr      nz,#2496		; @8180  (-27)
+	; ;; gap-fill from golden boots $8180-$8180
+	db	#E5		; @8180
 	ld      hl,#4064		; @8181 216440
 	jp      j_9504		; @8184 C30495
-	--      ldi		; @8187 ED
+;	--      ldi		; @8187 ED
 
 ; - OVERLAY - 0x16b0
 
-	ret		; @8187 C9
+	db	#ED		; @8187 ED  ldi (overlay stub; listing mangled)
+	ret		; @8188 C9
+	; ;; gap-fill from golden boots $8188-$8188
+;	db	#C9		; @8188
 	jp      j_86b1		; @8189 C3B186
 	ret		; @818C C9
 	rlca		; @818D 07
@@ -11959,6 +12167,8 @@ j_3f21:
 
 ; - OVERLAY - 0x0ea8
 
+	; ;; gap-fill from golden boots $8196-$8197
+	db	#11,#40		; @8196
 	and     (hl)		; @8198 A6
 	set     0,a		; @8199 CBC7
 	ld      (hl),a		; @819B 77
@@ -11968,47 +12178,61 @@ j_3f21:
 ; - OVERLAY - 0x21a0
 
 ;	----4e    ld      a,(cutscene2_state)		; @81A0
+	; ;; gap-fill from golden boots $81A0-$81A0
+	db	#4E		; @81A0
 	jp      j_344f		; @81A1 C34F34
 	ld      b,c		; @81A4 41
 	rst     #20		; @81A5 E7
-	c221--    jp      nz,#--21		; @81A6
+;	c221--    jp      nz,#--21		; @81A6
 
 ; - OVERLAY - 0x19b8
 
+	; ;; gap-fill from golden boots $81A6-$81A7
+	db	#C2,#21		; @81A6
 	call    j_1000		; @81A8 CD0010
-	jr      j_19c4		; @81AB 1807
+	db	#18,#07		; @81AB 1807  jr $+9 (was jr j_19c4; out of JR range)
 	inc     e		; @81AD 1C
-	cd42--    call    #0042		; @81AE
+;	cd42--    call    #0042		; @81AE
 
 ; - unused -
 
+	; ;; gap-fill from golden boots $81AE-$81AF
+	db	#CD,#42		; @81AE
 	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @81B0 FFFFFFFFFFFFFFFF
 	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @81B8 FFFFFFFFFFFFFFFF
 
 ; - OVERLAY - 0x24f8
 
-	--1a      ld      a,#1a		; @81C0
+;	--1a      ld      a,#1a		; @81C0
+	; ;; gap-fill from golden boots $81C0-$81C0
+	db	#1A		; @81C0
 	jp      j_95c3		; @81C1 C3C395
 	ld      b,#06		; @81C4 0606
-	dd21----  ld ix,pac_y		; @81C6
+;	dd21----  ld ix,pac_y		; @81C6
 
 ; - OVERLAY - 0x16f8
 
-	--084d    ld      a,(pac_y)		; @81C6
+;	--084d    ld      a,(pac_y)		; @81C6
+	; ;; gap-fill from golden boots $81C6-$81C9
+	db	#DD,#21,#08,#4D		; @81C6
 	jp      j_86d9		; @81CA C3D986
 	ret		; @81CD C9
-	jr      c,#.+5		; @81CE 3805
+;	jr      c,#.+5		; @81CE 3805
 
 ; - OVERLAY - 0x2bf0
 
+	; ;; gap-fill from golden boots $81CE-$81CF
+	db	#38,#05		; @81CE
 	ld      a,(level_number)		; @81D0 3A134E
 	inc     a		; @81D3 3C
 	jp      j_8793		; @81D4 C39387
-	--      ld      l,#4e		; @81D7 2E  junk
+;	--      ld      l,#4e		; @81D7 2E  junk
 
 ; - OVERLAY - 0x08e0
 
 ;	----4e    ld      a,(dots_eaten)		; @81D8
+	; ;; gap-fill from golden boots $81D7-$81D8
+	db	#2E,#4E		; @81D7
 	jp      j_94a1		; @81D9 C3A194
 	nop		; @81DC 00
 	ld hl,level_state		; @81DD 21044E
@@ -12017,10 +12241,12 @@ j_3f21:
 
 	ld      (CH2_VOL),a		; @81E0 32964E
 	ld hl,SONG_TABLE_3		; @81E3 218D96
-	dd21----  ld      ix,#FFFF		; @81E6
+;	dd21----  ld      ix,#FFFF		; @81E6
 
 ; - unused -
 
+	; ;; gap-fill from golden boots $81E6-$81E7
+	db	#DD,#21		; @81E6
 	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF	; @81E8 FFFFFFFFFFFFFFFF
 
 ; lookup table.  used in #361F for sprite movement
@@ -12114,6 +12340,8 @@ j_3f21:
 	db	#F3,#75,#86	; @8254 F37586  SETCHAR	#8675	; ACT sign
 	db	#F2,#01	; @8257 F201  SETN		01
 	db	#F0,#00,#00	; @8259 F00000  LOOP		00 00
+	; ;; gap-fill from golden boots $825C-$825C
+	db	#16		; @825C
 	db	#F1,#BD,#52	; @825D F1BD52  SETPOS	BD 52
 	db	#F2,#28	; @8260 F228  SETN		28
 	db	#F6	; @8262 F6  PAUSE
@@ -12342,9 +12570,9 @@ j_3f21:
 	db	#F2,#10	; @83E6 F210  SETN( 10 )
 	db	#F6	; @83E8 F6  PAUSE
 	db	#F2,#24	; @83E9 F224  SETN( 24 )
-	  SPEED?
+;	  SPEED?
 	db	#F0,#90,#00,#09	; @83EB F0900009  LOOP( 90 0 09)
-          XX YY CC
+;          XX YY CC
 	db	#FF	; @83EF FF  end code
 
 ; data for 2nd intermission, part 2
@@ -12367,6 +12595,8 @@ j_3f21:
 	db	#F6	; @840D F6
 	db	#F1,#00,#94	; @840E F10094
 	db	#F3,#1D,#86	; @8411 F31D86  #861D 8414:  F2 58
+	; ;; gap-fill from golden boots $8414-$8415
+	db	#F2,#58		; @8414
 	db	#F0,#30,#00,#09	; @8416 F0300009
 	db	#F2,#7F	; @841A F27F
 	db	#F6	; @841C F6
@@ -12617,7 +12847,9 @@ j_3f21:
 	db	#F1,#00,#94	; @8604 F10094
 	db	#F3,#41,#86	; @8607 F34186  #8641
 	db	#F2,#72	; @860A F272
-	db	#F0,#10,#00,#09	; @850C F0100009
+;	db	#F0,#10,#00,#09	; @850C F0100009
+	; ;; gap-fill from golden boots $860C-$860F
+	db	#F0,#10,#00,#09		; @860C
 	db	#F2,#7F,#F6	; @8610 F27FF6
 	db	#FF	; @8613 FF  end code
 
@@ -12806,7 +13038,7 @@ j_8747:
 
 	ld hl,fruit2_released		; @8752 210D4E  yes, load HL with #4E0D for 2nd fruit
 	jp	j_875b		; @8755 C35B87  skip ahead
-(
+;(
 j_8758:
 	ld hl,fruit1_released		; @8758 210C4E  load HL with 4E0C for first fruit
 
@@ -13288,7 +13520,7 @@ j_883d:
 ; data table used for drawing slow down tunnels on level 3
 
 	db	#42,#16,#0A,#16,#0A,#16,#0A,#20	; @8E28 42160A160A160A20
-	db	#30,#20,#20,#DE,#E0,#22,#20,#20,#20,#20,#16,#0A,#16,#16,#00,#00	; @8E30 302020DEE02220202020160A16160000
+	db	#20,#20,#DE,#E0,#22,#20,#20,#20,#20,#16,#0A,#16,#0A,#16,#00,#00		; @8E30 302020DEE02220202020160A16160000
 
 
 	;; entrance fruit paths for maze 2:  #8E40-8E72
@@ -13404,6 +13636,8 @@ j_883d:
 
 	;; exit fruit paths for maze 3
 
+	; ;; gap-fill from golden boots $9140-$9141
+	db	#BF,#AA		; @9140
 	db	#56,#91	; @9142 5691  #9156
 	db	#22,#00,#00	; @9144 220000
 	db	#5F,#91	; @9147 5F91  #915F
@@ -13560,13 +13794,17 @@ j_9484:
 	; Pellet map lookup table
 
 	db	#3B,#8A	; @9499 3B8A  #8A3B	; pellets for maze 1
-	db	#27,#8D	; @949C 278D  #8D27	; pellets for maze 2
-	db	#18,#90	; @949D 1890  #9018	; pellets for maze 3
+	; ;; gap-fill from golden boots $949B-$949B
+	db	#27		; @949B
+	db	#8D,#18		; @949C 278D  #8D27	; pellets for maze 2
+;	db	#18,#90	; @949D 1890  #9018	; pellets for maze 3
+	; ;; gap-fill from golden boots $949E-$949E
+	db	#90		; @949E
 	db	#EC,#92	; @949F EC92  #92EC	; pellets for maze 4
 
 	;; check the number of pellets to see if the board is cleared
 
-	push    bc		; @94A0 C5  junk ?
+;	push    bc		; @94A0 C5  junk ?
 
 j_94a1:
 	push 	bc		; @94A1 C5  save BC
@@ -13584,7 +13822,9 @@ j_94a1:
 
 	db	#2C,#8B	; @94B5 2C8B  #8B2C holds number of pellets for maze 1
 	db	#17,#8E	; @94B7 178E  #8E17 holds number of pellets for maze 2
-	db	#09,#91	; @94B8 0991  #9109 holds number of pellets for maze 3
+;	db	#09,#91	; @94B8 0991  #9109 holds number of pellets for maze 3
+	; ;; gap-fill from golden boots $94B9-$94BA
+	db	#09,#91		; @94B9
 	db	#F9,#93	; @94BB F993  #93F9 holds number of pellets for maze 4
 
 ; Used to determine which maze to draw and other things
@@ -14011,13 +14251,13 @@ j_9654:
 	db	#6B,#71,#6A,#88,#8B,#6A,#6B,#71,#6A,#6B,#71,#73,#75,#96,#95,#96	; @96A5 6B716A888B6A6B716A6B717375969596
 	db	#FF	; @96B5 FF
 
-.org 0x9695
-.byte 0xf1, 0x00, 0xf2, 0x02, 0xf3, 0x0a, 0xf4, 0x00
-.byte 0x41, 0x43, 0x45
-.byte 0x86, 0x8a, 0x88, 0x8b
-.byte 0x6a, 0x6b, 0x71, 0x6a, 0x88, 0x8b
-.byte 0x6a, 0x6b, 0x71, 0x6a, 0x6b, 0x71, 0x73, 0x75
-.byte 0x96, 0x95, 0x96, 0xff
+;.org 0x9695
+;	db	#F1,#00,#F2,#02,#F3,#0A,#F4,#00
+;	db	#41,#43,#45
+;	db	#86,#8A,#88,#8B
+;	db	#6A,#6B,#71,#6A,#88,#8B
+;	db	#6A,#6B,#71,#6A,#6B,#71,#73,#75
+;	db	#96,#95,#96,#FF
 
 
 ; startup song
@@ -14111,6 +14351,10 @@ j_97be:
 	;; unknown / unused
 	; this seems to be a copy of the code from #8800-8840
 
+	; ;; gap-fill from golden boots $97D0-$97FF
+	db	#47,#45,#4E,#45,#52,#41,#4C,#20,#43,#4F,#4D,#50,#55,#54,#45,#52		; @97D0
+	db	#20,#20,#43,#4F,#52,#50,#4F,#52,#41,#54,#49,#4F,#4E,#20,#20,#20		; @97E0
+	db	#48,#65,#6C,#6C,#6F,#2C,#20,#4E,#61,#6B,#61,#6D,#75,#72,#61,#21		; @97F0
 	add  a,d		; @9800 82
 	adc  a,e		; @9801 8B
 	ld   (hl),e		; @9802 73
@@ -14154,127 +14398,252 @@ j_983d:
 	jp   j_19cd		; @983E C3CD19
 
 	
-	................		; @9841 FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-	................		; @9850 FFFFFF0000FFFF000000000100000001
-	................		; @9860 000000FFFE000000FF0000FFFE000000
-	................		; @9870 FF000000FF000000FF000001FF01FF00
-	................		; @9880 0000000000FF00000000010000FF0000
-	................		; @9890 00000100000001000000010000010101
-	................		; @98A0 01000001000100010001000100010001
-	................		; @98B0 000100010001000100FFFFFFFF0000FF
-	.@..............		; @98C0 FF40FCD0D2D2D2D2D4FCDA02DCFCFCFC
-	................		; @98D0 FCFCFCDA02DCFCFCFCD0D2D2D2D2D2D2
-	................		; @98E0 D2D4FCDA05DCFCDA02DCFCFCFCFCFCFC
-	................		; @98F0 DA02DCFCFCFCDA08DCFCDA02E6EA02E7
-	................		; @9900 D2EB02E7D2D2D2D2D2D2EB02E7D2D2D2
-	................		; @9910 EB02E6E8E8E8EA02DCFCDA02DEE415DE
-	................		; @9920 C0C0C0E402DCFCDA02DEE402E6E8E8E8
-	................		; @9930 E8EA02E6E8E8E8EA02E6EA02E6EA02DE
-	................		; @9940 C0C0C0E402DCFCDA02E7EB02E7E9E9E9
-	................		; @9950 F5E402DEF3E9E9EB02DEE402DEE402E7
-	................		; @9960 E9E9E9EB02DCFCDA09DEE402DEE405DE
-	................		; @9970 E402DEE408DCFCFAE8E8EA02E6E8EA02
-	................		; @9980 DEE402DEE402E6E8E8F4E402DEE402E6
-	................		; @9990 E8E8E8EA02DCFCFBE9E9EB02DEC0E402
-	................		; @99A0 E7EB02E7EB02E7E9E9F5E402E7EB02DE
-	................		; @99B0 F3E9E9EB02DCFCDA05DEC0E40BDEE405
-	................		; @99C0 DEE405DCFCDA02E6EA02DEC0E402E6EA
-	................		; @99D0 02ECD3D3D3EE02DEE402E6EA02DEE402
-	................		; @99E0 E6EA02DCFCDA02DEE402E7E9EB02DEE4
-	................		; @99F0 02DCFCFCFCDA02E7EB02DEE402E7EB02
-	................		; @9A00 DEE402DCFCDA02DEE406DEE402F0FCFC
-	................		; @9A10 FCDA05DEE405DEE402DCFCDA02DEE402
-	................		; @9A20 E6E8E8E8F4E402CEFCFCFCDA02E6E8E8
-	...........b....		; @9A30 F4E402E6E8E8F4E402DC006202011301
-	................		; @9A40 01010201040313060403010101010101
-	................		; @9A50 01010101010101010101010101060403
-	................		; @9A60 10030604031003060401010101010101
-	................		; @9A70 0C0301010101010107040C030607040C
-	................		; @9A80 030604010101040C0101010301010104
-	................		; @9A90 03040F03030403040F03030403010101
-	................		; @9AA0 010F0101010304031904031904030101
-	................		; @9AB0 01010F010101030403040F0303040304
-	................		; @9AC0 0F030304010101040C01010103010101
-	................		; @9AD0 07040C030607040C0306040101010101
-	................		; @9AE0 01010C03010101010101040310030604
-	................		; @9AF0 03100306040301010101010101010101
-	................		; @9B00 01010101010101010106040313060402
-	................		; @9B10 01130101010201000000000000000000
-	..............".		; @9B20 000000000000000000000000E01D221D
-	9@ @;c@|@.C.CI..		; @9B30 394020403B63407C4083439C43490917
-	.......).......c		; @9B40 0917090EE0E0E0290917091709000063
-	....h."..q.'L.{.		; @9B50 8B13940C688B2294F4718B274CF47B8B
-	.L........TUUU._		; @9B60 1C4C0C80AAAABFAA800A54555555FF5F
-	U..WU.W..@U.....		; @9B70 55EAFF5755F557FF154055EAAF02EAFF
-	................		; @9B80 FFAA948B140000998B1700009F8B1A00
-	....U@UU........		; @9B90 00A68B1D55405555BFAA80AAAABFAAAA
-	......U...UU..@.		; @9BA0 80AA0280AAAA550000005555FDAA40FC
-	................		; @9BB0 DA02DED8D2D2D2D2D2D2D2D6D8D2D2D2
-	................		; @9BC0 D2D4FCFCFCFCDA02DED8D2D2D2D2D4FC
-	................		; @9BD0 DA02DEE408DEE405DCFCFCFCFCDA02DE
-	................		; @9BE0 E405DCFCDA02DEE402E6E8E8E8EA02DE
-	................		; @9BF0 E402E6EA02E7D2D2D2D2EB02E7EB02E6
-	................		; @9C00 EA02DCFCDA02DEE402DEF3E9E9EB02DE
-	................		; @9C10 E402DEE40CDEE402DCFCDA02DEE402DE
-	................		; @9C20 E405DEE402DEF2E8E8E8EA02E6EA02E6
-	................		; @9C30 E8E8F4E402DCFCDA02E7EB02DEE402E6
-	................		; @9C40 EA02E7EB02E7E9E9E9E9EB02DEE402E7
-	................		; @9C50 E9E9E9EB02DCFCDA05DEE402DEE40CDE
-	................		; @9C60 E408DCFCFAE8E8EA02DEE402DEF2E8E8
-	................		; @9C70 E8E8EA02E6E8E8EA02DEF2E8E8EA02E6
-	................		; @9C80 EA02DCFCFBE9E9EB02E7EB02E7E9E9E9
-	................		; @9C90 E9E9EB02E7E9F5E402DEF3E9E9EB02DE
-	................		; @9CA0 E402DCFCDA12DEE402DEE405DEE402DC
-	................		; @9CB0 FCDA02E6EA02E6E8E8E8E8EA02ECD3D3
-	................		; @9CC0 D3EE02E7EB02E7EB02E6EA02DEE402DC
-	................		; @9CD0 FCDA02DEE402E7E9E9E9F5E402DCFCFC
-	................		; @9CE0 FCDA08DEE402E7EB02DCFCDA02DEE406
-	................		; @9CF0 DEE402F0FCFCFCDA02E6E8E8E8EA02DE
-	................		; @9D00 E405DCFCDA02DEF2E8E8E8EA02DEE402
-	................		; @9D10 CEFCFCFCDA02DEC0C0C0E402DEF2E8E8
-	.......f........		; @9D20 EA02DC00000000660101010101030101
-	................		; @9D30 010B0101070603030A03070603030101
-	................		; @9D40 01010101010101010307030101010307
-	................		; @9D50 03060703030307030607030301010101
-	................		; @9D60 0101010101010301010101010107030D
-	................		; @9D70 060307030D0603040101010101010D03
-	................		; @9D80 01010103040310030303040310010101
-	................		; @9D90 03030403010101011201010104071504
-	................		; @9DA0 07150403010101011201010104031001
-	................		; @9DB0 01010303040310030303040101010101
-	................		; @9DC0 010D030101010307030D060307030D06
-	................		; @9DD0 03070303010101010101010101010301
-	................		; @9DE0 01010101010703030307030607030101
-	................		; @9DF0 01030703060706030301010101010101
-	................		; @9E00 01010103070603030A03080101010101
-	.........".9@ @;		; @9E10 030101010B0101F41D221D394020403B
-	e@{@.C.CB......		; @9E20 65407B4085439B4342160A160A160A20
-	.."    .......		; @9E30 2020DEE02220202020160A160A160000
-	T....Y....a.&..k		; @9E40 548E13C40C598E1EC4F4618E2614F46B
-	........*.@UU.P		; @9E50 8E1D140C02AAAA802A0240557F551550
-	...WU..WU......		; @9E60 05EAFF5755F5FF577F5505EAFFFFFFEA
-	...............!		; @9E70 AFAA02878E1200008C8E1D0000948E21
-	....,..UU.....*		; @9E80 00009D8E2C0000557F55D5FFAABFAA2A
-	.....*.......U..		; @9E90 A0EAFFFFAA2AA0020000A0AA025515A0
-	*.T...U.@.......		; @9EA0 2A005405000055FD40FCD0D2D2D2D2D2
-	................		; @9EB0 D2D6E402E7D2D2D2D2D2D2D2D2D2D2D6
-	................		; @9EC0 D8D2D2D2D2D2D2D2D4FCDA07DEE40DDE
-	................		; @9ED0 E408DCFCDA02E6E8E8EA02DEE402E6E8
-	................		; @9EE0 E8EA02E6E8E8E8EA02E7EB02E6EA02E6
-	................		; @9EF0 EA02DCFCDA02DEF3E9EB02E7EB02E7E9
-	................		; @9F00 F5E402E7E9E9F5E405DEE402DEE402DC
-	................		; @9F10 FCDA02DEE409DEE405DEE402E6E8E8F4
-	................		; @9F20 E402DEE402DCFCDA02DEE402E6E8E8E8
-	................		; @9F30 E8EA02E7EB02E6EA02E7EB02E7E9E9E9
-	................		; @9F40 EB02E7EB02DCFCDA02DEE402E7E9E9E9
-	................		; @9F50 F5E405DEE40EDCFCDA02DEE406DEE402
-	................		; @9F60 E6E8E8F4E402E6E8E8E8EA02E6E8E8E8
-	................		; @9F70 E8E8F4FCDA02E7EB02E6E8EA02E7EB02
-	................		; @9F80 E7E9E9E9EB02DEF3E9E9EB02DEF3E9E9
-	................		; @9F90 E9E9F5FCDA05DEC0E40BDEE405DEE405
-	................		; @9FA0 DCFCFAE8E8EA02DEC0E402E6EA02ECD3
-	................		; @9FB0 D3D3EE02DEE402E6EA02DEE402E6EA02
-	................		; @9FC0 DCFCFBE9E9EB02E7E9EB02DEE402DCFC
-	................		; @9FD0 FCFCDA02E7EB02DEE402E7EB02DEE402
-	................		; @9FE0 DCFCDA09DEE402F0FCFCFCDA05DEE405
-	................		; @9FF0 DEE402DCFCDA02E6E8E8E8E8EA02DEE4
+;	................		; @9841 FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+;	................		; @9850 FFFFFF0000FFFF000000000100000001
+;	................		; @9860 000000FFFE000000FF0000FFFE000000
+;	................		; @9870 FF000000FF000000FF000001FF01FF00
+;	................		; @9880 0000000000FF00000000010000FF0000
+;	................		; @9890 00000100000001000000010000010101
+;	................		; @98A0 01000001000100010001000100010001
+;	................		; @98B0 000100010001000100FFFFFFFF0000FF
+;	.@..............		; @98C0 FF40FCD0D2D2D2D2D4FCDA02DCFCFCFC
+;	................		; @98D0 FCFCFCDA02DCFCFCFCD0D2D2D2D2D2D2
+;	................		; @98E0 D2D4FCDA05DCFCDA02DCFCFCFCFCFCFC
+;	................		; @98F0 DA02DCFCFCFCDA08DCFCDA02E6EA02E7
+;	................		; @9900 D2EB02E7D2D2D2D2D2D2EB02E7D2D2D2
+;	................		; @9910 EB02E6E8E8E8EA02DCFCDA02DEE415DE
+;	................		; @9920 C0C0C0E402DCFCDA02DEE402E6E8E8E8
+;	................		; @9930 E8EA02E6E8E8E8EA02E6EA02E6EA02DE
+;	................		; @9940 C0C0C0E402DCFCDA02E7EB02E7E9E9E9
+;	................		; @9950 F5E402DEF3E9E9EB02DEE402DEE402E7
+;	................		; @9960 E9E9E9EB02DCFCDA09DEE402DEE405DE
+;	................		; @9970 E402DEE408DCFCFAE8E8EA02E6E8EA02
+;	................		; @9980 DEE402DEE402E6E8E8F4E402DEE402E6
+;	................		; @9990 E8E8E8EA02DCFCFBE9E9EB02DEC0E402
+;	................		; @99A0 E7EB02E7EB02E7E9E9F5E402E7EB02DE
+;	................		; @99B0 F3E9E9EB02DCFCDA05DEC0E40BDEE405
+;	................		; @99C0 DEE405DCFCDA02E6EA02DEC0E402E6EA
+;	................		; @99D0 02ECD3D3D3EE02DEE402E6EA02DEE402
+;	................		; @99E0 E6EA02DCFCDA02DEE402E7E9EB02DEE4
+;	................		; @99F0 02DCFCFCFCDA02E7EB02DEE402E7EB02
+;	................		; @9A00 DEE402DCFCDA02DEE406DEE402F0FCFC
+;	................		; @9A10 FCDA05DEE405DEE402DCFCDA02DEE402
+;	................		; @9A20 E6E8E8E8F4E402CEFCFCFCDA02E6E8E8
+;	...........b....		; @9A30 F4E402E6E8E8F4E402DC006202011301
+;	................		; @9A40 01010201040313060403010101010101
+;	................		; @9A50 01010101010101010101010101060403
+;	................		; @9A60 10030604031003060401010101010101
+;	................		; @9A70 0C0301010101010107040C030607040C
+;	................		; @9A80 030604010101040C0101010301010104
+;	................		; @9A90 03040F03030403040F03030403010101
+;	................		; @9AA0 010F0101010304031904031904030101
+;	................		; @9AB0 01010F010101030403040F0303040304
+;	................		; @9AC0 0F030304010101040C01010103010101
+;	................		; @9AD0 07040C030607040C0306040101010101
+;	................		; @9AE0 01010C03010101010101040310030604
+;	................		; @9AF0 03100306040301010101010101010101
+;	................		; @9B00 01010101010101010106040313060402
+;	................		; @9B10 01130101010201000000000000000000
+;	..............".		; @9B20 000000000000000000000000E01D221D
+	; ;; gap-fill from golden boots $9841-$9B2F
+	db	#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF,#FF		; @9841
+	db	#FF,#FF,#00,#00,#FF,#FF,#00,#00,#00,#00,#01,#00,#00,#00,#01,#00		; @9851
+	db	#00,#00,#FF,#FE,#00,#00,#00,#FF,#00,#00,#FF,#FE,#00,#00,#00,#FF		; @9861
+	db	#00,#00,#00,#FF,#00,#00,#00,#FF,#00,#00,#01,#FF,#01,#FF,#00,#00		; @9871
+	db	#00,#00,#00,#00,#FF,#00,#00,#00,#00,#01,#00,#00,#FF,#00,#00,#00		; @9881
+	db	#00,#01,#00,#00,#00,#01,#00,#00,#00,#01,#00,#00,#01,#01,#01,#01		; @9891
+	db	#00,#00,#01,#00,#01,#00,#01,#00,#01,#00,#01,#00,#01,#00,#01,#00		; @98A1
+	db	#01,#00,#01,#00,#01,#00,#01,#00,#FF,#FF,#FF,#FF,#00,#00,#FF,#FF		; @98B1
+	db	#40,#FC,#D0,#D2,#D2,#D2,#D2,#D4,#FC,#DA,#02,#DC,#FC,#FC,#FC,#FC		; @98C1
+	db	#FC,#FC,#DA,#02,#DC,#FC,#FC,#FC,#D0,#D2,#D2,#D2,#D2,#D2,#D2,#D2		; @98D1
+	db	#D4,#FC,#DA,#05,#DC,#FC,#DA,#02,#DC,#FC,#FC,#FC,#FC,#FC,#FC,#DA		; @98E1
+	db	#02,#DC,#FC,#FC,#FC,#DA,#08,#DC,#FC,#DA,#02,#E6,#EA,#02,#E7,#D2		; @98F1
+	db	#EB,#02,#E7,#D2,#D2,#D2,#D2,#D2,#D2,#EB,#02,#E7,#D2,#D2,#D2,#EB		; @9901
+	db	#02,#E6,#E8,#E8,#E8,#EA,#02,#DC,#FC,#DA,#02,#DE,#E4,#15,#DE,#C0		; @9911
+	db	#C0,#C0,#E4,#02,#DC,#FC,#DA,#02,#DE,#E4,#02,#E6,#E8,#E8,#E8,#E8		; @9921
+	db	#EA,#02,#E6,#E8,#E8,#E8,#EA,#02,#E6,#EA,#02,#E6,#EA,#02,#DE,#C0		; @9931
+	db	#C0,#C0,#E4,#02,#DC,#FC,#DA,#02,#E7,#EB,#02,#E7,#E9,#E9,#E9,#F5		; @9941
+	db	#E4,#02,#DE,#F3,#E9,#E9,#EB,#02,#DE,#E4,#02,#DE,#E4,#02,#E7,#E9		; @9951
+	db	#E9,#E9,#EB,#02,#DC,#FC,#DA,#09,#DE,#E4,#02,#DE,#E4,#05,#DE,#E4		; @9961
+	db	#02,#DE,#E4,#08,#DC,#FC,#FA,#E8,#E8,#EA,#02,#E6,#E8,#EA,#02,#DE		; @9971
+	db	#E4,#02,#DE,#E4,#02,#E6,#E8,#E8,#F4,#E4,#02,#DE,#E4,#02,#E6,#E8		; @9981
+	db	#E8,#E8,#EA,#02,#DC,#FC,#FB,#E9,#E9,#EB,#02,#DE,#C0,#E4,#02,#E7		; @9991
+	db	#EB,#02,#E7,#EB,#02,#E7,#E9,#E9,#F5,#E4,#02,#E7,#EB,#02,#DE,#F3		; @99A1
+	db	#E9,#E9,#EB,#02,#DC,#FC,#DA,#05,#DE,#C0,#E4,#0B,#DE,#E4,#05,#DE		; @99B1
+	db	#E4,#05,#DC,#FC,#DA,#02,#E6,#EA,#02,#DE,#C0,#E4,#02,#E6,#EA,#02		; @99C1
+	db	#EC,#D3,#D3,#D3,#EE,#02,#DE,#E4,#02,#E6,#EA,#02,#DE,#E4,#02,#E6		; @99D1
+	db	#EA,#02,#DC,#FC,#DA,#02,#DE,#E4,#02,#E7,#E9,#EB,#02,#DE,#E4,#02		; @99E1
+	db	#DC,#FC,#FC,#FC,#DA,#02,#E7,#EB,#02,#DE,#E4,#02,#E7,#EB,#02,#DE		; @99F1
+	db	#E4,#02,#DC,#FC,#DA,#02,#DE,#E4,#06,#DE,#E4,#02,#F0,#FC,#FC,#FC		; @9A01
+	db	#DA,#05,#DE,#E4,#05,#DE,#E4,#02,#DC,#FC,#DA,#02,#DE,#E4,#02,#E6		; @9A11
+	db	#E8,#E8,#E8,#F4,#E4,#02,#CE,#FC,#FC,#FC,#DA,#02,#E6,#E8,#E8,#F4		; @9A21
+	db	#E4,#02,#E6,#E8,#E8,#F4,#E4,#02,#DC,#00,#62,#02,#01,#13,#01,#01		; @9A31
+	db	#01,#02,#01,#04,#03,#13,#06,#04,#03,#01,#01,#01,#01,#01,#01,#01		; @9A41
+	db	#01,#01,#01,#01,#01,#01,#01,#01,#01,#01,#01,#01,#06,#04,#03,#10		; @9A51
+	db	#03,#06,#04,#03,#10,#03,#06,#04,#01,#01,#01,#01,#01,#01,#01,#0C		; @9A61
+	db	#03,#01,#01,#01,#01,#01,#01,#07,#04,#0C,#03,#06,#07,#04,#0C,#03		; @9A71
+	db	#06,#04,#01,#01,#01,#04,#0C,#01,#01,#01,#03,#01,#01,#01,#04,#03		; @9A81
+	db	#04,#0F,#03,#03,#04,#03,#04,#0F,#03,#03,#04,#03,#01,#01,#01,#01		; @9A91
+	db	#0F,#01,#01,#01,#03,#04,#03,#19,#04,#03,#19,#04,#03,#01,#01,#01		; @9AA1
+	db	#01,#0F,#01,#01,#01,#03,#04,#03,#04,#0F,#03,#03,#04,#03,#04,#0F		; @9AB1
+	db	#03,#03,#04,#01,#01,#01,#04,#0C,#01,#01,#01,#03,#01,#01,#01,#07		; @9AC1
+	db	#04,#0C,#03,#06,#07,#04,#0C,#03,#06,#04,#01,#01,#01,#01,#01,#01		; @9AD1
+	db	#01,#0C,#03,#01,#01,#01,#01,#01,#01,#04,#03,#10,#03,#06,#04,#03		; @9AE1
+	db	#10,#03,#06,#04,#03,#01,#01,#01,#01,#01,#01,#01,#01,#01,#01,#01		; @9AF1
+	db	#01,#01,#01,#01,#01,#01,#01,#01,#06,#04,#03,#13,#06,#04,#02,#01		; @9B01
+	db	#13,#01,#01,#01,#02,#01,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00		; @9B11
+	db	#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#00,#E0,#1D,#22,#1D		; @9B21
+	db	#39,#40,#20,#40,#3B,#63,#40,#7C,#40,#83,#43,#9C,#43,#49,#09,#17		; @9B30 394020403B63407C4083439C43490917  9@ @;c@|@.C.CI..
+;	.......).......c		; @9B40 0917090EE0E0E0290917091709000063
+;	....h."..q.'L.{.		; @9B50 8B13940C688B2294F4718B274CF47B8B
+;	.L........TUUU._		; @9B60 1C4C0C80AAAABFAA800A54555555FF5F
+;	U..WU.W..@U.....		; @9B70 55EAFF5755F557FF154055EAAF02EAFF
+;	................		; @9B80 FFAA948B140000998B1700009F8B1A00
+;	....U@UU........		; @9B90 00A68B1D55405555BFAA80AAAABFAAAA
+;	......U...UU..@.		; @9BA0 80AA0280AAAA550000005555FDAA40FC
+;	................		; @9BB0 DA02DED8D2D2D2D2D2D2D2D6D8D2D2D2
+;	................		; @9BC0 D2D4FCFCFCFCDA02DED8D2D2D2D2D4FC
+;	................		; @9BD0 DA02DEE408DEE405DCFCFCFCFCDA02DE
+;	................		; @9BE0 E405DCFCDA02DEE402E6E8E8E8EA02DE
+;	................		; @9BF0 E402E6EA02E7D2D2D2D2EB02E7EB02E6
+;	................		; @9C00 EA02DCFCDA02DEE402DEF3E9E9EB02DE
+;	................		; @9C10 E402DEE40CDEE402DCFCDA02DEE402DE
+;	................		; @9C20 E405DEE402DEF2E8E8E8EA02E6EA02E6
+;	................		; @9C30 E8E8F4E402DCFCDA02E7EB02DEE402E6
+;	................		; @9C40 EA02E7EB02E7E9E9E9E9EB02DEE402E7
+;	................		; @9C50 E9E9E9EB02DCFCDA05DEE402DEE40CDE
+;	................		; @9C60 E408DCFCFAE8E8EA02DEE402DEF2E8E8
+;	................		; @9C70 E8E8EA02E6E8E8EA02DEF2E8E8EA02E6
+;	................		; @9C80 EA02DCFCFBE9E9EB02E7EB02E7E9E9E9
+;	................		; @9C90 E9E9EB02E7E9F5E402DEF3E9E9EB02DE
+;	................		; @9CA0 E402DCFCDA12DEE402DEE405DEE402DC
+;	................		; @9CB0 FCDA02E6EA02E6E8E8E8E8EA02ECD3D3
+;	................		; @9CC0 D3EE02E7EB02E7EB02E6EA02DEE402DC
+;	................		; @9CD0 FCDA02DEE402E7E9E9E9F5E402DCFCFC
+;	................		; @9CE0 FCDA08DEE402E7EB02DCFCDA02DEE406
+;	................		; @9CF0 DEE402F0FCFCFCDA02E6E8E8E8EA02DE
+;	................		; @9D00 E405DCFCDA02DEF2E8E8E8EA02DEE402
+;	................		; @9D10 CEFCFCFCDA02DEC0C0C0E402DEF2E8E8
+;	.......f........		; @9D20 EA02DC00000000660101010101030101
+;	................		; @9D30 010B0101070603030A03070603030101
+;	................		; @9D40 01010101010101010307030101010307
+;	................		; @9D50 03060703030307030607030301010101
+;	................		; @9D60 0101010101010301010101010107030D
+;	................		; @9D70 060307030D0603040101010101010D03
+;	................		; @9D80 01010103040310030303040310010101
+;	................		; @9D90 03030403010101011201010104071504
+;	................		; @9DA0 07150403010101011201010104031001
+;	................		; @9DB0 01010303040310030303040101010101
+;	................		; @9DC0 010D030101010307030D060307030D06
+;	................		; @9DD0 03070303010101010101010101010301
+;	................		; @9DE0 01010101010703030307030607030101
+;	................		; @9DF0 01030703060706030301010101010101
+;	................		; @9E00 01010103070603030A03080101010101
+;	.........".9@ @;		; @9E10 030101010B0101F41D221D394020403B
+;	e@{@.C.CB......		; @9E20 65407B4085439B4342160A160A160A20
+;	.."    .......		; @9E30 2020DEE02220202020160A160A160000
+;	T....Y....a.&..k		; @9E40 548E13C40C598E1EC4F4618E2614F46B
+;	........*.@UU.P		; @9E50 8E1D140C02AAAA802A0240557F551550
+;	...WU..WU......		; @9E60 05EAFF5755F5FF577F5505EAFFFFFFEA
+;	...............!		; @9E70 AFAA02878E1200008C8E1D0000948E21
+;	....,..UU.....*		; @9E80 00009D8E2C0000557F55D5FFAABFAA2A
+;	.....*.......U..		; @9E90 A0EAFFFFAA2AA0020000A0AA025515A0
+;	*.T...U.@.......		; @9EA0 2A005405000055FD40FCD0D2D2D2D2D2
+;	................		; @9EB0 D2D6E402E7D2D2D2D2D2D2D2D2D2D2D6
+;	................		; @9EC0 D8D2D2D2D2D2D2D2D4FCDA07DEE40DDE
+;	................		; @9ED0 E408DCFCDA02E6E8E8EA02DEE402E6E8
+;	................		; @9EE0 E8EA02E6E8E8E8EA02E7EB02E6EA02E6
+;	................		; @9EF0 EA02DCFCDA02DEF3E9EB02E7EB02E7E9
+;	................		; @9F00 F5E402E7E9E9F5E405DEE402DEE402DC
+;	................		; @9F10 FCDA02DEE409DEE405DEE402E6E8E8F4
+;	................		; @9F20 E402DEE402DCFCDA02DEE402E6E8E8E8
+;	................		; @9F30 E8EA02E7EB02E6EA02E7EB02E7E9E9E9
+;	................		; @9F40 EB02E7EB02DCFCDA02DEE402E7E9E9E9
+;	................		; @9F50 F5E405DEE40EDCFCDA02DEE406DEE402
+;	................		; @9F60 E6E8E8F4E402E6E8E8E8EA02E6E8E8E8
+;	................		; @9F70 E8E8F4FCDA02E7EB02E6E8EA02E7EB02
+;	................		; @9F80 E7E9E9E9EB02DEF3E9E9EB02DEF3E9E9
+;	................		; @9F90 E9E9F5FCDA05DEC0E40BDEE405DEE405
+;	................		; @9FA0 DCFCFAE8E8EA02DEC0E402E6EA02ECD3
+;	................		; @9FB0 D3D3EE02DEE402E6EA02DEE402E6EA02
+;	................		; @9FC0 DCFCFBE9E9EB02E7E9EB02DEE402DCFC
+;	................		; @9FD0 FCFCDA02E7EB02DEE402E7EB02DEE402
+;	................		; @9FE0 DCFCDA09DEE402F0FCFCFCDA05DEE405
+;	................		; @9FF0 DEE402DCFCDA02E6E8E8E8E8EA02DEE4
+	; ;; gap-fill from golden boots $9B40-$9FFF
+	db	#09,#17,#09,#0E,#E0,#E0,#E0,#29,#09,#17,#09,#17,#09,#00,#00,#63		; @9B40
+	db	#8B,#13,#94,#0C,#68,#8B,#22,#94,#F4,#71,#8B,#27,#4C,#F4,#7B,#8B		; @9B50
+	db	#1C,#4C,#0C,#80,#AA,#AA,#BF,#AA,#80,#0A,#54,#55,#55,#55,#FF,#5F		; @9B60
+	db	#55,#EA,#FF,#57,#55,#F5,#57,#FF,#15,#40,#55,#EA,#AF,#02,#EA,#FF		; @9B70
+	db	#FF,#AA,#94,#8B,#14,#00,#00,#99,#8B,#17,#00,#00,#9F,#8B,#1A,#00		; @9B80
+	db	#00,#A6,#8B,#1D,#55,#40,#55,#55,#BF,#AA,#80,#AA,#AA,#BF,#AA,#AA		; @9B90
+	db	#80,#AA,#02,#80,#AA,#AA,#55,#00,#00,#00,#55,#55,#FD,#AA,#40,#FC		; @9BA0
+	db	#DA,#02,#DE,#D8,#D2,#D2,#D2,#D2,#D2,#D2,#D2,#D6,#D8,#D2,#D2,#D2		; @9BB0
+	db	#D2,#D4,#FC,#FC,#FC,#FC,#DA,#02,#DE,#D8,#D2,#D2,#D2,#D2,#D4,#FC		; @9BC0
+	db	#DA,#02,#DE,#E4,#08,#DE,#E4,#05,#DC,#FC,#FC,#FC,#FC,#DA,#02,#DE		; @9BD0
+	db	#E4,#05,#DC,#FC,#DA,#02,#DE,#E4,#02,#E6,#E8,#E8,#E8,#EA,#02,#DE		; @9BE0
+	db	#E4,#02,#E6,#EA,#02,#E7,#D2,#D2,#D2,#D2,#EB,#02,#E7,#EB,#02,#E6		; @9BF0
+	db	#EA,#02,#DC,#FC,#DA,#02,#DE,#E4,#02,#DE,#F3,#E9,#E9,#EB,#02,#DE		; @9C00
+	db	#E4,#02,#DE,#E4,#0C,#DE,#E4,#02,#DC,#FC,#DA,#02,#DE,#E4,#02,#DE		; @9C10
+	db	#E4,#05,#DE,#E4,#02,#DE,#F2,#E8,#E8,#E8,#EA,#02,#E6,#EA,#02,#E6		; @9C20
+	db	#E8,#E8,#F4,#E4,#02,#DC,#FC,#DA,#02,#E7,#EB,#02,#DE,#E4,#02,#E6		; @9C30
+	db	#EA,#02,#E7,#EB,#02,#E7,#E9,#E9,#E9,#E9,#EB,#02,#DE,#E4,#02,#E7		; @9C40
+	db	#E9,#E9,#E9,#EB,#02,#DC,#FC,#DA,#05,#DE,#E4,#02,#DE,#E4,#0C,#DE		; @9C50
+	db	#E4,#08,#DC,#FC,#FA,#E8,#E8,#EA,#02,#DE,#E4,#02,#DE,#F2,#E8,#E8		; @9C60
+	db	#E8,#E8,#EA,#02,#E6,#E8,#E8,#EA,#02,#DE,#F2,#E8,#E8,#EA,#02,#E6		; @9C70
+	db	#EA,#02,#DC,#FC,#FB,#E9,#E9,#EB,#02,#E7,#EB,#02,#E7,#E9,#E9,#E9		; @9C80
+	db	#E9,#E9,#EB,#02,#E7,#E9,#F5,#E4,#02,#DE,#F3,#E9,#E9,#EB,#02,#DE		; @9C90
+	db	#E4,#02,#DC,#FC,#DA,#12,#DE,#E4,#02,#DE,#E4,#05,#DE,#E4,#02,#DC		; @9CA0
+	db	#FC,#DA,#02,#E6,#EA,#02,#E6,#E8,#E8,#E8,#E8,#EA,#02,#EC,#D3,#D3		; @9CB0
+	db	#D3,#EE,#02,#E7,#EB,#02,#E7,#EB,#02,#E6,#EA,#02,#DE,#E4,#02,#DC		; @9CC0
+	db	#FC,#DA,#02,#DE,#E4,#02,#E7,#E9,#E9,#E9,#F5,#E4,#02,#DC,#FC,#FC		; @9CD0
+	db	#FC,#DA,#08,#DE,#E4,#02,#E7,#EB,#02,#DC,#FC,#DA,#02,#DE,#E4,#06		; @9CE0
+	db	#DE,#E4,#02,#F0,#FC,#FC,#FC,#DA,#02,#E6,#E8,#E8,#E8,#EA,#02,#DE		; @9CF0
+	db	#E4,#05,#DC,#FC,#DA,#02,#DE,#F2,#E8,#E8,#E8,#EA,#02,#DE,#E4,#02		; @9D00
+	db	#CE,#FC,#FC,#FC,#DA,#02,#DE,#C0,#C0,#C0,#E4,#02,#DE,#F2,#E8,#E8		; @9D10
+	db	#EA,#02,#DC,#00,#00,#00,#00,#66,#01,#01,#01,#01,#01,#03,#01,#01		; @9D20
+	db	#01,#0B,#01,#01,#07,#06,#03,#03,#0A,#03,#07,#06,#03,#03,#01,#01		; @9D30
+	db	#01,#01,#01,#01,#01,#01,#01,#01,#03,#07,#03,#01,#01,#01,#03,#07		; @9D40
+	db	#03,#06,#07,#03,#03,#03,#07,#03,#06,#07,#03,#03,#01,#01,#01,#01		; @9D50
+	db	#01,#01,#01,#01,#01,#01,#03,#01,#01,#01,#01,#01,#01,#07,#03,#0D		; @9D60
+	db	#06,#03,#07,#03,#0D,#06,#03,#04,#01,#01,#01,#01,#01,#01,#0D,#03		; @9D70
+	db	#01,#01,#01,#03,#04,#03,#10,#03,#03,#03,#04,#03,#10,#01,#01,#01		; @9D80
+	db	#03,#03,#04,#03,#01,#01,#01,#01,#12,#01,#01,#01,#04,#07,#15,#04		; @9D90
+	db	#07,#15,#04,#03,#01,#01,#01,#01,#12,#01,#01,#01,#04,#03,#10,#01		; @9DA0
+	db	#01,#01,#03,#03,#04,#03,#10,#03,#03,#03,#04,#01,#01,#01,#01,#01		; @9DB0
+	db	#01,#0D,#03,#01,#01,#01,#03,#07,#03,#0D,#06,#03,#07,#03,#0D,#06		; @9DC0
+	db	#03,#07,#03,#03,#01,#01,#01,#01,#01,#01,#01,#01,#01,#01,#03,#01		; @9DD0
+	db	#01,#01,#01,#01,#01,#07,#03,#03,#03,#07,#03,#06,#07,#03,#01,#01		; @9DE0
+	db	#01,#03,#07,#03,#06,#07,#06,#03,#03,#01,#01,#01,#01,#01,#01,#01		; @9DF0
+	db	#01,#01,#01,#03,#07,#06,#03,#03,#0A,#03,#08,#01,#01,#01,#01,#01		; @9E00
+	db	#03,#01,#01,#01,#0B,#01,#01,#F4,#1D,#22,#1D,#39,#40,#20,#40,#3B		; @9E10
+	db	#65,#40,#7B,#40,#85,#43,#9B,#43,#42,#16,#0A,#16,#0A,#16,#0A,#20		; @9E20
+	db	#20,#20,#DE,#E0,#22,#20,#20,#20,#20,#16,#0A,#16,#0A,#16,#00,#00		; @9E30
+	db	#54,#8E,#13,#C4,#0C,#59,#8E,#1E,#C4,#F4,#61,#8E,#26,#14,#F4,#6B		; @9E40
+	db	#8E,#1D,#14,#0C,#02,#AA,#AA,#80,#2A,#02,#40,#55,#7F,#55,#15,#50		; @9E50
+	db	#05,#EA,#FF,#57,#55,#F5,#FF,#57,#7F,#55,#05,#EA,#FF,#FF,#FF,#EA		; @9E60
+	db	#AF,#AA,#02,#87,#8E,#12,#00,#00,#8C,#8E,#1D,#00,#00,#94,#8E,#21		; @9E70
+	db	#00,#00,#9D,#8E,#2C,#00,#00,#55,#7F,#55,#D5,#FF,#AA,#BF,#AA,#2A		; @9E80
+	db	#A0,#EA,#FF,#FF,#AA,#2A,#A0,#02,#00,#00,#A0,#AA,#02,#55,#15,#A0		; @9E90
+	db	#2A,#00,#54,#05,#00,#00,#55,#FD,#40,#FC,#D0,#D2,#D2,#D2,#D2,#D2		; @9EA0
+	db	#D2,#D6,#E4,#02,#E7,#D2,#D2,#D2,#D2,#D2,#D2,#D2,#D2,#D2,#D2,#D6		; @9EB0
+	db	#D8,#D2,#D2,#D2,#D2,#D2,#D2,#D2,#D4,#FC,#DA,#07,#DE,#E4,#0D,#DE		; @9EC0
+	db	#E4,#08,#DC,#FC,#DA,#02,#E6,#E8,#E8,#EA,#02,#DE,#E4,#02,#E6,#E8		; @9ED0
+	db	#E8,#EA,#02,#E6,#E8,#E8,#E8,#EA,#02,#E7,#EB,#02,#E6,#EA,#02,#E6		; @9EE0
+	db	#EA,#02,#DC,#FC,#DA,#02,#DE,#F3,#E9,#EB,#02,#E7,#EB,#02,#E7,#E9		; @9EF0
+	db	#F5,#E4,#02,#E7,#E9,#E9,#F5,#E4,#05,#DE,#E4,#02,#DE,#E4,#02,#DC		; @9F00
+	db	#FC,#DA,#02,#DE,#E4,#09,#DE,#E4,#05,#DE,#E4,#02,#E6,#E8,#E8,#F4		; @9F10
+	db	#E4,#02,#DE,#E4,#02,#DC,#FC,#DA,#02,#DE,#E4,#02,#E6,#E8,#E8,#E8		; @9F20
+	db	#E8,#EA,#02,#E7,#EB,#02,#E6,#EA,#02,#E7,#EB,#02,#E7,#E9,#E9,#E9		; @9F30
+	db	#EB,#02,#E7,#EB,#02,#DC,#FC,#DA,#02,#DE,#E4,#02,#E7,#E9,#E9,#E9		; @9F40
+	db	#F5,#E4,#05,#DE,#E4,#0E,#DC,#FC,#DA,#02,#DE,#E4,#06,#DE,#E4,#02		; @9F50
+	db	#E6,#E8,#E8,#F4,#E4,#02,#E6,#E8,#E8,#E8,#EA,#02,#E6,#E8,#E8,#E8		; @9F60
+	db	#E8,#E8,#F4,#FC,#DA,#02,#E7,#EB,#02,#E6,#E8,#EA,#02,#E7,#EB,#02		; @9F70
+	db	#E7,#E9,#E9,#E9,#EB,#02,#DE,#F3,#E9,#E9,#EB,#02,#DE,#F3,#E9,#E9		; @9F80
+	db	#E9,#E9,#F5,#FC,#DA,#05,#DE,#C0,#E4,#0B,#DE,#E4,#05,#DE,#E4,#05		; @9F90
+	db	#DC,#FC,#FA,#E8,#E8,#EA,#02,#DE,#C0,#E4,#02,#E6,#EA,#02,#EC,#D3		; @9FA0
+	db	#D3,#D3,#EE,#02,#DE,#E4,#02,#E6,#EA,#02,#DE,#E4,#02,#E6,#EA,#02		; @9FB0
+	db	#DC,#FC,#FB,#E9,#E9,#EB,#02,#E7,#E9,#EB,#02,#DE,#E4,#02,#DC,#FC		; @9FC0
+	db	#FC,#FC,#DA,#02,#E7,#EB,#02,#DE,#E4,#02,#E7,#EB,#02,#DE,#E4,#02		; @9FD0
+	db	#DC,#FC,#DA,#09,#DE,#E4,#02,#F0,#FC,#FC,#FC,#DA,#05,#DE,#E4,#05		; @9FE0
+	db	#DE,#E4,#02,#DC,#FC,#DA,#02,#E6,#E8,#E8,#E8,#E8,#EA,#02,#DE,#E4		; @9FF0

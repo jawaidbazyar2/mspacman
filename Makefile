@@ -27,8 +27,9 @@ $(BUILD_DIR):
 
 # Assemble working copy with SjASMPlus.
 # --raw writes a flat binary; listing goes beside it for debugging.
-$(BIN): $(ASM) $(SJASMPLUS) | $(BUILD_DIR)
+$(BIN): $(ASM) $(SRC_DIR)/ram.inc $(SJASMPLUS) | $(BUILD_DIR)
 	$(SJASMPLUS) \
+		-i $(SRC_DIR) \
 		--raw=$(BIN) \
 		--lst=$(LST) \
 		--fullpath \
@@ -45,17 +46,7 @@ sjasmplus-check:
 # After a successful assemble, compare 4KB slices to golden boots.
 # Map: 0000/1000/2000/3000/8000/9000 → boot1..boot6
 verify: $(BIN)
-	@python3 -c '\
-from pathlib import Path; import sys; \
-b = Path("$(BIN)").read_bytes(); \
-slices = [("boot1",0x0000),("boot2",0x1000),("boot3",0x2000),("boot4",0x3000),("boot5",0x8000),("boot6",0x9000)]; \
-bad = 0; \
-\
-for name, off in slices: \
-    ok = Path(name).read_bytes() == b[off:off+0x1000]; \
-    print("%s: %s" % (name, "OK" if ok else "DIFF")); \
-    bad += not ok; \
-sys.exit(bad)'
+	python3 py/verify_boots.py $(BIN)
 
 clean:
 	rm -rf $(BUILD_DIR)
