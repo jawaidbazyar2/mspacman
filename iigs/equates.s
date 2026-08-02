@@ -55,8 +55,8 @@ SPR_BYTES      equ 84
 SPR_BASE_X     equ 72		; PF_ORIGIN_X - 4
 SPR_BASE_Y     equ 4		; PF_ORIGIN_Y - 3
 NUM_SPRITES    equ 64
-NUM_ACTORS     equ 4
-* 4 actors × 84-byte save-under = 336 bytes → $7500..$764F (below DIRTY)
+NUM_ACTORS     equ 1		; sanity: was 4; masked blit cost scales with this
+* actors × 84-byte save-under; keep under DIRTY at $7800
 
 NUM_TILES      equ 256
 TILE_BYTES_ROW equ 3
