@@ -61,28 +61,16 @@ SetBorder
 	rts
 
 WaitVBL
-* Poll Mega II VBL ($C019 bit7). Border → black for the whole wait (slack).
-* If the bit never toggles, time out so a stuck sense cannot hang forever.
+* IIgs $C019: bit7=1 during blank (TN #40). Border black for slack time.
+* Wait until OUT of VBL, then until INTO VBL (next blank leading edge).
+* Do NOT time out past :w1 — that used to skip :w2 and drop frame sync.
 	php
 	sep	#$20
 	lda	#BRD_VBL
 	jsr	SetBorder
-	ldy	#$40
-:outer	ldx	#$00
-:w1	lda	>RDVBLBAR
-	bpl	:gotlow
-	dex
-	bne	:w1
-	dey
-	bne	:outer
-	bra	:done
-:gotlow	ldy	#$40
-:outer2	ldx	#$00
-:w2	lda	>RDVBLBAR
-	bmi	:done
-	dex
-	bne	:w2
-	dey
-	bne	:outer2
-:done	plp
+]w1	lda	>RDVBLBAR
+	bmi	]w1			; while in VBL (bit7 set)
+]w2	lda	>RDVBLBAR
+	bpl	]w2			; while in active display (bit7 clear)
+	plp
 	rts

@@ -430,15 +430,13 @@ EraseSprite
 	clc
 	adc	#SAVEUNDER16
 	sta	>R_SAVE
-	lda	#12
-	sta	>R_ROW
 	lda	>R_SAVE
 	tax
 	lda	>R_DEST
 	tay
-* 7 bytes/row from save-under (bank $02), not maze in bank $03.
-* Words @0,@2,@4 + overlapped word @5 → bytes 0–6 (no 8th byte).
-]er	lda	>BANK2,x
+* Unrolled 12×7: save-under → SHR. Words @0,2,4 + @5 per row (no 8th byte).
+* X = SAVEUNDER16+…, Y = SHR offset; no per-row adc/tax/tay.
+	lda	>BANK2,x
 	sta	$2000,y
 	lda	>BANK2+2,x
 	sta	$2002,y
@@ -446,18 +444,94 @@ EraseSprite
 	sta	$2004,y
 	lda	>BANK2+5,x
 	sta	$2005,y
-	txa
-	clc
-	adc	#7
-	tax
-	tya
-	clc
-	adc	#SHR_ROW_BYTES
-	tay
-	lda	>R_ROW
-	dec
-	sta	>R_ROW
-	bne	]er
+	lda	>BANK2+7,x
+	sta	$2000+160,y
+	lda	>BANK2+9,x
+	sta	$2002+160,y
+	lda	>BANK2+11,x
+	sta	$2004+160,y
+	lda	>BANK2+12,x
+	sta	$2005+160,y
+	lda	>BANK2+14,x
+	sta	$2000+320,y
+	lda	>BANK2+16,x
+	sta	$2002+320,y
+	lda	>BANK2+18,x
+	sta	$2004+320,y
+	lda	>BANK2+19,x
+	sta	$2005+320,y
+	lda	>BANK2+21,x
+	sta	$2000+480,y
+	lda	>BANK2+23,x
+	sta	$2002+480,y
+	lda	>BANK2+25,x
+	sta	$2004+480,y
+	lda	>BANK2+26,x
+	sta	$2005+480,y
+	lda	>BANK2+28,x
+	sta	$2000+640,y
+	lda	>BANK2+30,x
+	sta	$2002+640,y
+	lda	>BANK2+32,x
+	sta	$2004+640,y
+	lda	>BANK2+33,x
+	sta	$2005+640,y
+	lda	>BANK2+35,x
+	sta	$2000+800,y
+	lda	>BANK2+37,x
+	sta	$2002+800,y
+	lda	>BANK2+39,x
+	sta	$2004+800,y
+	lda	>BANK2+40,x
+	sta	$2005+800,y
+	lda	>BANK2+42,x
+	sta	$2000+960,y
+	lda	>BANK2+44,x
+	sta	$2002+960,y
+	lda	>BANK2+46,x
+	sta	$2004+960,y
+	lda	>BANK2+47,x
+	sta	$2005+960,y
+	lda	>BANK2+49,x
+	sta	$2000+1120,y
+	lda	>BANK2+51,x
+	sta	$2002+1120,y
+	lda	>BANK2+53,x
+	sta	$2004+1120,y
+	lda	>BANK2+54,x
+	sta	$2005+1120,y
+	lda	>BANK2+56,x
+	sta	$2000+1280,y
+	lda	>BANK2+58,x
+	sta	$2002+1280,y
+	lda	>BANK2+60,x
+	sta	$2004+1280,y
+	lda	>BANK2+61,x
+	sta	$2005+1280,y
+	lda	>BANK2+63,x
+	sta	$2000+1440,y
+	lda	>BANK2+65,x
+	sta	$2002+1440,y
+	lda	>BANK2+67,x
+	sta	$2004+1440,y
+	lda	>BANK2+68,x
+	sta	$2005+1440,y
+	lda	>BANK2+70,x
+	sta	$2000+1600,y
+	lda	>BANK2+72,x
+	sta	$2002+1600,y
+	lda	>BANK2+74,x
+	sta	$2004+1600,y
+	lda	>BANK2+75,x
+	sta	$2005+1600,y
+	lda	>BANK2+77,x
+	sta	$2000+1760,y
+	lda	>BANK2+79,x
+	sta	$2002+1760,y
+	lda	>BANK2+81,x
+	sta	$2004+1760,y
+	lda	>BANK2+82,x
+	sta	$2005+1760,y
 	lda	>R_BASE
 	tax
 	sep	#$20
@@ -504,14 +578,12 @@ DrawSprite
 	clc
 	adc	#SAVEUNDER16
 	sta	>R_SAVE
-	lda	#12
-	sta	>R_ROW
 	lda	>R_SAVE
 	tax
 	lda	>R_DEST
 	tay
-* Capture 7 bytes: words @0,@2,@4 + overlapped word @5
-]su	lda	$2000,y
+* Unrolled 12×7 save-under capture (SHR → bank $02). Same layout as EraseSprite.
+	lda	$2000,y
 	sta	>BANK2,x
 	lda	$2002,y
 	sta	>BANK2+2,x
@@ -519,18 +591,94 @@ DrawSprite
 	sta	>BANK2+4,x
 	lda	$2005,y
 	sta	>BANK2+5,x
-	txa
-	clc
-	adc	#7
-	tax
-	tya
-	clc
-	adc	#SHR_ROW_BYTES
-	tay
-	lda	>R_ROW
-	dec
-	sta	>R_ROW
-	bne	]su
+	lda	$2000+160,y
+	sta	>BANK2+7,x
+	lda	$2002+160,y
+	sta	>BANK2+9,x
+	lda	$2004+160,y
+	sta	>BANK2+11,x
+	lda	$2005+160,y
+	sta	>BANK2+12,x
+	lda	$2000+320,y
+	sta	>BANK2+14,x
+	lda	$2002+320,y
+	sta	>BANK2+16,x
+	lda	$2004+320,y
+	sta	>BANK2+18,x
+	lda	$2005+320,y
+	sta	>BANK2+19,x
+	lda	$2000+480,y
+	sta	>BANK2+21,x
+	lda	$2002+480,y
+	sta	>BANK2+23,x
+	lda	$2004+480,y
+	sta	>BANK2+25,x
+	lda	$2005+480,y
+	sta	>BANK2+26,x
+	lda	$2000+640,y
+	sta	>BANK2+28,x
+	lda	$2002+640,y
+	sta	>BANK2+30,x
+	lda	$2004+640,y
+	sta	>BANK2+32,x
+	lda	$2005+640,y
+	sta	>BANK2+33,x
+	lda	$2000+800,y
+	sta	>BANK2+35,x
+	lda	$2002+800,y
+	sta	>BANK2+37,x
+	lda	$2004+800,y
+	sta	>BANK2+39,x
+	lda	$2005+800,y
+	sta	>BANK2+40,x
+	lda	$2000+960,y
+	sta	>BANK2+42,x
+	lda	$2002+960,y
+	sta	>BANK2+44,x
+	lda	$2004+960,y
+	sta	>BANK2+46,x
+	lda	$2005+960,y
+	sta	>BANK2+47,x
+	lda	$2000+1120,y
+	sta	>BANK2+49,x
+	lda	$2002+1120,y
+	sta	>BANK2+51,x
+	lda	$2004+1120,y
+	sta	>BANK2+53,x
+	lda	$2005+1120,y
+	sta	>BANK2+54,x
+	lda	$2000+1280,y
+	sta	>BANK2+56,x
+	lda	$2002+1280,y
+	sta	>BANK2+58,x
+	lda	$2004+1280,y
+	sta	>BANK2+60,x
+	lda	$2005+1280,y
+	sta	>BANK2+61,x
+	lda	$2000+1440,y
+	sta	>BANK2+63,x
+	lda	$2002+1440,y
+	sta	>BANK2+65,x
+	lda	$2004+1440,y
+	sta	>BANK2+67,x
+	lda	$2005+1440,y
+	sta	>BANK2+68,x
+	lda	$2000+1600,y
+	sta	>BANK2+70,x
+	lda	$2002+1600,y
+	sta	>BANK2+72,x
+	lda	$2004+1600,y
+	sta	>BANK2+74,x
+	lda	$2005+1600,y
+	sta	>BANK2+75,x
+	lda	$2000+1760,y
+	sta	>BANK2+77,x
+	lda	$2002+1760,y
+	sta	>BANK2+79,x
+	lda	$2004+1760,y
+	sta	>BANK2+81,x
+	lda	$2005+1760,y
+	sta	>BANK2+82,x
 	lda	>R_IDX
 	jsr	Mul84
 	sta	>R_OFF

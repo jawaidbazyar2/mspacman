@@ -65,12 +65,14 @@ PYTHONPATH=$HOME/src/gssquared/clients/python/src \
 
 | Border | Phase |
 |--------|--------|
-| Red | `EraseAllSprites` |
-| Green | `DrawAllSprites` |
-| Med blue | `CopySpritePos` |
+| Purple | `EraseAllSprites` (fast after unroll — easy to miss) |
+| Green | `DrawAllSprites` (usually the wide band) |
+| Light blue | `CopySpritePos` |
 | Orange | `AdvanceRails` |
-| Black | `WaitVBL` (idle slack — more black = healthier budget) |
+| Black | `WaitVBL` slack — **no black ⇒ work fills the frame** (orange→purple can look “yellow”) |
 | White | `DEMO_FREEZE` (host capture) |
+
+Order in time: purple → green → light blue → orange → **black** → (repeat). Yellowish flash at the wrap usually means orange+purple with **no black** (budget full), not a mystery fifth color.
 
 ## Useful flags
 
