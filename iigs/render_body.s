@@ -227,15 +227,11 @@ DrawTile
 	sta	>R_ROW
 	lda	>R_DEST
 	tay
-* 8-bit stores — 16-bit sta would write a 4th byte past each 6px tile
-]tr	sep	#$20
-	lda	>AST_TILES,x
+* 3 bytes/row: word @0 then overlapped word @1 (covers 0–2, no 4th byte)
+]tr	lda	>AST_TILES,x
 	sta	$2000,y
 	lda	>AST_TILES+1,x
 	sta	$2001,y
-	lda	>AST_TILES+2,x
-	sta	$2002,y
-	rep	#$20
 	txa
 	clc
 	adc	#3
@@ -305,15 +301,11 @@ DrawMaze
 	sta	>R_ROW
 	lda	>R_DEST
 	tay
-* 8-bit stores — 16-bit sta spills 2px past the rightmost column
-]mc	sep	#$20
-	lda	>AST_MAZE_CELLS,x
+* 3 bytes/row: word @0 + overlapped word @1 (no spill past cell)
+]mc	lda	>AST_MAZE_CELLS,x
 	sta	$2000,y
 	lda	>AST_MAZE_CELLS+1,x
 	sta	$2001,y
-	lda	>AST_MAZE_CELLS+2,x
-	sta	$2002,y
-	rep	#$20
 	txa
 	clc
 	adc	#3
@@ -444,23 +436,16 @@ EraseSprite
 	tax
 	lda	>R_DEST
 	tay
-* 8-bit — 16-bit sta $2006,y would clobber the next screen byte
-]er	sep	#$20
-	lda	>BANK2,x
+* 7 bytes/row from save-under (bank $02), not maze in bank $03.
+* Words @0,@2,@4 + overlapped word @5 → bytes 0–6 (no 8th byte).
+]er	lda	>BANK2,x
 	sta	$2000,y
-	lda	>BANK2+1,x
-	sta	$2001,y
 	lda	>BANK2+2,x
 	sta	$2002,y
-	lda	>BANK2+3,x
-	sta	$2003,y
 	lda	>BANK2+4,x
 	sta	$2004,y
 	lda	>BANK2+5,x
 	sta	$2005,y
-	lda	>BANK2+6,x
-	sta	$2006,y
-	rep	#$20
 	txa
 	clc
 	adc	#7
@@ -525,23 +510,15 @@ DrawSprite
 	tax
 	lda	>R_DEST
 	tay
-* 8-bit save-under — 16-bit stores overlapped rows (byte 7 = next row)
-]su	sep	#$20
-	lda	$2000,y
+* Capture 7 bytes: words @0,@2,@4 + overlapped word @5
+]su	lda	$2000,y
 	sta	>BANK2,x
-	lda	$2001,y
-	sta	>BANK2+1,x
 	lda	$2002,y
 	sta	>BANK2+2,x
-	lda	$2003,y
-	sta	>BANK2+3,x
 	lda	$2004,y
 	sta	>BANK2+4,x
 	lda	$2005,y
 	sta	>BANK2+5,x
-	lda	$2006,y
-	sta	>BANK2+6,x
-	rep	#$20
 	txa
 	clc
 	adc	#7

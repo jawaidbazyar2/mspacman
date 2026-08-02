@@ -51,11 +51,22 @@ LoadPalette
 
 * PalTable lives in palette_data.s (put from all.s) — maze PROM #1D → pens 0–3
 
-WaitVBL
-* Poll Mega II VBL ($C019 bit7). If the bit never toggles, time out
-* so a stuck sense cannot hang the harness forever.
+SetBorder
+* A = color 0–15. Writes $00/C034 low nibble only (high ← 0; fine for demo).
 	php
 	sep	#$20
+	and	#$0F
+	sta	>BORDCOLOR
+	plp
+	rts
+
+WaitVBL
+* Poll Mega II VBL ($C019 bit7). Border → black for the whole wait (slack).
+* If the bit never toggles, time out so a stuck sense cannot hang forever.
+	php
+	sep	#$20
+	lda	#BRD_VBL
+	jsr	SetBorder
 	ldy	#$40
 :outer	ldx	#$00
 :w1	lda	>RDVBLBAR

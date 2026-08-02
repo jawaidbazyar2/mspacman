@@ -170,7 +170,7 @@ Do **not** model the four power pills as soft sprites on the IIgs. Keep the soft
 
 ### Positioning & 4bpp packing (locked)
 
-SHR **320** mode stores **two pixels per byte** (4 bits each). That constrains horizontal blits, not gameplay motion. Tile rows are **3 bytes** (6 px) and sprite rows **7 bytes** (14 px): always store those with **8-bit** `sta` (or an explicit last-byte store). A 16-bit `sta` while `m=0` writes one extra byte and spills past the playfield right edge / corrupts save-under rows.
+SHR **320** mode stores **two pixels per byte** (4 bits each). That constrains horizontal blits, not gameplay motion. Tile rows are **3 bytes** (6 px) and sprite save-under rows **7 bytes** (14 px). Use **overlapped 16-bit** copies: tiles word@0 + word@1; sprites words@0,2,4 + word@5 — never a plain word store that extends past the cell (that spills into the next SHR byte / next save row). Masked sprite blit stays per-byte/nibble.
 
 | Axis | Decision |
 |------|----------|
@@ -346,7 +346,7 @@ make iigs-test   # spawn GSSquared, inject, CALL 768, dump build/iigs/frame.png
 
 Harness maze tiles must match `make gfx` upright orientation (CW + row XOR 3). Ground-truth previews: `build/gfx/ppm/maze1_8x8_upright.png` / `maze1_6x6_upright.png`.
 
-**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`py/gen_ghost_rails.py` → `iigs/rails_data.s`). Rails write **new** `ACT_X`/`ACT_Y` only; erase reads **old** `ACT_OX`/`ACT_OY`, draw reads new, then commit. Bodies use `ACT_COLOR` (Blinky/Pinky/Inky/Clyde pens 5/7/9/11) at blit. Loop: erase→draw→commit→rails→VBL until a key at `$C000`/`$C010`, or host sets `DEMO_FREEZE` (`$02/7904`) before SHR capture.
+**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`py/gen_ghost_rails.py` → `iigs/rails_data.s`). Rails write **new** `ACT_X`/`ACT_Y` only; erase reads **old** `ACT_OX`/`ACT_OY`, draw reads new, then commit. Bodies use `ACT_COLOR` (Blinky/Pinky/Inky/Clyde pens 5/7/9/11) at blit. Loop: erase→draw→commit→rails→VBL until a key at `$C000`/`$C010`, or host sets `DEMO_FREEZE` (`$02/7904`) before SHR capture. **Border** (`$C034`) changes per phase (red/green/blue/orange/black) for visual timing — see `BRD_*` in `equates.s` / [`UserTesting.md`](../UserTesting.md).
 
 ---
 
@@ -376,15 +376,19 @@ TBD. Arcade Namco WSG → IIgs Ensoniq DOC (or simpler square/noise approximatio
 
 ## 6. CPU / memory model
 
-Full Z80↔65816 strategy TBD. **Harness v1 memory map** (seed for the port):
+Full Z80↔65816 strategy TBD.
+
+**Detailed harness map:** [`IIgs-MemoryMap.md`](IIgs-MemoryMap.md) (banks `$00`–`$03`/`$E1`, actor fields, asset ranges, scratch, ownership).
+
+Summary:
 
 | Bank / range | Contents |
 |--------------|----------|
-| `$02/0000` | Code + actor state + save-under + scratch |
+| `$02/0000` | Code + actors + save-under + dirty + scratch |
 | `$02/7000` | Logical tilemap 28×31 |
-| `$03/0000` | `tiles6.bin` + even sprites/masks; odd forms at startup; maze tilemap; stitched `maze1_cells.bin` @ `$037000` |
-| `$01/2000` | SHR shadow write target (**shadowing ON**) |
-| `$E1/2000` | Displayed SHR (capture / ground truth) |
+| `$03/0000` | Tiles, even/odd sprites+masks, maze, stitched cells |
+| `$01/2000` | SHR shadow (**shadowing ON**) |
+| `$E1/2000` | Displayed SHR (host capture) |
 
 Playfield origin: **(76, 7)** for the 168×186 maze in 320×200. Side HUD unused in the harness.
 

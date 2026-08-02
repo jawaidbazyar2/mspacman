@@ -31,7 +31,7 @@ IIGS_BIN  := $(IIGS_BUILD)/harness.bin
 GSSQUARED ?= $(HOME)/src/gssquared/build/GSSquared
 GS2_PY    := $(HOME)/src/gssquared/clients/python/src
 
-.PHONY: all clean verify sjasmplus-check gfx gfx-ppm palette maze tiles-preview iigs iigs-test
+.PHONY: all clean verify sjasmplus-check gfx gfx-ppm palette maze tiles-preview iigs iigs-test iigs-demo
 
 all: $(BIN)
 
@@ -114,6 +114,10 @@ iigs-test: gfx maze iigs
 		--gfx $(GFX_DIR) \
 		--out $(IIGS_BUILD)/frame.png \
 		--run-seconds 2.0
+
+# Interactive demo: one process builds (if needed), spawns GS2, waits for Enter.
+iigs-demo:
+	GS2_PY=$(GS2_PY) GSSQUARED=$(GSSQUARED) python3 py/gs2_run_demo.py
 
 clean:
 	rm -rf $(BUILD_DIR)

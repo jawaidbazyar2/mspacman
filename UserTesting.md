@@ -23,48 +23,54 @@ make gfx maze iigs
 - `make maze` — level-1 tilemap + stitched cells + ghost rails (`iigs/rails_data.s`)  
 - `make iigs` — Merlin32 → `build/iigs/harness.bin`
 
-## Quick look (script owns the emulator)
+## Interactive demo (one command)
 
-Spawns GSSquared, boots to Applesoft, injects harness + assets, types `CALL 768`, runs the demo, then freezes and writes `build/iigs/frame.png` before quitting the emu:
+Builds if needed, spawns GSSquared, injects, runs the rail demo, waits for **Enter in that terminal**, then quits the emulator:
+
+```bash
+make iigs-demo
+```
+
+Same thing directly:
+
+```bash
+python3 py/gs2_run_demo.py
+```
+
+- Watch the GSSquared window (border = phase profiler).  
+- **Any key in the emulator** → 65816 `ExitDemo`.  
+- **Enter in the terminal** → quit GSSquared.
+
+## Still-frame CI-style capture
+
+Spawns GSSquared, runs briefly, freezes, writes `build/iigs/frame.png`, quits:
 
 ```bash
 make iigs-test
 ```
 
-For a longer interactive window before freeze/quit:
+Timed run without the interactive waiter:
 
 ```bash
 PYTHONPATH=$HOME/src/gssquared/clients/python/src \
   python3 py/gs2_render_test.py --run-seconds 60
 ```
 
-Watch the GSSquared window during the run. Press **any key** in the emulator to end the demo early (clears `$C000` via `$C010`, drops SHR, hangs). If you wait out `--run-seconds`, the host sets `DEMO_FREEZE` (`$02/7904`) and captures a PNG.
-
-## Keep GSSquared open (attach)
-
-**Terminal 1** — start the emulator with the debug socket:
-
-```bash
-$HOME/src/gssquared/build/GSSquared -p 5 --debug /tmp/gs2-mspacman.sock --no-quit-confirm
-```
-
-**Terminal 2** — inject and run without quitting the emu when the script exits:
-
-```bash
-cd /path/to/mspacman
-PYTHONPATH=$HOME/src/gssquared/clients/python/src \
-  python3 py/gs2_render_test.py \
-    --attach /tmp/gs2-mspacman.sock \
-    --run-seconds 120
-```
-
-Animation runs for `--run-seconds`; then the script freezes and captures `build/iigs/frame.png` but leaves GSSquared running. Keypress still ends the demo from inside the harness.
-
 ## What you should see
 
 - Maze 1 in SHR 320×200 (pink/red walls, pellets).  
 - Four ghosts on a shared waypoint loop: **red / pink / cyan / orange**, spaced around the path.  
-- Smooth erase → move → draw (no mid-band “missing sprite” tear if beam waits are working).
+- Smooth erase → draw → commit → rails (move is outside the blit hole).  
+- **Border color = phase profiler** (width of each color ≈ time in that phase):
+
+| Border | Phase |
+|--------|--------|
+| Red | `EraseAllSprites` |
+| Green | `DrawAllSprites` |
+| Med blue | `CopySpritePos` |
+| Orange | `AdvanceRails` |
+| Black | `WaitVBL` (idle slack — more black = healthier budget) |
+| White | `DEMO_FREEZE` (host capture) |
 
 ## Useful flags
 

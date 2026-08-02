@@ -36,11 +36,12 @@ Start
 	jsr	CopySpritePos
 	lda	#0
 	sta	>FRAME_COUNT
-	cli				; IRQs ok once frame path is live
+* Keep SEI — no IRQ handlers installed; cli → random BRK/monitor
 	jsr	WaitVBL			; sync before first erase/draw
 
 MainLoop
 * erase(old) → draw(new) → old←new → move(new) → WaitVBL
+* Border color = phase profiler (see BRD_* in equates.s).
 	sep	#$20
 	lda	>KBD
 	bpl	:nokey
@@ -50,21 +51,43 @@ MainLoop
 	lda	>DEMO_FREEZE
 	and	#$00FF
 	bne	:frozen
+	sep	#$20
+	lda	#BRD_ERASE
+	jsr	SetBorder
+	rep	#$30
 	jsr	EraseAllSprites		; ACT_OX/OY
+	sep	#$20
+	lda	#BRD_DRAW
+	jsr	SetBorder
+	rep	#$30
 	jsr	DrawAllSprites		; ACT_X/Y
+	sep	#$20
+	lda	#BRD_COPY
+	jsr	SetBorder
+	rep	#$30
 	jsr	CopySpritePos		; old ← new
+	sep	#$20
+	lda	#BRD_RAILS
+	jsr	SetBorder
+	rep	#$30
 	jsr	AdvanceRails		; write new XY only
 	lda	>FRAME_COUNT
 	inc
 	sta	>FRAME_COUNT
-	jsr	WaitVBL
+	jsr	WaitVBL			; border black while waiting
 	bra	MainLoop
-:frozen	jsr	WaitVBL
+:frozen	sep	#$20
+	lda	#BRD_FREEZE
+	jsr	SetBorder		; white between frozen waits
+	rep	#$30
+	jsr	WaitVBL			; black again while in WaitVBL
 	bra	MainLoop
 
 ExitDemo
 * Any key ends the rail demo: drop SHR, halt (host freeze still used for PNG).
 	sep	#$30
+	lda	#0
+	jsr	SetBorder
 	lda	#$41
 	sta	>NEWVIDEO
 	lda	>KBDSTRB

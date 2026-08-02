@@ -13,7 +13,16 @@ SHADOW         equ $00C035
 RDVBLBAR       equ $00C019
 KBD            equ $00C000
 KBDSTRB        equ $00C010
+BORDCOLOR      equ $00C034	; low nibble = border (preserve high clock bits)
 TXTCLR         equ $00C050
+
+* MainLoop phase border colors (classic 16; visual frame profiler)
+BRD_ERASE      equ $01		; red — EraseAllSprites
+BRD_DRAW       equ $0C		; green — DrawAllSprites
+BRD_COPY       equ $06		; med blue — CopySpritePos
+BRD_RAILS      equ $09		; orange — AdvanceRails
+BRD_VBL        equ $00		; black — WaitVBL (idle / slack)
+BRD_FREEZE     equ $0F		; white — DEMO_FREEZE spin
 
 BANK_CODE      equ $02
 BANK_SHR       equ $01
