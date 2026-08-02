@@ -344,6 +344,8 @@ make iigs-test   # spawn GSSquared, inject, CALL 768, dump build/iigs/frame.png
 
 Harness maze tiles must match `make gfx` upright orientation (CW + row XOR 3). Ground-truth previews: `build/gfx/ppm/maze1_8x8_upright.png` / `maze1_6x6_upright.png`.
 
+**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`py/gen_ghost_rails.py` → `iigs/rails_data.s`). Motion only **writes** `ACT_X`/`ACT_Y`; soft-sprite erase/draw **reads** them. Bodies use `ACT_COLOR` (Blinky/Pinky/Inky/Clyde pens 5/7/9/11) substituted for marker pen 6 at blit. Erase/draw are **Y-sorted** with `WaitBeamSafe` (Mega II `$C02E`/`$C02F`) so updates stay ahead of the raster. Loop runs until a key at `$C000`/`$C010`, or host sets `DEMO_FREEZE` (`$02/7904`) before SHR capture.
+
 ---
 
 ## 4. Input

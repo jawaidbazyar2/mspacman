@@ -218,9 +218,11 @@ def mask_from_pens(img: list[list[int]]) -> list[list[int]]:
     return [[0xF if p else 0 for p in row] for row in img]
 
 
-# Arcade sprite pens 1–3 → SHR pens that are not maze wall red/peach (2–3).
-# Palette slots 5–7 / 9 come from gen_palette.py (color ROM fill).
-_SPRITE_PEN_MAP = (0, 7, 9, 6)  # body → slot 6 ($0D95), not wall red at 3/5
+# Arcade sprite pens 1–3 → SHR pens. Body (pen 3) stays at marker slot 6 so
+# DrawSprite can substitute ACT_COLOR (Blinky/Pinky/Inky/Clyde). Eyes use
+# slots that do not collide with those body colors (5/7/9/11).
+#   pen1 (eye white) → 1 (maze pale), pen2 (pupil) → 15, pen3 (body) → 6
+_SPRITE_PEN_MAP = (0, 1, 15, 6)
 
 
 def remap_sprite_pens(img: list[list[int]]) -> list[list[int]]:

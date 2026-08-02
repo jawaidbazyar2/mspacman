@@ -1,67 +1,124 @@
 *
-* Actor init / bounce (included from all.s)
+* Actor init + rail tour
+* Rails write ACT_X / ACT_Y only; renderer reads them (no SHR here).
 *
 
+* A = tile coord → screen pixel in A (X variant)
+TileToScreenX
+	sta	>$027A14
+	asl
+	clc
+	adc	>$027A14
+	asl				; tile * 6
+	clc
+	adc	#SPR_BASE_X
+	rts
+
+TileToScreenY
+	sta	>$027A14
+	asl
+	clc
+	adc	>$027A14
+	asl
+	clc
+	adc	#SPR_BASE_Y
+	rts
+
+SetActorAtWP
+* X = actor base ($7400+); A = waypoint index (0..RAIL_LEN-1)
+* Sets ACT_WP, ACT_X, ACT_Y from RailPath
+	php
+	sep	#$20
+	sta	>$02000A,x		; ACT_WP
+	rep	#$20
+	and	#$00FF
+	asl
+	tay
+	lda	RailPath,y
+	and	#$00FF
+	jsr	TileToScreenX
+	sta	>$020000,x
+	iny
+	lda	RailPath,y
+	and	#$00FF
+	jsr	TileToScreenY
+	sta	>$020002,x
+	plp
+	rts
+
 InitActors
-* Three demo actors on pellet tiles (still). Screen coords:
-*   X = PF_ORIGIN_X + tile_x*6 + SPR_OFF_X (-4)
-*   Y = PF_ORIGIN_Y + tile_y*6 + SPR_OFF_Y (-3)
+* Four ghosts; waypoint phases from rails_data.s (RAIL_START0..3)
 	php
 	rep	#$30
 	ldx	#$7400
-	lda	#90			; 76+3*6-4; tile (3,20)
-	sta	>$020000,x
-	lda	#124			; 7+20*6-3
-	sta	>$020002,x
+	lda	#RAIL_START0
+	jsr	SetActorAtWP
 	lda	#0
 	sta	>$020004,x
 	sta	>$020006,x
 	sep	#$20
-	lda	#$20			; ghost
+	lda	#$20
 	sta	>$020008,x
 	lda	#0
 	sta	>$020009,x
+	lda	#COL_BLINKY
+	sta	>$02000B,x
 	rep	#$20
 
 	ldx	#$7410
-	lda	#126			; 76+9*6-4; tile (9,20)
-	sta	>$020000,x
-	lda	#124
-	sta	>$020002,x
+	lda	#RAIL_START1
+	jsr	SetActorAtWP
 	lda	#0
 	sta	>$020004,x
 	sta	>$020006,x
 	sep	#$20
-	lda	#$22			; ghost variant
+	lda	#$22
 	sta	>$020008,x
 	lda	#0
 	sta	>$020009,x
+	lda	#COL_PINKY
+	sta	>$02000B,x
 	rep	#$20
 
 	ldx	#$7420
-	lda	#181			; 76+18*6-3 odd (odd-path smoke test)
-	sta	>$020000,x
-	lda	#124
-	sta	>$020002,x
+	lda	#RAIL_START2
+	jsr	SetActorAtWP
 	lda	#0
 	sta	>$020004,x
 	sta	>$020006,x
 	sep	#$20
-	lda	#$2C			; fruit-ish
+	lda	#$24
 	sta	>$020008,x
 	lda	#0
 	sta	>$020009,x
+	lda	#COL_INKY
+	sta	>$02000B,x
+	rep	#$20
+
+	ldx	#$7430
+	lda	#RAIL_START3
+	jsr	SetActorAtWP
+	lda	#0
+	sta	>$020004,x
+	sta	>$020006,x
+	sep	#$20
+	lda	#$26
+	sta	>$020008,x
+	lda	#0
+	sta	>$020009,x
+	lda	#COL_CLYDE
+	sta	>$02000B,x
 	rep	#$20
 	plp
 	rts
 
-UpdateActors
+AdvanceRails
+* For each actor: step ACT_X/ACT_Y 1px toward current waypoint; on arrival advance WP.
 	php
 	rep	#$30
 	lda	#0
 	sta	>$027A16
-UpdateLoop
-	lda	>$027A16
+]ar	lda	>$027A16
 	asl
 	asl
 	asl
@@ -69,59 +126,54 @@ UpdateLoop
 	clc
 	adc	#$7400
 	tax
+	phx
+	lda	>$02000A,x		; ACT_WP (byte in low)
+	and	#$00FF
+	asl
+	tay
+	lda	RailPath,y
+	and	#$00FF
+	jsr	TileToScreenX
+	sta	>$027A00
+	iny
+	lda	RailPath,y
+	and	#$00FF
+	jsr	TileToScreenY
+	sta	>$027A02
+	plx
 	lda	>$020000,x
-	clc
-	adc	>$020004,x
+	cmp	>$027A00
+	beq	:yAxis
+	bcc	:goRight
+	dec
 	sta	>$020000,x
-	lda	>$020002,x
-	clc
-	adc	>$020006,x
-	sta	>$020002,x
-
-	lda	>$020000,x
-	cmp	#76
-	bcs	:xhi
-	lda	#76
+	bra	:arNext
+:goRight	inc
 	sta	>$020000,x
-	lda	>$020004,x
-	eor	#$FFFF
-	inc
-	sta	>$020004,x
-	bra	:y
-:xhi	cmp	#76+168-14
-	bcc	:y
-	lda	#76+168-14
-	sta	>$020000,x
-	lda	>$020004,x
-	eor	#$FFFF
-	inc
-	sta	>$020004,x
-
-:y	lda	>$020002,x
-	cmp	#7
-	bcs	:yhi
-	lda	#7
+	bra	:arNext
+:yAxis	lda	>$020002,x
+	cmp	>$027A02
+	beq	:hit
+	bcc	:goDown
+	dec
 	sta	>$020002,x
-	lda	>$020006,x
-	eor	#$FFFF
-	inc
-	sta	>$020006,x
-	bra	:next
-:yhi	cmp	#7+186-12
-	bcc	:next
-	lda	#7+186-12
+	bra	:arNext
+:goDown	inc
 	sta	>$020002,x
-	lda	>$020006,x
-	eor	#$FFFF
+	bra	:arNext
+:hit	sep	#$20
+	lda	>$02000A,x
 	inc
-	sta	>$020006,x
-
-:next	lda	>$027A16
+	cmp	#RAIL_LEN
+	bcc	:storeWp
+	lda	#0
+:storeWp	sta	>$02000A,x
+	rep	#$20
+:arNext	lda	>$027A16
 	inc
 	sta	>$027A16
-	lda	>$027A16
-	cmp	#3
-	bcs	:udone
-	jmp	UpdateLoop
-:udone	plp
+	cmp	#NUM_ACTORS
+	bcs	:arDone
+	jmp	]ar
+:arDone	plp
 	rts

@@ -61,6 +61,7 @@ MAZE_CELLS_ADDR = 0x037000
 # With SHR shadowing on, bank $01 is authoritative; $E1 tracks it.
 SHR_ADDR = 0x012000
 PAL_ADDR = 0x019E00
+DEMO_FREEZE_ADDR = 0x027904
 
 CHUNK = 0x4000
 
@@ -255,11 +256,21 @@ def main() -> int:
             launch_via_basic(client)
             print(f"running {args.run_seconds}s…")
             time.sleep(args.run_seconds)
+            # Freeze after a completed Draw so capture is not mid-erase.
             client.pause()
             try:
                 client.wait_stopped(timeout=5.0)
             except TimeoutError:
                 print("warning: no EVT_STOPPED after pause (continuing capture)")
+            client.write_mem(MEM_MAIN, DEMO_FREEZE_ADDR, bytes([1]))
+            print(f"DEMO_FREEZE=1 @ ${DEMO_FREEZE_ADDR:06X}")
+            client.continue_()
+            time.sleep(0.15)
+            client.pause()
+            try:
+                client.wait_stopped(timeout=5.0)
+            except TimeoutError:
+                print("warning: no EVT_STOPPED after freeze settle")
             capture_frame(client, args.out)
 
             if own_process:

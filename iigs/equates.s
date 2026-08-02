@@ -11,6 +11,10 @@
 NEWVIDEO       equ $00C029
 SHADOW         equ $00C035
 RDVBLBAR       equ $00C019
+VERTCNT        equ $00C02E
+HORIZCNT       equ $00C02F
+KBD            equ $00C000
+KBDSTRB        equ $00C010
 TXTCLR         equ $00C050
 
 BANK_CODE      equ $02
@@ -39,11 +43,13 @@ SPR_ART_H      equ 12
 SPR_BYTES_ROW  equ 7
 SPR_BYTES      equ 84
 * Center sprite cell on a 6×6 tile. Art is centered in the 14-wide cell
-* (opaque ~cols 2–11); -4 lines that band up with the 6px path.
-SPR_OFF_X      equ -4
-SPR_OFF_Y      equ -3
+* (opaque ~cols 2–11); -4/-3 lines that band up with the 6px path.
+* Merlin cannot fold negative equates into #imm expressions — use bases.
+SPR_BASE_X     equ 72		; PF_ORIGIN_X - 4
+SPR_BASE_Y     equ 4		; PF_ORIGIN_Y - 3
 NUM_SPRITES    equ 64
-NUM_ACTORS     equ 3
+NUM_ACTORS     equ 4
+* 4 actors × 84-byte save-under = 336 bytes → $7500..$764F (below DIRTY)
 
 NUM_TILES      equ 256
 TILE_BYTES_ROW equ 3
@@ -64,6 +70,7 @@ DIRTY_COUNT    equ $027800
 DIRTY_LIST     equ $027802
 FRAME_COUNT    equ $027900
 EAT_INDEX      equ $027902
+DEMO_FREEZE    equ $027904	; nonzero → MainLoop skips erase/rails/draw
 
 ACT_SIZE       equ 16
 ACT_X          equ 0
@@ -72,4 +79,13 @@ ACT_DX         equ 4
 ACT_DY         equ 6
 ACT_SPR        equ 8
 ACT_FLAGS      equ 9
+ACT_WP         equ 10		; waypoint index into RailPath (byte)
+ACT_COLOR      equ 11		; SHR pen for body (replaces marker pen 6)
 FLAG_DRAWN     equ $01
+
+* Ghost body pens (palette slots from gen_palette color-ROM fill)
+COL_BLINKY     equ 5		; red
+COL_PINKY      equ 7		; pink
+COL_INKY       equ 9		; cyan
+COL_CLYDE      equ 11		; orange
+BODY_PEN       equ 6		; marker in sprite assets

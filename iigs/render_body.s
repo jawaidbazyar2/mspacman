@@ -16,6 +16,12 @@ R_TMP          equ $027A14
 R_ACT          equ $027A16
 R_BASE         equ $027A18
 R_SAVE         equ $027A1A
+R_BODY         equ $027A1C	; ACT_COLOR nibble for RemapBodyByte
+R_BTMP         equ $027A1E
+R_SAFEY        equ $027A30	; scanline wait threshold (pixel Y)
+R_SORT         equ $027A20	; 4 actor indices, Y-sorted
+R_SI           equ $027A28
+R_SJ           equ $027A2A
 
 CopyMaze
 	php
@@ -338,29 +344,127 @@ DrawMaze
 	plp
 	rts
 
+* Sort actor indices at R_SORT by ACT_Y ascending (beam-race order).
+SortActorsByY
+* Bubble-sort actor indices at $7A20 (bank $02 / DB) by ACT_Y.
+* Merlin32 long addr is X-only — use abs,x with DB=$02.
+	php
+	sep	#$30
+	lda	#0
+	sta	>$027A20
+	lda	#1
+	sta	>$027A21
+	lda	#2
+	sta	>$027A22
+	lda	#3
+	sta	>$027A23
+	lda	#0
+	sta	>R_SI
+]si	lda	#0
+	sta	>R_SJ
+]sj	lda	>R_SJ
+	tax
+	lda	$7A20,x			; idx[j]
+	jsr	:yOf
+	sta	>R_BTMP
+	lda	>R_SJ
+	inc
+	tax
+	lda	$7A20,x			; idx[j+1]
+	jsr	:yOf
+	cmp	>R_BTMP
+	bcs	:noswap
+	lda	>R_SJ
+	tax
+	lda	$7A20,x
+	sta	>R_BTMP
+	lda	$7A21,x
+	sta	$7A20,x
+	lda	>R_BTMP
+	sta	$7A21,x
+:noswap	lda	>R_SJ
+	inc
+	sta	>R_SJ
+	cmp	#NUM_ACTORS-1
+	bcc	]sj
+	lda	>R_SI
+	inc
+	sta	>R_SI
+	cmp	#NUM_ACTORS-1
+	bcc	]si
+	plp
+	rts
+
+:yOf	asl				; A=actor idx → ACT_Y low in A
+	asl
+	asl
+	asl
+	tax
+	lda	$7402,x
+	rts
+
 EraseAllSprites
+* Y-sorted + WaitBeamSafe so erase finishes before the beam hits each sprite.
 	php
 	rep	#$30
-	lda	#2
-	sta	>$027A16
-]e	lda	>$027A16
+	jsr	SortActorsByY
+	lda	#0
+	sta	>R_SI
+]e	sep	#$20
+	lda	>R_SI
+	tax
+	lda	$7A20,x
+	sta	>R_ACT
+	rep	#$20
+	and	#$00FF
+	asl
+	asl
+	asl
+	asl
+	tax
+	lda	>$020002,x		; ACT_Y
+	sta	>R_SAFEY
+	jsr	WaitBeamSafe
+	lda	>R_ACT
+	and	#$00FF
 	jsr	EraseSprite
-	lda	>$027A16
-	dec
-	sta	>$027A16
-	bpl	]e
+	lda	>R_SI
+	inc
+	sta	>R_SI
+	cmp	#NUM_ACTORS
+	bcc	]e
 	plp
 	rts
 
 DrawAllSprites
 	php
 	rep	#$30
+	jsr	SortActorsByY
 	lda	#0
+	sta	>R_SI
+]d	sep	#$20
+	lda	>R_SI
+	tax
+	lda	$7A20,x
+	sta	>R_ACT
+	rep	#$20
+	and	#$00FF
+	asl
+	asl
+	asl
+	asl
+	tax
+	lda	>$020002,x
+	sta	>R_SAFEY
+	jsr	WaitBeamSafe
+	lda	>R_ACT
+	and	#$00FF
 	jsr	DrawSprite
-	lda	#1
-	jsr	DrawSprite
-	lda	#2
-	jsr	DrawSprite
+	lda	>R_SI
+	inc
+	sta	>R_SI
+	cmp	#NUM_ACTORS
+	bcc	]d
 	plp
 	rts
 
@@ -472,6 +576,9 @@ DrawSprite
 	lda	>$020008,x
 	and	#$00FF
 	sta	>$027A10
+	lda	>$02000B,x		; ACT_COLOR
+	and	#$000F
+	sta	>R_BODY
 	jsr	ScreenXY
 	lda	>$027A16
 	jsr	Mul84
@@ -533,6 +640,32 @@ DrawSprite
 	plp
 	rts
 
+* A = packed sprite byte; replace BODY_PEN ($6) nibbles with R_BODY.
+RemapBodyByte
+	php
+	sep	#$20
+	sta	>R_BTMP
+	and	#$F0
+	cmp	#$60			; BODY_PEN in high nibble
+	bne	:hiOk
+	lda	>R_BODY
+	asl
+	asl
+	asl
+	asl
+	bra	:hi
+:hiOk	lda	>R_BTMP
+	and	#$F0
+:hi	sta	>$027A12
+	lda	>R_BTMP
+	and	#$0F
+	cmp	#BODY_PEN
+	bne	:loOk
+	lda	>R_BODY
+:loOk	ora	>$027A12
+	plp
+	rts
+
 MaskedBlitEven
 	rep	#$30
 	lda	#12
@@ -578,8 +711,11 @@ MaskByteE
 	eor	#$FF
 	and	$2000,y
 	sta	>$027A14
+	lda	>$031200,x
+	jsr	RemapBodyByte
+	sta	>R_BTMP
 	lda	>$032700,x
-	and	>$031200,x
+	and	>R_BTMP
 	ora	>$027A14
 	sta	$2000,y
 	rep	#$20
@@ -630,8 +766,11 @@ MaskByteO
 	eor	#$FF
 	and	$2000,y
 	sta	>$027A14
+	lda	>$033C00,x
+	jsr	RemapBodyByte
+	sta	>R_BTMP
 	lda	>$035100,x
-	and	>$033C00,x
+	and	>R_BTMP
 	ora	>$027A14
 	sta	$2000,y
 	rep	#$20

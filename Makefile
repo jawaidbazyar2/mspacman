@@ -76,6 +76,12 @@ palette:
 # Decode level-1 maze tilemap (28x31) + stitched cells (needs tiles6.bin).
 maze: boot1 boot2 boot3 boot4 boot5 boot6
 	python3 py/gen_maze1.py --out $(GFX_DIR)
+	$(MAKE) rails
+
+# Waypoint loop for four-ghost rail demo (Merlin rails_data.s).
+.PHONY: rails
+rails: $(GFX_DIR)/maze1_28x31.bin
+	python3 py/gen_ghost_rails.py --maze $(GFX_DIR)/maze1_28x31.bin --out $(IIGS_DIR)/rails_data.s
 
 # Native 8×8 maze + tile sheet (no 6×6 scale) to validate rotate/flip.
 # Example: make tiles-preview COMPARE=native,cw,upright
@@ -86,14 +92,15 @@ tiles-preview: maze
 		--out $(GFX_DIR)/ppm
 
 # Assemble IIgs render harness with Merlin32 → build/iigs/harness.bin
-iigs: palette $(IIGS_BIN)
+iigs: palette rails $(IIGS_BIN)
 
 $(IIGS_BUILD):
 	mkdir -p $(IIGS_BUILD)
 
 $(IIGS_BIN): $(IIGS_DIR)/link.s $(IIGS_DIR)/all.s $(IIGS_DIR)/equates.s \
 		$(IIGS_DIR)/shr_body.s $(IIGS_DIR)/render_body.s \
-		$(IIGS_DIR)/harness_body.s $(IIGS_DIR)/palette_data.s \
+		$(IIGS_DIR)/harness_body.s $(IIGS_DIR)/rails_data.s \
+		$(IIGS_DIR)/palette_data.s \
 		$(MERLIN32) | $(IIGS_BUILD)
 	cd $(IIGS_DIR) && $(MERLIN32) $(MERLIN_LIB) link.s
 	mv -f $(IIGS_DIR)/harness.bin $(IIGS_BIN)
@@ -105,7 +112,8 @@ iigs-test: gfx maze iigs
 		--gs2 $(GSSQUARED) \
 		--bin $(IIGS_BIN) \
 		--gfx $(GFX_DIR) \
-		--out $(IIGS_BUILD)/frame.png
+		--out $(IIGS_BUILD)/frame.png \
+		--run-seconds 2.0
 
 clean:
 	rm -rf $(BUILD_DIR)
