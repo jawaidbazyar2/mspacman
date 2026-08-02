@@ -65,24 +65,24 @@ Merlin `org $0000` → loaded at `$02/0000`.
 
 | Address | Size | Notes |
 |---------|------|-------|
-| `$02/0000`–… | `harness.bin` | Code + compiled ghost blits (keep below `$7000`) |
-| …–`$02/6FFF` | — | **Free** (keep code below `$7000`) |
+| `$02/0000`–… | `harness.bin` | Code + compiled ghost/fruit/Ms. Pac blits (keep below `$8000`) |
+| …–`$02/7FFF` | — | **Free** after code (working RAM starts at `$8000`) |
 
 ### Logical tilemap and actors
 
 | Address | Symbol | Size | Notes |
 |---------|--------|------|-------|
 | `$02/6000`–`$02/653F` | (free) | 1344 | Was `SPR_WORK*`; ghosts use compiled blits now |
-| `$02/7000`–`$02/7363` | `TILEMAP` | 868 | 28×31 tile codes (copy of `AST_MAZE`) |
-| `$02/7364`–`$02/73FF` | — | — | Unused pad to actors |
-| `$02/7400`–`$02/744F` | `ACTORS` | 80 | 5 actors × 16 bytes (4 ghosts + fruit) |
-| `$02/7450`–`$02/74FF` | — | — | Reserved for actor 5 (Ms. Pac) later |
-| `$02/7500`–`$02/76A3` | `SAVEUNDER` | 420 | 5 × 84-byte (14×12) underlays |
-| `$02/76A4`–`$02/77FF` | — | — | Free (must stay below dirty) |
+| `$02/8000`–`$02/8363` | `TILEMAP` | 868 | 28×31 tile codes (copy of `AST_MAZE`) |
+| `$02/8364`–`$02/83FF` | — | — | Unused pad to actors |
+| `$02/8400`–`$02/845F` | `ACTORS` | 96 | 6 actors × 16 bytes (4 ghosts + fruit + Ms. Pac) |
+| `$02/8460`–`$02/84FF` | — | — | Pad to save-under |
+| `$02/8500`–`$02/86F7` | `SAVEUNDER` | 504 | 6 × 84-byte (14×12) underlays |
+| `$02/86F8`–`$02/87FF` | — | — | Free (must stay below dirty) |
 
 ### Actor record (`ACT_SIZE` = 16)
 
-Base = `$027400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with `>BANK2+field,x`.
+Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with `>BANK2+field,x`.
 
 | Off | Symbol | Type | Who writes | Who reads |
 |-----|--------|------|------------|-----------|
@@ -90,50 +90,50 @@ Base = `$027400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | +2 | `ACT_Y` | word | rails / logic (**new**) | `DrawSprite` |
 | +4 | `ACT_OX` | word | `CopySpritePos` / init (**old**) | `EraseSprite` |
 | +6 | `ACT_OY` | word | `CopySpritePos` / init (**old**) | `EraseSprite` |
-| +8 | `ACT_SPR` | byte | rails / fruit cycle (ghost `$20–$27` or fruit `$00–$07`) | `DrawSprite` → ghost/fruit blit table |
+| +8 | `ACT_SPR` | byte | rails / fruit / pac (ghost `$20–$27`, fruit `$00–$07`, Ms. Pac `dir*3+mouth`) | `DrawSprite` → ghost/fruit/MsPac blit table |
 | +9 | `ACT_FLAGS` | byte | render (`FLAG_DRAWN`) | render |
-| +10 | `ACT_WP` | byte | rails (waypoint index; ghosts only) | rails only |
-| +11 | `ACT_COLOR` | byte | init (ghost body pen 5/7/9/11; unused for fruit) | `DrawSprite` → `GhostBlitTable` |
+| +10 | `ACT_WP` | byte | rails (waypoint index; ghosts + Ms. Pac) | rails only |
+| +11 | `ACT_COLOR` | byte | init (ghost body pen 5/7/9/11; unused for fruit/Ms. Pac) | `DrawSprite` → `GhostBlitTable` |
 | +12…15 | — | — | reserved | — |
 
 ### Frame / dirty / demo control
 
 | Address | Symbol | Size | Notes |
 |---------|--------|------|-------|
-| `$02/7800` | `DIRTY_COUNT` | 2 | Number of dirty tile entries |
-| `$02/7802`–… | `DIRTY_LIST` | pairs | `(tx,ty)` bytes; room before `$7900` |
-| `$02/7900` | `FRAME_COUNT` | 2 | Frame counter |
-| `$02/7902` | `EAT_INDEX` | 2 | Dirty-eat demo cursor |
-| `$02/7904` | `DEMO_FREEZE` | 1 | Host≠0 → skip erase/draw/rails |
-| `$02/7905`–`$02/79FF` | — | — | Free |
+| `$02/8800` | `DIRTY_COUNT` | 2 | Number of dirty tile entries |
+| `$02/8802`–… | `DIRTY_LIST` | pairs | `(tx,ty)` bytes; room before `$8900` |
+| `$02/8900` | `FRAME_COUNT` | 2 | Frame counter |
+| `$02/8902` | `EAT_INDEX` | 2 | Dirty-eat demo cursor |
+| `$02/8904` | `DEMO_FREEZE` | 1 | Host≠0 → skip erase/draw/rails |
+| `$02/8905`–`$02/89FF` | — | — | Free |
 
 ### Render / harness scratch
 
 | Address | Symbol | Notes |
 |---------|--------|-------|
-| `$02/7A00` | `R_X` | Screen / temp X |
-| `$02/7A02` | `R_Y` | Screen / temp Y |
-| `$02/7A04` | `R_TX` | Tile X |
-| `$02/7A06` | `R_TY` | Tile Y |
-| `$02/7A08` | `R_TILE` | Tile code |
-| `$02/7A0A` | `R_OFF` | Byte offset / mul scratch |
-| `$02/7A0C` | `R_DEST` | SHR offset |
-| `$02/7A0E` | `R_ROW` | Row counter |
-| `$02/7A10` | `R_IDX` | Sprite index |
-| `$02/7A12` | `R_CARRY` | Nibble / mul scratch |
-| `$02/7A14` | `R_TMP` | General temp |
-| `$02/7A16` | `R_ACT` | Actor index |
-| `$02/7A18` | `R_BASE` | Actor base (`ACTORS16+…`) |
-| `$02/7A1A` | `R_SAVE` | Save-under pointer |
-| `$02/7A1C` | `R_BODY` | Body pen for remap |
-| `$02/7A1E` | `R_BTMP` | Blit temp |
-| `$02/7A20`–`$02/7A24` | `R_SORT` | Y-sorted actor indices (`NUM_ACTORS`) |
-| `$02/7A28` | `R_SI` | Sort / draw walk index |
-| `$02/7A2A` | `R_SJ` | Sort inner index |
-| `$02/7A2C` | `R_YOFF` | `ACT_Y` / `ACT_OY` field for sort |
+| `$02/8A00` | `R_X` | Screen / temp X |
+| `$02/8A02` | `R_Y` | Screen / temp Y |
+| `$02/8A04` | `R_TX` | Tile X |
+| `$02/8A06` | `R_TY` | Tile Y |
+| `$02/8A08` | `R_TILE` | Tile code |
+| `$02/8A0A` | `R_OFF` | Byte offset / mul scratch |
+| `$02/8A0C` | `R_DEST` | SHR offset |
+| `$02/8A0E` | `R_ROW` | Row counter |
+| `$02/8A10` | `R_IDX` | Sprite index |
+| `$02/8A12` | `R_CARRY` | Nibble / mul scratch |
+| `$02/8A14` | `R_TMP` | General temp |
+| `$02/8A16` | `R_ACT` | Actor index |
+| `$02/8A18` | `R_BASE` | Actor base (`ACTORS16+…`) |
+| `$02/8A1A` | `R_SAVE` | Save-under pointer |
+| `$02/8A1C` | `R_BODY` | Body pen for remap |
+| `$02/8A1E` | `R_BTMP` | Blit temp |
+| `$02/8A20`–`$02/8A25` | `R_SORT` | Y-sorted actor indices (`NUM_ACTORS` = 6) |
+| `$02/8A28` | `R_SI` | Sort / draw walk index |
+| `$02/8A2A` | `R_SJ` | Sort inner index |
+| `$02/8A2C` | `R_YOFF` | `ACT_Y` / `ACT_OY` field for sort |
 
 `BANK2` = `$020000` (long base for `,x` with 16-bit offset).  
-`ACTORS16` = `$7400`, `SAVEUNDER16` = `$7500`.
+`ACTORS16` = `$8400`, `SAVEUNDER16` = `$8500`.
 
 ---
 
@@ -159,10 +159,12 @@ Host writes these before `CALL 768`. Packed 4bpp; already upright (CW + row XOR 
 
 | Actor | Save base | Bytes |
 |-------|-----------|-------|
-| 0 | `$02/7500` | 84 |
-| 1 | `$02/7554` | 84 |
-| 2 | `$02/75A8` | 84 |
-| 3 | `$02/75FC` | 84 |
+| 0 | `$02/8500` | 84 |
+| 1 | `$02/8554` | 84 |
+| 2 | `$02/85A8` | 84 |
+| 3 | `$02/85FC` | 84 |
+| 4 | `$02/8650` | 84 |
+| 5 | `$02/86A4` | 84 |
 
 Formula: `SAVEUNDER16 + index × 84`. One cell = 7 bytes × 12 rows.
 
@@ -174,7 +176,7 @@ Formula: `SAVEUNDER16 + index × 84`. One cell = 7 bytes × 12 rows.
 |--------|-----------|----------|
 | `ACT_X`/`ACT_Y` (new) | Rails / game logic | Draw |
 | `ACT_OX`/`ACT_OY` (old) | `CopySpritePos` after draw | Erase |
-| `ACT_SPR` / `ACT_COLOR` | Rails / init | `DrawSprite` (compiled `GhostBlitGo`) |
+| `ACT_SPR` / `ACT_COLOR` | Rails / init | `DrawSprite` (compiled `GhostBlitGo` / `FruitBlitGo` / `MsPacBlitGo`) |
 | `ACT_WP` | Rails | Rails only |
 | `ACT_FLAGS` | Render | Render |
 | `TILEMAP` / dirty list | Game logic | Tile redraw |
@@ -186,9 +188,9 @@ Formula: `SAVEUNDER16 + index × 84`. One cell = 7 bytes × 12 rows.
 
 ## Gaps / constraints
 
-1. **Code must stay below `$02/7000`.**
-2. **Save-under must stay below `$02/7800`** (dirty list).
-3. Expanding to 6 actors: 6×16 = 96 → actors through `$745F`; 6×84 = 504 → save through `$76F7` (still under `$7800`).
+1. **Code must stay below `$02/8000`** (working RAM starts there).
+2. **Save-under must stay below `$02/8800`** (dirty list).
+3. Six actors: 6×16 = 96 → actors through `$845F`; 6×84 = 504 → save through `$86F7` (still under `$8800`).
 4. Odd sprite/mask forms are **host-injected** (not generated on target in the current harness).
 
 When this map changes, update [`iigs/equates.s`](../iigs/equates.s) first, then this file.

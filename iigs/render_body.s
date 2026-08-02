@@ -2,30 +2,30 @@
 * Tile / sprite render (included from all.s)
 *
 
-R_X            equ $027A00
-R_Y            equ $027A02
-R_TX           equ $027A04
-R_TY           equ $027A06
-R_TILE         equ $027A08
-R_OFF          equ $027A0A
-R_DEST         equ $027A0C
-R_ROW          equ $027A0E
-R_IDX          equ $027A10
-R_CARRY        equ $027A12
-R_TMP          equ $027A14
-R_ACT          equ $027A16
-R_BASE         equ $027A18
-R_SAVE         equ $027A1A
-R_BODY         equ $027A1C	; ACT_COLOR nibble for RemapBodyByte
-R_BTMP         equ $027A1E
-R_SORT         equ $027A20	; NUM_ACTORS actor indices, Y-sorted
-R_SI           equ $027A28
-R_SJ           equ $027A2A
-R_YOFF         equ $027A2C	; ACT_Y or ACT_OY offset for SortActorsByY
+R_X            equ $028A00
+R_Y            equ $028A02
+R_TX           equ $028A04
+R_TY           equ $028A06
+R_TILE         equ $028A08
+R_OFF          equ $028A0A
+R_DEST         equ $028A0C
+R_ROW          equ $028A0E
+R_IDX          equ $028A10
+R_CARRY        equ $028A12
+R_TMP          equ $028A14
+R_ACT          equ $028A16
+R_BASE         equ $028A18
+R_SAVE         equ $028A1A
+R_BODY         equ $028A1C	; ACT_COLOR nibble for RemapBodyByte
+R_BTMP         equ $028A1E
+R_SORT         equ $028A20	; NUM_ACTORS actor indices, Y-sorted
+R_SI           equ $028A28
+R_SJ           equ $028A2A
+R_YOFF         equ $028A2C	; ACT_Y or ACT_OY offset for SortActorsByY
 * Bank $02 long base: >BANK2+field,x with X = ACTORS16 / SAVEUNDER16
 BANK2          equ $020000
-ACTORS16       equ $7400
-SAVEUNDER16    equ $7500
+ACTORS16       equ $8400
+SAVEUNDER16    equ $8500
 
 CopyMaze
 	php
@@ -632,7 +632,7 @@ EraseSprite
 
 DrawSprite
 * A = actor index — must save before PHB bank switch clobbers it
-* Save-under then compiled ghost or fruit blit; no SPR_WORK / remap.
+* Save-under then compiled ghost / fruit / Ms. Pac blit; no SPR_WORK / remap.
 	php
 	rep	#$30
 	sta	>R_ACT
@@ -765,6 +765,8 @@ DrawSprite
 	lda	>R_ACT
 	cmp	#FRUIT_ACTOR
 	beq	:fruitBlit
+	cmp	#PAC_ACTOR
+	beq	:pacBlit
 * Ghost: index = color_slot*16 + (ACT_SPR&7)*2 + (X&1)
 	lda	>R_BASE
 	tax
@@ -809,6 +811,23 @@ DrawSprite
 	lda	>R_DEST
 	tay
 	jsr	FruitBlitGo
+	bra	:blitDone
+:pacBlit
+* Ms. Pac: index = (ACT_SPR & $0F)*2 + (X&1); ACT_SPR = dir*3+mouth
+	lda	>R_BASE
+	tax
+	lda	>BANK2+ACT_SPR,x
+	and	#$000F
+	asl				; slot*2
+	sta	>R_OFF
+	lda	>R_X
+	and	#$0001
+	ora	>R_OFF
+	asl				; word index
+	tax
+	lda	>R_DEST
+	tay
+	jsr	MsPacBlitGo
 :blitDone
 	lda	>R_BASE
 	tax

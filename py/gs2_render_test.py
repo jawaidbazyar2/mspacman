@@ -61,7 +61,7 @@ MAZE_CELLS_ADDR = 0x037000
 # With SHR shadowing on, bank $01 is authoritative; $E1 tracks it.
 SHR_ADDR = 0x012000
 PAL_ADDR = 0x019E00
-DEMO_FREEZE_ADDR = 0x027904
+DEMO_FREEZE_ADDR = 0x028904
 
 CHUNK = 0x4000
 

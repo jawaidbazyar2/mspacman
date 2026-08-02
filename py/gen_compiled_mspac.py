@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""Emit compiled 65816 masked blits for Ms. Pac walk frames.
+
+24 variants: 4 directions × 3 mouth positions × even/odd.
+
+Arcade source: Ms. Pac patch #869C–#86EA. Sprite index is code & $3F;
+bits 7/6 are X/Y flip. Color bank #09 prebaked into §2 SHR pens.
+
+  index = (dir*3 + mouth)*2 + (X & 1)  → MsPacBlitTable
+  ACT_SPR = dir*3 + mouth  (0..11)
+
+Usage:
+  python3 py/gen_compiled_mspac.py
+  python3 py/gen_compiled_mspac.py --sprites mspacman-orig/5f -o iigs/compiled_mspac.s
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib.util
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_SPRITE_ROM = ROOT / "mspacman-orig" / "5f"
+DEFAULT_COLOR_ROM = ROOT / "mspacman-orig" / "82s123.7f"
+DEFAULT_PALETTE_ROM = ROOT / "mspacman-orig" / "82s126.4a"
+DEFAULT_OUT = ROOT / "iigs" / "compiled_mspac.s"
+
+ROWS = 12
+COLS = 7
+SHR_BASE = 0x2000
+ROW_BYTES = 160
+COLOR_BANK = 0x09
+
+# (dir, mouth, rom_index, h_flip, v_flip, label)
+# Mouth slots match harness phase tables (E/N: 0,1,2,1; S/W: 0,1,0,2).
+FRAMES = (
+    (0, 0, 0x2F, False, False, "E0"),
+    (0, 1, 0x37, False, False, "E1"),
+    (0, 2, 0x2D, False, False, "E2"),
+    (1, 0, 0x34, False, False, "S0"),
+    (1, 1, 0x31, False, False, "S1"),
+    (1, 2, 0x33, False, False, "S2"),
+    (2, 0, 0x35, False, False, "W0"),
+    (2, 1, 0x2D, True, False, "W1"),
+    (2, 2, 0x2F, True, False, "W2"),
+    (3, 0, 0x33, True, True, "N0"),
+    (3, 1, 0x36, False, False, "N1"),
+    (3, 2, 0x31, True, True, "N2"),
+)
+
+# Color-ROM index → preferred SHR pen (§2; same map as fruit)
+_ROM_TO_SHR = {
+    0: 0,
+    1: 5,
+    2: 6,
+    3: 7,
+    4: 0,
+    5: 9,
+    6: 10,
+    7: 11,
+    8: 0,
+    9: 13,
+    10: 0,
+    11: 15,
+    12: 4,
+    13: 8,
+    14: 2,
+    15: 1,
+}
+
+
+def _load_gfx():
+    path = ROOT / "py" / "gen_shr_gfx.py"
+    spec = importlib.util.spec_from_file_location("gen_shr_gfx", path)
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _load_pal():
+    path = ROOT / "py" / "gen_palette.py"
+    spec = importlib.util.spec_from_file_location("gen_palette", path)
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def bank_to_shr_map(palette_rom: Path, bank: int) -> tuple[int, int, int, int]:
+    pal = _load_pal()
+    rom_pens = pal.load_palette_pens(palette_rom, bank)
+    return tuple(_ROM_TO_SHR[p & 15] for p in rom_pens)  # type: ignore[return-value]
+
+
+def remap_img(img: list[list[int]], shr_map: tuple[int, ...]) -> list[list[int]]:
+    return [[shr_map[p & 3] for p in row] for row in img]
+
+
+def flip_h(img: list[list[int]]) -> list[list[int]]:
+    return [row[::-1] for row in img]
+
+
+def emit_blit(label: str, spr: bytes, msk: bytes) -> tuple[list[str], int, int]:
+    lines = [
+        label,
+        "\tphp",
+        "\tsep\t#$20",
+    ]
+    full = partial = 0
+    for row in range(ROWS):
+        for col in range(COLS):
+            i = row * COLS + col
+            m = msk[i]
+            if m == 0:
+                continue
+            addr = SHR_BASE + row * ROW_BYTES + col
+            s = spr[i] & m
+            if m == 0xFF:
+                lines.append(f"\tlda\t#${s:02X}")
+                lines.append(f"\tsta\t${addr:04X},y")
+                full += 1
+            else:
+                lines.append(f"\tlda\t${addr:04X},y")
+                lines.append(f"\tand\t#${m ^ 0xFF:02X}")
+                lines.append(f"\tora\t#${s:02X}")
+                lines.append(f"\tsta\t${addr:04X},y")
+                partial += 1
+    lines += ["\tplp", "\trts", ""]
+    return lines, full, partial
+
+
+def build_cell(gfx, rom: bytes, spr_code: int, h_flip: bool, v_flip: bool, shr_map):
+    raw = gfx.decode_sprite(rom, spr_code)
+    art = gfx.subsample_symmetric(gfx.upright_sprite(raw), gfx._SPR_SCALE_IDX)
+    if v_flip:
+        art = gfx.flip_v(art)
+    if h_flip:
+        art = flip_h(art)
+    even = remap_img(gfx.pad_sprite_14x12(art), shr_map)
+    odd = gfx.shift_odd_cell(even)
+    return (
+        gfx.pack_4bpp_rows(even),
+        bytes(gfx.pack_4bpp_rows(gfx.mask_from_pens(even))),
+        gfx.pack_4bpp_rows(odd),
+        bytes(gfx.pack_4bpp_rows(gfx.mask_from_pens(odd))),
+    )
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--sprites", type=Path, default=DEFAULT_SPRITE_ROM)
+    ap.add_argument("--color-rom", type=Path, default=DEFAULT_COLOR_ROM)
+    ap.add_argument("--palette-rom", type=Path, default=DEFAULT_PALETTE_ROM)
+    ap.add_argument("-o", "--out", type=Path, default=DEFAULT_OUT)
+    args = ap.parse_args()
+
+    if not args.sprites.is_file():
+        raise SystemExit(f"missing sprite ROM {args.sprites}")
+
+    gfx = _load_gfx()
+    rom = args.sprites.read_bytes()
+    shr_map = bank_to_shr_map(args.palette_rom, COLOR_BANK)
+
+    lines: list[str] = [
+        "*",
+        "* Generated by py/gen_compiled_mspac.py - do not edit by hand",
+        "* MsPacBlitTable: (dir*3+mouth)*2 + (X&1) -> abs addresses",
+        "* ACT_SPR = dir*3 + mouth (0..11); each blit Y=SHR offset, DBR=$01",
+        "*",
+        "",
+        "MsPacBlitGo",
+        "* X = index*2 into MsPacBlitTable; JMP so blit RTS returns to caller.",
+        "\tjmp\t(MsPacBlitTable,x)",
+        "",
+        "MsPacBlitTable",
+    ]
+
+    labels: list[str] = []
+    for dir_, mouth, spr_code, h_flip, v_flip, name in FRAMES:
+        for parity, tag in enumerate(("E", "O")):
+            lab = f"MP{dir_}{mouth}_{tag}"
+            labels.append(lab)
+            flips = ("", "H", "V", "HV")[int(h_flip) + 2 * int(v_flip)]
+            lines.append(
+                f"\tda\t{lab}\t; {name} spr=${spr_code:02X}"
+                f"{('+' + flips) if flips else ''} "
+                f"{'odd' if parity else 'even'}"
+            )
+
+    lines.append("")
+    body: list[str] = []
+    total_full = total_part = 0
+
+    for dir_, mouth, spr_code, h_flip, v_flip, name in FRAMES:
+        even_s, even_m, odd_s, odd_m = build_cell(
+            gfx, rom, spr_code, h_flip, v_flip, shr_map
+        )
+        for tag, spr, msk in (("E", even_s, even_m), ("O", odd_s, odd_m)):
+            lab = f"MP{dir_}{mouth}_{tag}"
+            blit, full, part = emit_blit(lab, spr, msk)
+            body.extend(blit)
+            total_full += full
+            total_part += part
+            flips = ("", "H", "V", "HV")[int(h_flip) + 2 * int(v_flip)]
+            print(
+                f"  {lab}: {name} spr=${spr_code:02X}"
+                f"{('+' + flips) if flips else ''} map={shr_map}"
+            )
+
+    lines.extend(body)
+    lines.append("\tmx\t%00")
+    lines.append("")
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text("\n".join(lines) + "\n", encoding="ascii")
+    print(
+        f"wrote {args.out} ({len(labels)} blits, "
+        f"{total_full} solid + {total_part} partial byte ops)"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

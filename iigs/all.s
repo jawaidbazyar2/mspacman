@@ -101,7 +101,9 @@ ExitDemo
 	put	compiled_ghosts.s
 	mx	%00			; compiled blits end mid-sep; restore before fruit
 	put	compiled_fruits.s
-	mx	%00			; fruit blits end mid-sep; restore before harness
+	mx	%00			; fruit blits end mid-sep; restore before mspac
+	put	compiled_mspac.s
+	mx	%00			; mspac blits end mid-sep; restore before harness
 	put	harness_body.s
 	put	rails_data.s
 * Palette data last so it is not accidentally DP-addressed if |abs is missed

@@ -7,6 +7,7 @@ Design notes for porting arcade Ms. Pac-Man (`mspacmab`) to the Apple IIgs. This
 | §1 Display & tile scale | **Locked** |
 | §2 Color / SHR palette | **Capacity locked** (13/16; target pack + fruit prebake live) |
 | §3 Sprite drawing | **Locked (v1)** |
+| §3 coords / motion | **Locked** (arcade sim → SHR blit) |
 | §3.1 Frame loop & VBL | **Locked (v1)** |
 | §3.2 Graphics asset pipeline | **Locked (v1)** |
 | §3.3 Render harness (Merlin32) | **Scaffolding live** |
@@ -250,14 +251,34 @@ Do **not** model the four power pills as soft sprites on the IIgs. Keep the soft
 - **Draw order (v1):** fruit, then Ms. Pac, then ghosts (back → front). When matching arcade eat-ghost / power-pill priority matters visually, adjust ghost↔pac order to match the VBLANK priority swaps in `mspac.asm`; fruit stays under the actors.
 - Backup if save-under fights flashing pills: redraw the 6×6 tiles under the old sprite rect from the logical tilemap instead. Not the v1 default.
 
+### Game coordinates & motion (locked)
+
+**Simulate in arcade space; convert only at blit.**
+
+Arcade actors advance **0 or 1 pixel per frame** (direction table `#32FF` ±1), gated by **32-bit rotating step schedules** (duty cycle of 1 px steps — not Q-format fixed-point). Tiles are **8×8**; centers use `pos & 7 == 4`. AI, collisions, speeds, and pattern timing stay in that model.
+
+| Layer | Units | Role |
+|-------|-------|------|
+| **Logic** | Arcade pixels / 8×8 tiles | Positions, speed bits, ghost AI, dots, collisions — unchanged from `mspacmab` semantics |
+| **Display** | SHR pixels / 6×6 tiles | Soft-blit only |
+
+Blit map (after sprite centering offsets):
+
+\[
+x_{\mathrm{shr}} = \mathrm{PF\_ORIGIN\_X} + \lfloor x_{\mathrm{arcade}} \times 6/8 \rfloor,\quad
+y_{\mathrm{shr}} = \mathrm{PF\_ORIGIN\_Y} + \lfloor y_{\mathrm{arcade}} \times 6/8 \rfloor
+\]
+
+Do **not** retune the 32-bit patterns for 6×6 or step 1 IIgs pixel per logic tick as gameplay motion — that changes tile phase and breaks arcade timing/patterns. (Harness **rails** that `inc`/`dec` screen XY are demo-only, not the gameplay model.) Display may skip/dup an SHR pixel under 0.75 scale; that is visual only.
+
 ### Positioning & 4bpp packing (locked)
 
 SHR **320** mode stores **two pixels per byte** (4 bits each). That constrains horizontal blits, not gameplay motion. Tile rows are **3 bytes** (6 px) and sprite save-under rows **7 bytes** (14 px). Use **overlapped 16-bit** copies: tiles word@0 + word@1; sprites words@0,2,4 + word@5 — never a plain word store that extends past the cell (that spills into the next SHR byte / next save row). Masked sprite blit stays per-byte/nibble.
 
 | Axis | Decision |
 |------|----------|
-| **X** | **Arbitrary pixel** positions (1 IIgs-pixel steps). Do **not** restrict sprites to byte boundaries (even X only). To sit a sprite on a maze tile, use `PF_ORIGIN_X + tile*6 + SPR_OFF_X` with **`SPR_OFF_X = -4`** (art is centered in the 14-wide cell; left-aligning at the tile origin overhangs only the right wall). |
-| **Y** | **`SPR_OFF_Y = -3`** centers 12px art on the 6px tile. |
+| **X** | Blit at the mapped SHR X (arbitrary pixel; even/odd forms). Do **not** restrict to byte boundaries. Sprite cell centering: **`SPR_OFF_X = -4`** on the 14-wide cell. |
+| **Y** | Mapped SHR Y; **`SPR_OFF_Y = -3`** centers 12px art on the 6px tile. |
 
 **Asset storage (locked):**
 
@@ -274,7 +295,7 @@ SHR **320** mode stores **two pixels per byte** (4 bits each). That constrains h
 
 1. **Ghosts:** build-time **compiled** masked blits (`py/gen_compiled_ghosts.py`) for walk frames `$20–$27` × 4 body colors × even/odd; save-under still unrolled data copies.
 2. **Fruit (demo):** `py/gen_compiled_fruits.py` — 8 types × even/odd, colors prebaked from `#879D`. Harness actor 4 sits at fixed tile (14,17); `AdvanceFruit` cycles `ACT_SPR` every 360 frames. HUD fruit strip still TBD (precolored tiles, not actors).
-3. **Ms. Pac (later):** same compiled-blit pattern; keep erase as save-under restore.
+3. **Ms. Pac (walk):** `py/gen_compiled_mspac.py` — 4 dirs × 3 mouths × even/odd (24 blits), bank `#09` prebaked; west/north apply H / HV flips. Harness actor 5 on rails; `ACT_SPR = dir*3 + mouth` from arcade `#869C` phase tables. Death frames later.
 
 ```mermaid
 flowchart TB

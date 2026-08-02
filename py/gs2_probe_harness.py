@@ -61,12 +61,12 @@ def main() -> int:
             st = client.get_status()
             print(f"status mode={st.execution_mode} raw={st!r}")
             dump(client, 0x020000, 16, "CODE")
-            dump(client, 0x027000, 32, "TILEMAP")
+            dump(client, 0x028000, 32, "TILEMAP")
             dump(client, 0x026000, 32, "SPR_WORK")
-            dump(client, 0x027400, 16, "ACTOR0")
+            dump(client, 0x028400, 16, "ACTOR0")
             dump(client, 0x012000, 64, "SHR_$01")
             dump(client, 0xE12000, 64, "SHR_$E1")
-            dump(client, 0x027904, 4, "FREEZE/FC")
+            dump(client, 0x028904, 4, "FREEZE/FC")
             try:
                 client.quit()
             except Exception:

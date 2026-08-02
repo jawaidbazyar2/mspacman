@@ -56,12 +56,15 @@ SPR_BASE_X     equ 72		; PF_ORIGIN_X - 4
 SPR_BASE_Y     equ 4		; PF_ORIGIN_Y - 3
 NUM_SPRITES    equ 64
 NUM_GHOSTS     equ 4		; Blinky / Pinky / Inky / Clyde (rails)
-NUM_ACTORS     equ 5		; ghosts + fruit demo actor
+NUM_ACTORS     equ 6		; ghosts + fruit + Ms. Pac
 FRUIT_ACTOR    equ 4
+PAC_ACTOR      equ 5
 FRUIT_PERIOD   equ 360		; frames between fruit-type changes
 FRUIT_TILE_X   equ 14		; fixed demo tile (below ghost house)
 FRUIT_TILE_Y   equ 17
-* actors × 84-byte save-under; keep under DIRTY at $7800
+PAC_RAIL_START equ 24		; Ms. Pac rail waypoint (mid-path visibility)
+* actors × 84-byte save-under; keep under DIRTY at $8800
+* Working RAM starts at $8000 so compiled blits may grow through $7xxx.
 
 NUM_TILES      equ 256
 TILE_BYTES_ROW equ 3
@@ -80,14 +83,14 @@ SPR_WORK16     equ $6000
 SPR_WORK_PAIR  equ 168		; spr+mask one parity
 SPR_WORK_ACTOR equ 336		; even pair + odd pair (NUM_ACTORS × this)
 
-TILEMAP        equ $027000
-ACTORS         equ $027400
-SAVEUNDER      equ $027500
-DIRTY_COUNT    equ $027800
-DIRTY_LIST     equ $027802
-FRAME_COUNT    equ $027900
-EAT_INDEX      equ $027902
-DEMO_FREEZE    equ $027904	; nonzero → MainLoop skips erase/rails/draw
+TILEMAP        equ $028000
+ACTORS         equ $028400
+SAVEUNDER      equ $028500
+DIRTY_COUNT    equ $028800
+DIRTY_LIST     equ $028802
+FRAME_COUNT    equ $028900
+EAT_INDEX      equ $028902
+DEMO_FREEZE    equ $028904	; nonzero → MainLoop skips erase/rails/draw
 
 ACT_SIZE       equ 16
 ACT_X          equ 0		; new X (rails write; DrawSprite reads)

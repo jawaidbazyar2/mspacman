@@ -27,28 +27,28 @@ REPLACEMENTS: list[tuple[str, str]] = [
     (r">\$030002", ">AST_TILES+2"),
     (r">\$030001", ">AST_TILES+1"),
     (r">\$030000", ">AST_TILES"),
-    (r">\$027803", ">DIRTY_LIST+1"),
-    (r">\$027802", ">DIRTY_LIST"),
-    (r">\$027800", ">DIRTY_COUNT"),
-    (r">\$027902", ">EAT_INDEX"),
-    (r">\$027900", ">FRAME_COUNT"),
-    (r">\$027000", ">TILEMAP"),
-    (r">\$027A1E", ">R_BTMP"),
-    (r">\$027A1C", ">R_BODY"),
-    (r">\$027A1A", ">R_SAVE"),
-    (r">\$027A18", ">R_BASE"),
-    (r">\$027A16", ">R_ACT"),
-    (r">\$027A14", ">R_TMP"),
-    (r">\$027A12", ">R_CARRY"),
-    (r">\$027A10", ">R_IDX"),
-    (r">\$027A0E", ">R_ROW"),
-    (r">\$027A0C", ">R_DEST"),
-    (r">\$027A0A", ">R_OFF"),
-    (r">\$027A08", ">R_TILE"),
-    (r">\$027A06", ">R_TY"),
-    (r">\$027A04", ">R_TX"),
-    (r">\$027A02", ">R_Y"),
-    (r">\$027A00", ">R_X"),
+    (r">\$028803", ">DIRTY_LIST+1"),
+    (r">\$028802", ">DIRTY_LIST"),
+    (r">\$028800", ">DIRTY_COUNT"),
+    (r">\$028902", ">EAT_INDEX"),
+    (r">\$028900", ">FRAME_COUNT"),
+    (r">\$028000", ">TILEMAP"),
+    (r">\$028A1E", ">R_BTMP"),
+    (r">\$028A1C", ">R_BODY"),
+    (r">\$028A1A", ">R_SAVE"),
+    (r">\$028A18", ">R_BASE"),
+    (r">\$028A16", ">R_ACT"),
+    (r">\$028A14", ">R_TMP"),
+    (r">\$028A12", ">R_CARRY"),
+    (r">\$028A10", ">R_IDX"),
+    (r">\$028A0E", ">R_ROW"),
+    (r">\$028A0C", ">R_DEST"),
+    (r">\$028A0A", ">R_OFF"),
+    (r">\$028A08", ">R_TILE"),
+    (r">\$028A06", ">R_TY"),
+    (r">\$028A04", ">R_TX"),
+    (r">\$028A02", ">R_Y"),
+    (r">\$028A00", ">R_X"),
     # Actor fields (X = ACTORS16+…). Save-under rows fixed afterward.
     (r">\$02000B", ">BANK2+ACT_COLOR"),
     (r">\$020009", ">BANK2+ACT_FLAGS"),
@@ -60,8 +60,8 @@ REPLACEMENTS: list[tuple[str, str]] = [
     (r">\$020002", ">BANK2+ACT_Y"),
     (r">\$020001", ">BANK2+1"),
     (r">\$020000", ">BANK2"),
-    (r"#\$7400", "#ACTORS16"),
-    (r"#\$7500", "#SAVEUNDER16"),
+    (r"#\$8400", "#ACTORS16"),
+    (r"#\$8500", "#SAVEUNDER16"),
     (r"adc\t#76\b", "adc\t#PF_ORIGIN_X"),
     (r"adc\t#160-7\b", "adc\t#SHR_ROW_BYTES-7"),
     (r"adc\t#160\b", "adc\t#SHR_ROW_BYTES"),
@@ -72,12 +72,12 @@ def ensure_bank2_equates(text: str) -> str:
     if re.search(r"^BANK2\s+equ\b", text, re.M):
         return text
     return text.replace(
-        "R_BTMP         equ $027A1E\n",
-        "R_BTMP         equ $027A1E\n"
+        "R_BTMP         equ $028A1E\n",
+        "R_BTMP         equ $028A1E\n"
         "* Bank $02 long base: >BANK2+field,x with X = ACTORS16 / SAVEUNDER16\n"
         "BANK2          equ $020000\n"
-        "ACTORS16       equ $7400\n"
-        "SAVEUNDER16    equ $7500\n",
+        "ACTORS16       equ $8400\n"
+        "SAVEUNDER16    equ $8500\n",
         1,
     )
 
