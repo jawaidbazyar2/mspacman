@@ -61,7 +61,6 @@ REPLACEMENTS: list[tuple[str, str]] = [
     (r">\$020001", ">BANK2+1"),
     (r">\$020000", ">BANK2"),
     (r"#\$8400", "#ACTORS16"),
-    (r"#\$8500", "#SAVEUNDER16"),
     (r"adc\t#76\b", "adc\t#PF_ORIGIN_X"),
     (r"adc\t#160-7\b", "adc\t#SHR_ROW_BYTES-7"),
     (r"adc\t#160\b", "adc\t#SHR_ROW_BYTES"),
@@ -74,10 +73,9 @@ def ensure_bank2_equates(text: str) -> str:
     return text.replace(
         "R_BTMP         equ $028A1E\n",
         "R_BTMP         equ $028A1E\n"
-        "* Bank $02 long base: >BANK2+field,x with X = ACTORS16 / SAVEUNDER16\n"
+        "* Bank $02 long base: >BANK2+field,x with X = ACTORS16\n"
         "BANK2          equ $020000\n"
-        "ACTORS16       equ $8400\n"
-        "SAVEUNDER16    equ $8500\n",
+        "ACTORS16       equ $8400\n",
         1,
     )
 

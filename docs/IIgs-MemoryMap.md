@@ -16,13 +16,15 @@ While running: **DB = `$02`** (code bank), **DP = `$0000`**, **stack** = `$01FF`
 | `$01` | SHR shadow (pixels, SCB, palette) — **shadowing ON** |
 | `$02` | Harness code + game/render RAM |
 | `$03` | Injected graphics / maze assets (read-only at runtime) |
+| `$04` | Full SHR **pixel** mirror (maze/tiles only; no sprites) — erase source |
 | `$E1` | Displayed SHR (tracks `$01` when shadowing on; host PNG capture) |
 
 ```
 $00  soft-switches, CALL 768 stub
 $01  SHR shadow ──────────────────────────► display via $E1
-$02  code | … | tilemap | actors | save | dirty | scratch
+$02  code | … | tilemap | actors | dirty | scratch
 $03  tiles | sprites/masks even+odd | maze | stitched cells
+$04  BG pixel mirror (same offsets as $01/2000)
 ```
 
 ---
@@ -76,9 +78,7 @@ Merlin `org $0000` → loaded at `$02/0000`.
 | `$02/8000`–`$02/8363` | `TILEMAP` | 868 | 28×31 tile codes (copy of `AST_MAZE`) |
 | `$02/8364`–`$02/83FF` | — | — | Unused pad to actors |
 | `$02/8400`–`$02/845F` | `ACTORS` | 96 | 6 actors × 16 bytes (4 ghosts + fruit + Ms. Pac) |
-| `$02/8460`–`$02/84FF` | — | — | Pad to save-under |
-| `$02/8500`–`$02/86F7` | `SAVEUNDER` | 504 | 6 × 84-byte (14×12) underlays |
-| `$02/86F8`–`$02/87FF` | — | — | Free (must stay below dirty) |
+| `$02/8460`–`$02/87FF` | — | — | Free (was save-under; erase uses bank `$04`) |
 
 ### Actor record (`ACT_SIZE` = 16)
 
@@ -124,7 +124,7 @@ Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | `$02/8A14` | `R_TMP` | General temp |
 | `$02/8A16` | `R_ACT` | Actor index |
 | `$02/8A18` | `R_BASE` | Actor base (`ACTORS16+…`) |
-| `$02/8A1A` | `R_SAVE` | Save-under pointer |
+| `$02/8A1A` | `R_SAVE` | Scratch (unused by erase) |
 | `$02/8A1C` | `R_BODY` | Body pen for remap |
 | `$02/8A1E` | `R_BTMP` | Blit temp |
 | `$02/8A20`–`$02/8A25` | `R_SORT` | Y-sorted actor indices (`NUM_ACTORS` = 6) |
@@ -133,7 +133,17 @@ Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | `$02/8A2C` | `R_YOFF` | `ACT_Y` / `ACT_OY` field for sort |
 
 `BANK2` = `$020000` (long base for `,x` with 16-bit offset).  
-`ACTORS16` = `$8400`, `SAVEUNDER16` = `$8500`.
+`ACTORS16` = `$8400`.
+
+---
+
+## Bank `$04` — background pixel mirror
+
+| Address | Symbol | Size | Notes |
+|---------|--------|------|-------|
+| `$04/2000`–`$04/9F3F` | `BG_PIXELS` | 32000 | Same layout as `$01/2000`. Maze/`DrawTile` maintain it; sprites never write here. Erase copies 14×12 rects from here → `$01`. |
+
+Built at runtime (`DrawMaze` → `$04`, then copy to `$01`). Host does not inject `$04`.
 
 ---
 
@@ -155,21 +165,6 @@ Host writes these before `CALL 768`. Packed 4bpp; already upright (CW + row XOR 
 
 ---
 
-## Save-under layout
-
-| Actor | Save base | Bytes |
-|-------|-----------|-------|
-| 0 | `$02/8500` | 84 |
-| 1 | `$02/8554` | 84 |
-| 2 | `$02/85A8` | 84 |
-| 3 | `$02/85FC` | 84 |
-| 4 | `$02/8650` | 84 |
-| 5 | `$02/86A4` | 84 |
-
-Formula: `SAVEUNDER16 + index × 84`. One cell = 7 bytes × 12 rows.
-
----
-
 ## Ownership (register model)
 
 | Region | Publisher | Consumer |
@@ -179,8 +174,8 @@ Formula: `SAVEUNDER16 + index × 84`. One cell = 7 bytes × 12 rows.
 | `ACT_SPR` / `ACT_COLOR` | Rails / init | `DrawSprite` (compiled `GhostBlitGo` / `FruitBlitGo` / `MsPacBlitGo`) |
 | `ACT_WP` | Rails | Rails only |
 | `ACT_FLAGS` | Render | Render |
-| `TILEMAP` / dirty list | Game logic | Tile redraw |
-| `SAVEUNDER` | Draw (capture) / Erase (restore) | Render only — erase does **not** re-blit bank `$03` maze |
+| `TILEMAP` / dirty list | Game logic | Tile redraw (`DrawTile` → `$01` and `$04`) |
+| `BG_PIXELS` (`$04`) | `DrawMaze` / `DrawTile` | `EraseSprite` (restore rect → `$01`) |
 | `$03/*` assets | Host inject | Render (read) |
 | SHR `$01` | Render | Display |
 
@@ -189,8 +184,8 @@ Formula: `SAVEUNDER16 + index × 84`. One cell = 7 bytes × 12 rows.
 ## Gaps / constraints
 
 1. **Code must stay below `$02/8000`** (working RAM starts there).
-2. **Save-under must stay below `$02/8800`** (dirty list).
-3. Six actors: 6×16 = 96 → actors through `$845F`; 6×84 = 504 → save through `$86F7` (still under `$8800`).
+2. Six actors: 6×16 = 96 → actors through `$845F`.
+3. Dirty playfield changes must update **both** `$01` and `$04`.
 4. Odd sprite/mask forms are **host-injected** (not generated on target in the current harness).
 
 When this map changes, update [`iigs/equates.s`](../iigs/equates.s) first, then this file.

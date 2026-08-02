@@ -27,12 +27,14 @@ BRD_FREEZE     equ $0F		; white — DEMO_FREEZE spin
 BANK_CODE      equ $02
 BANK_SHR       equ $01
 BANK_ASSETS    equ $03
+BANK_BG        equ $04		; full SHR pixel mirror (no sprites)
 
 SHR_PIXELS     equ $012000
 SHR_SCB        equ $019D00
 SHR_PALETTE    equ $019E00
 SHR_ROW_BYTES  equ 160
 SHR_PIXEL_BYTES equ 32000
+BG_PIXELS      equ $042000	; same layout/offsets as SHR_PIXELS
 
 PF_ORIGIN_X    equ 76
 PF_ORIGIN_Y    equ 7
@@ -63,8 +65,8 @@ FRUIT_PERIOD   equ 360		; frames between fruit-type changes
 FRUIT_TILE_X   equ 14		; fixed demo tile (below ghost house)
 FRUIT_TILE_Y   equ 17
 PAC_RAIL_START equ 24		; Ms. Pac rail waypoint (mid-path visibility)
-* actors × 84-byte save-under; keep under DIRTY at $8800
 * Working RAM starts at $8000 so compiled blits may grow through $7xxx.
+* Erase restores from BANK_BG mirror — no per-actor save-under.
 
 NUM_TILES      equ 256
 TILE_BYTES_ROW equ 3
@@ -85,7 +87,7 @@ SPR_WORK_ACTOR equ 336		; even pair + odd pair (NUM_ACTORS × this)
 
 TILEMAP        equ $028000
 ACTORS         equ $028400
-SAVEUNDER      equ $028500
+* $028500–$0287FF free (was SAVEUNDER)
 DIRTY_COUNT    equ $028800
 DIRTY_LIST     equ $028802
 FRAME_COUNT    equ $028900

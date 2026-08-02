@@ -22,10 +22,9 @@ R_SORT         equ $028A20	; NUM_ACTORS actor indices, Y-sorted
 R_SI           equ $028A28
 R_SJ           equ $028A2A
 R_YOFF         equ $028A2C	; ACT_Y or ACT_OY offset for SortActorsByY
-* Bank $02 long base: >BANK2+field,x with X = ACTORS16 / SAVEUNDER16
+* Bank $02 long base: >BANK2+field,x with X = ACTORS16
 BANK2          equ $020000
 ACTORS16       equ $8400
-SAVEUNDER16    equ $8500
 
 CopyMaze
 	php
@@ -198,11 +197,26 @@ ShiftOneRow
 	plp
 	rts
 
+CopyBgToShr
+* Word-copy $04/2000 → $01/2000 (32000 bytes). Level-start only.
+	php
+	rep	#$30
+	ldx	#0
+]c	lda	>BG_PIXELS,x
+	sta	>SHR_PIXELS,x
+	inx
+	inx
+	cpx	#SHR_PIXEL_BYTES
+	bcc	]c
+	plp
+	rts
+
 DrawTile
+* Write tile to SHR ($01) and BG mirror ($04).
 	php
 	phb
 	sep	#$20
-	lda	#$01
+	lda	#BANK_SHR
 	pha
 	plb
 	rep	#$30
@@ -232,10 +246,20 @@ DrawTile
 	lda	>R_DEST
 	tay
 * 3 bytes/row: word @0 then overlapped word @1 (covers 0–2, no 4th byte)
+* Long,Y is not a 65816 mode — dual-write BG via long,X (X = dest).
 ]tr	lda	>AST_TILES,x
 	sta	$2000,y
+	sta	>R_BTMP
 	lda	>AST_TILES+1,x
 	sta	$2001,y
+	sta	>R_TMP
+	phx
+	tyx
+	lda	>R_BTMP
+	sta	>BG_PIXELS,x
+	lda	>R_TMP
+	sta	>BG_PIXELS+1,x
+	plx
 	txa
 	clc
 	adc	#3
@@ -253,12 +277,12 @@ DrawTile
 	rts
 
 DrawMaze
-* Blit pre-stitched per-cell 6x6 from AST_MAZE_CELLS (edge-repaired walls).
+* Blit pre-stitched per-cell 6x6 into BG mirror ($04), then copy to SHR ($01).
 * Cells are already upright (CW + row^3); no rotate/flip here.
 	php
 	phb
 	sep	#$20
-	lda	#$01
+	lda	#BANK_BG
 	pha
 	plb
 	rep	#$30
@@ -337,6 +361,7 @@ DrawMaze
 	bcs	:mdone
 	brl	]my
 :mdone	plb
+	jsr	CopyBgToShr
 	plp
 	rts
 
@@ -482,18 +507,12 @@ CopySpritePos
 	rts
 
 EraseSprite
-* A = actor index — must save before PHB bank switch clobbers it
-* Position from ACT_OX/OY (old).
+* A = actor index. Position from ACT_OX/OY (old).
+* Restore 14×12 from BG_PIXELS ($04) → SHR_PIXELS ($01) via long,X
+* (65816 has no absolute-long,Y mode).
 	php
 	rep	#$30
 	sta	>R_ACT
-	phb
-	sep	#$20
-	lda	#$01
-	pha
-	plb
-	rep	#$30
-	lda	>R_ACT
 	asl
 	asl
 	asl
@@ -505,7 +524,6 @@ EraseSprite
 	lda	>BANK2+ACT_FLAGS,x
 	and	#$0001
 	bne	:er
-	plb
 	plp
 	rts
 :er	lda	>BANK2+ACT_OX,x
@@ -513,132 +531,123 @@ EraseSprite
 	lda	>BANK2+ACT_OY,x
 	sta	>R_Y
 	jsr	ScreenXY
-	lda	>R_ACT
-	jsr	Mul84
-	clc
-	adc	#SAVEUNDER16
-	sta	>R_SAVE
-	lda	>R_SAVE
-	tax
 	lda	>R_DEST
-	tay
-* Unrolled 12×7: save-under → SHR. Words @0,2,4 + @5 per row (no 8th byte).
-* X = SAVEUNDER16+…, Y = SHR offset; no per-row adc/tax/tay.
-	lda	>BANK2,x
-	sta	$2000,y
-	lda	>BANK2+2,x
-	sta	$2002,y
-	lda	>BANK2+4,x
-	sta	$2004,y
-	lda	>BANK2+5,x
-	sta	$2005,y
-	lda	>BANK2+7,x
-	sta	$2000+160,y
-	lda	>BANK2+9,x
-	sta	$2002+160,y
-	lda	>BANK2+11,x
-	sta	$2004+160,y
-	lda	>BANK2+12,x
-	sta	$2005+160,y
-	lda	>BANK2+14,x
-	sta	$2000+320,y
-	lda	>BANK2+16,x
-	sta	$2002+320,y
-	lda	>BANK2+18,x
-	sta	$2004+320,y
-	lda	>BANK2+19,x
-	sta	$2005+320,y
-	lda	>BANK2+21,x
-	sta	$2000+480,y
-	lda	>BANK2+23,x
-	sta	$2002+480,y
-	lda	>BANK2+25,x
-	sta	$2004+480,y
-	lda	>BANK2+26,x
-	sta	$2005+480,y
-	lda	>BANK2+28,x
-	sta	$2000+640,y
-	lda	>BANK2+30,x
-	sta	$2002+640,y
-	lda	>BANK2+32,x
-	sta	$2004+640,y
-	lda	>BANK2+33,x
-	sta	$2005+640,y
-	lda	>BANK2+35,x
-	sta	$2000+800,y
-	lda	>BANK2+37,x
-	sta	$2002+800,y
-	lda	>BANK2+39,x
-	sta	$2004+800,y
-	lda	>BANK2+40,x
-	sta	$2005+800,y
-	lda	>BANK2+42,x
-	sta	$2000+960,y
-	lda	>BANK2+44,x
-	sta	$2002+960,y
-	lda	>BANK2+46,x
-	sta	$2004+960,y
-	lda	>BANK2+47,x
-	sta	$2005+960,y
-	lda	>BANK2+49,x
-	sta	$2000+1120,y
-	lda	>BANK2+51,x
-	sta	$2002+1120,y
-	lda	>BANK2+53,x
-	sta	$2004+1120,y
-	lda	>BANK2+54,x
-	sta	$2005+1120,y
-	lda	>BANK2+56,x
-	sta	$2000+1280,y
-	lda	>BANK2+58,x
-	sta	$2002+1280,y
-	lda	>BANK2+60,x
-	sta	$2004+1280,y
-	lda	>BANK2+61,x
-	sta	$2005+1280,y
-	lda	>BANK2+63,x
-	sta	$2000+1440,y
-	lda	>BANK2+65,x
-	sta	$2002+1440,y
-	lda	>BANK2+67,x
-	sta	$2004+1440,y
-	lda	>BANK2+68,x
-	sta	$2005+1440,y
-	lda	>BANK2+70,x
-	sta	$2000+1600,y
-	lda	>BANK2+72,x
-	sta	$2002+1600,y
-	lda	>BANK2+74,x
-	sta	$2004+1600,y
-	lda	>BANK2+75,x
-	sta	$2005+1600,y
-	lda	>BANK2+77,x
-	sta	$2000+1760,y
-	lda	>BANK2+79,x
-	sta	$2002+1760,y
-	lda	>BANK2+81,x
-	sta	$2004+1760,y
-	lda	>BANK2+82,x
-	sta	$2005+1760,y
+	tax
+* Unrolled 12×7: BG → SHR. Words @0,2,4 + @5 per row (no 8th byte).
+	lda	>BG_PIXELS,x
+	sta	>SHR_PIXELS,x
+	lda	>BG_PIXELS+2,x
+	sta	>SHR_PIXELS+2,x
+	lda	>BG_PIXELS+4,x
+	sta	>SHR_PIXELS+4,x
+	lda	>BG_PIXELS+5,x
+	sta	>SHR_PIXELS+5,x
+	lda	>BG_PIXELS+160,x
+	sta	>SHR_PIXELS+160,x
+	lda	>BG_PIXELS+162,x
+	sta	>SHR_PIXELS+162,x
+	lda	>BG_PIXELS+164,x
+	sta	>SHR_PIXELS+164,x
+	lda	>BG_PIXELS+165,x
+	sta	>SHR_PIXELS+165,x
+	lda	>BG_PIXELS+320,x
+	sta	>SHR_PIXELS+320,x
+	lda	>BG_PIXELS+322,x
+	sta	>SHR_PIXELS+322,x
+	lda	>BG_PIXELS+324,x
+	sta	>SHR_PIXELS+324,x
+	lda	>BG_PIXELS+325,x
+	sta	>SHR_PIXELS+325,x
+	lda	>BG_PIXELS+480,x
+	sta	>SHR_PIXELS+480,x
+	lda	>BG_PIXELS+482,x
+	sta	>SHR_PIXELS+482,x
+	lda	>BG_PIXELS+484,x
+	sta	>SHR_PIXELS+484,x
+	lda	>BG_PIXELS+485,x
+	sta	>SHR_PIXELS+485,x
+	lda	>BG_PIXELS+640,x
+	sta	>SHR_PIXELS+640,x
+	lda	>BG_PIXELS+642,x
+	sta	>SHR_PIXELS+642,x
+	lda	>BG_PIXELS+644,x
+	sta	>SHR_PIXELS+644,x
+	lda	>BG_PIXELS+645,x
+	sta	>SHR_PIXELS+645,x
+	lda	>BG_PIXELS+800,x
+	sta	>SHR_PIXELS+800,x
+	lda	>BG_PIXELS+802,x
+	sta	>SHR_PIXELS+802,x
+	lda	>BG_PIXELS+804,x
+	sta	>SHR_PIXELS+804,x
+	lda	>BG_PIXELS+805,x
+	sta	>SHR_PIXELS+805,x
+	lda	>BG_PIXELS+960,x
+	sta	>SHR_PIXELS+960,x
+	lda	>BG_PIXELS+962,x
+	sta	>SHR_PIXELS+962,x
+	lda	>BG_PIXELS+964,x
+	sta	>SHR_PIXELS+964,x
+	lda	>BG_PIXELS+965,x
+	sta	>SHR_PIXELS+965,x
+	lda	>BG_PIXELS+1120,x
+	sta	>SHR_PIXELS+1120,x
+	lda	>BG_PIXELS+1122,x
+	sta	>SHR_PIXELS+1122,x
+	lda	>BG_PIXELS+1124,x
+	sta	>SHR_PIXELS+1124,x
+	lda	>BG_PIXELS+1125,x
+	sta	>SHR_PIXELS+1125,x
+	lda	>BG_PIXELS+1280,x
+	sta	>SHR_PIXELS+1280,x
+	lda	>BG_PIXELS+1282,x
+	sta	>SHR_PIXELS+1282,x
+	lda	>BG_PIXELS+1284,x
+	sta	>SHR_PIXELS+1284,x
+	lda	>BG_PIXELS+1285,x
+	sta	>SHR_PIXELS+1285,x
+	lda	>BG_PIXELS+1440,x
+	sta	>SHR_PIXELS+1440,x
+	lda	>BG_PIXELS+1442,x
+	sta	>SHR_PIXELS+1442,x
+	lda	>BG_PIXELS+1444,x
+	sta	>SHR_PIXELS+1444,x
+	lda	>BG_PIXELS+1445,x
+	sta	>SHR_PIXELS+1445,x
+	lda	>BG_PIXELS+1600,x
+	sta	>SHR_PIXELS+1600,x
+	lda	>BG_PIXELS+1602,x
+	sta	>SHR_PIXELS+1602,x
+	lda	>BG_PIXELS+1604,x
+	sta	>SHR_PIXELS+1604,x
+	lda	>BG_PIXELS+1605,x
+	sta	>SHR_PIXELS+1605,x
+	lda	>BG_PIXELS+1760,x
+	sta	>SHR_PIXELS+1760,x
+	lda	>BG_PIXELS+1762,x
+	sta	>SHR_PIXELS+1762,x
+	lda	>BG_PIXELS+1764,x
+	sta	>SHR_PIXELS+1764,x
+	lda	>BG_PIXELS+1765,x
+	sta	>SHR_PIXELS+1765,x
 	lda	>R_BASE
 	tax
 	sep	#$20
 	lda	>BANK2+ACT_FLAGS,x
 	and	#$FE
 	sta	>BANK2+ACT_FLAGS,x
-	plb
 	plp
 	rts
 
 DrawSprite
 * A = actor index — must save before PHB bank switch clobbers it
-* Save-under then compiled ghost / fruit / Ms. Pac blit; no SPR_WORK / remap.
+* Compiled ghost / fruit / Ms. Pac blit only (no save-under; erase uses $04).
 	php
 	rep	#$30
 	sta	>R_ACT
 	phb
 	sep	#$20
-	lda	#$01
+	lda	#BANK_SHR
 	pha
 	plb
 	rep	#$30
@@ -656,112 +665,6 @@ DrawSprite
 	lda	>BANK2+ACT_Y,x
 	sta	>R_Y
 	jsr	ScreenXY
-	lda	>R_ACT
-	jsr	Mul84
-	clc
-	adc	#SAVEUNDER16
-	sta	>R_SAVE
-	lda	>R_SAVE
-	tax
-	lda	>R_DEST
-	tay
-* Unrolled 12×7 save-under capture (SHR → bank $02). Same layout as EraseSprite.
-	lda	$2000,y
-	sta	>BANK2,x
-	lda	$2002,y
-	sta	>BANK2+2,x
-	lda	$2004,y
-	sta	>BANK2+4,x
-	lda	$2005,y
-	sta	>BANK2+5,x
-	lda	$2000+160,y
-	sta	>BANK2+7,x
-	lda	$2002+160,y
-	sta	>BANK2+9,x
-	lda	$2004+160,y
-	sta	>BANK2+11,x
-	lda	$2005+160,y
-	sta	>BANK2+12,x
-	lda	$2000+320,y
-	sta	>BANK2+14,x
-	lda	$2002+320,y
-	sta	>BANK2+16,x
-	lda	$2004+320,y
-	sta	>BANK2+18,x
-	lda	$2005+320,y
-	sta	>BANK2+19,x
-	lda	$2000+480,y
-	sta	>BANK2+21,x
-	lda	$2002+480,y
-	sta	>BANK2+23,x
-	lda	$2004+480,y
-	sta	>BANK2+25,x
-	lda	$2005+480,y
-	sta	>BANK2+26,x
-	lda	$2000+640,y
-	sta	>BANK2+28,x
-	lda	$2002+640,y
-	sta	>BANK2+30,x
-	lda	$2004+640,y
-	sta	>BANK2+32,x
-	lda	$2005+640,y
-	sta	>BANK2+33,x
-	lda	$2000+800,y
-	sta	>BANK2+35,x
-	lda	$2002+800,y
-	sta	>BANK2+37,x
-	lda	$2004+800,y
-	sta	>BANK2+39,x
-	lda	$2005+800,y
-	sta	>BANK2+40,x
-	lda	$2000+960,y
-	sta	>BANK2+42,x
-	lda	$2002+960,y
-	sta	>BANK2+44,x
-	lda	$2004+960,y
-	sta	>BANK2+46,x
-	lda	$2005+960,y
-	sta	>BANK2+47,x
-	lda	$2000+1120,y
-	sta	>BANK2+49,x
-	lda	$2002+1120,y
-	sta	>BANK2+51,x
-	lda	$2004+1120,y
-	sta	>BANK2+53,x
-	lda	$2005+1120,y
-	sta	>BANK2+54,x
-	lda	$2000+1280,y
-	sta	>BANK2+56,x
-	lda	$2002+1280,y
-	sta	>BANK2+58,x
-	lda	$2004+1280,y
-	sta	>BANK2+60,x
-	lda	$2005+1280,y
-	sta	>BANK2+61,x
-	lda	$2000+1440,y
-	sta	>BANK2+63,x
-	lda	$2002+1440,y
-	sta	>BANK2+65,x
-	lda	$2004+1440,y
-	sta	>BANK2+67,x
-	lda	$2005+1440,y
-	sta	>BANK2+68,x
-	lda	$2000+1600,y
-	sta	>BANK2+70,x
-	lda	$2002+1600,y
-	sta	>BANK2+72,x
-	lda	$2004+1600,y
-	sta	>BANK2+74,x
-	lda	$2005+1600,y
-	sta	>BANK2+75,x
-	lda	$2000+1760,y
-	sta	>BANK2+77,x
-	lda	$2002+1760,y
-	sta	>BANK2+79,x
-	lda	$2004+1760,y
-	sta	>BANK2+81,x
-	lda	$2005+1760,y
-	sta	>BANK2+82,x
 	lda	>R_ACT
 	cmp	#FRUIT_ACTOR
 	beq	:fruitBlit
