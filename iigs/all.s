@@ -32,13 +32,15 @@ Start
 	sta	>DEMO_FREEZE
 	jsr	InitActors
 	jsr	DrawMaze
-	jsr	DrawAllSprites
+	jsr	DrawAllSprites		; new (== old at start)
+	jsr	CopySpritePos
 	lda	#0
 	sta	>FRAME_COUNT
 	cli				; IRQs ok once frame path is live
+	jsr	WaitVBL			; sync before first erase/draw
 
 MainLoop
-	jsr	WaitVBL
+* erase(old) → draw(new) → old←new → move(new) → WaitVBL
 	sep	#$20
 	lda	>KBD
 	bpl	:nokey
@@ -48,14 +50,17 @@ MainLoop
 	lda	>DEMO_FREEZE
 	and	#$00FF
 	bne	:frozen
-	jsr	EraseAllSprites
-	jsr	AdvanceRails		; write ACT_X/ACT_Y only
-	jsr	DrawAllSprites		; read ACT_X/ACT_Y
+	jsr	EraseAllSprites		; ACT_OX/OY
+	jsr	DrawAllSprites		; ACT_X/Y
+	jsr	CopySpritePos		; old ← new
+	jsr	AdvanceRails		; write new XY only
 	lda	>FRAME_COUNT
 	inc
 	sta	>FRAME_COUNT
+	jsr	WaitVBL
 	bra	MainLoop
-:frozen	bra	MainLoop
+:frozen	jsr	WaitVBL
+	bra	MainLoop
 
 ExitDemo
 * Any key ends the rail demo: drop SHR, halt (host freeze still used for PNG).

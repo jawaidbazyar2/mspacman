@@ -11,8 +11,6 @@
 NEWVIDEO       equ $00C029
 SHADOW         equ $00C035
 RDVBLBAR       equ $00C019
-VERTCNT        equ $00C02E
-HORIZCNT       equ $00C02F
 KBD            equ $00C000
 KBDSTRB        equ $00C010
 TXTCLR         equ $00C050
@@ -73,10 +71,10 @@ EAT_INDEX      equ $027902
 DEMO_FREEZE    equ $027904	; nonzero → MainLoop skips erase/rails/draw
 
 ACT_SIZE       equ 16
-ACT_X          equ 0
-ACT_Y          equ 2
-ACT_DX         equ 4
-ACT_DY         equ 6
+ACT_X          equ 0		; new X (rails write; DrawSprite reads)
+ACT_Y          equ 2		; new Y
+ACT_OX         equ 4		; old X (last drawn; EraseSprite reads)
+ACT_OY         equ 6		; old Y
 ACT_SPR        equ 8
 ACT_FLAGS      equ 9
 ACT_WP         equ 10		; waypoint index into RailPath (byte)

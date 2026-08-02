@@ -18,74 +18,74 @@ R_BASE         equ $027A18
 R_SAVE         equ $027A1A
 R_BODY         equ $027A1C	; ACT_COLOR nibble for RemapBodyByte
 R_BTMP         equ $027A1E
-R_SAFEY        equ $027A30	; scanline wait threshold (pixel Y)
-R_SORT         equ $027A20	; 4 actor indices, Y-sorted
-R_SI           equ $027A28
-R_SJ           equ $027A2A
+* Bank $02 long base: >BANK2+field,x with X = ACTORS16 / SAVEUNDER16
+BANK2          equ $020000
+ACTORS16       equ $7400
+SAVEUNDER16    equ $7500
 
 CopyMaze
 	php
 	rep	#$30
 	ldx	#0
-]c	lda	>$036600,x
-	sta	>$027000,x
+]c	lda	>AST_MAZE,x
+	sta	>TILEMAP,x
 	inx
 	inx
 	cpx	#868
 	bcc	]c
 	lda	#0
-	sta	>$027800
+	sta	>DIRTY_COUNT
 	lda	#0
-	sta	>$027902
+	sta	>EAT_INDEX
 	plp
 	rts
 
 Mul84
-	sta	>$027A14
+	sta	>R_TMP
 	asl
 	asl
-	sta	>$027A0A
-	lda	>$027A14
-	asl
-	asl
-	asl
-	asl
-	clc
-	adc	>$027A0A
-	sta	>$027A0A
-	lda	>$027A14
-	asl
-	asl
+	sta	>R_OFF
+	lda	>R_TMP
 	asl
 	asl
 	asl
 	asl
 	clc
-	adc	>$027A0A
+	adc	>R_OFF
+	sta	>R_OFF
+	lda	>R_TMP
+	asl
+	asl
+	asl
+	asl
+	asl
+	asl
+	clc
+	adc	>R_OFF
 	rts
 
 Mul18
-	sta	>$027A14
+	sta	>R_TMP
 	asl
-	sta	>$027A0A
-	lda	>$027A14
+	sta	>R_OFF
+	lda	>R_TMP
 	asl
 	asl
 	asl
 	asl
 	clc
-	adc	>$027A0A
+	adc	>R_OFF
 	rts
 
 ScreenXY
-	lda	>$027A02
+	lda	>R_Y
 	asl
 	asl
 	asl
 	asl
 	asl
-	sta	>$027A0A
-	lda	>$027A02
+	sta	>R_OFF
+	lda	>R_Y
 	asl
 	asl
 	asl
@@ -94,38 +94,38 @@ ScreenXY
 	asl
 	asl
 	clc
-	adc	>$027A0A
-	sta	>$027A0C
-	lda	>$027A00
+	adc	>R_OFF
+	sta	>R_DEST
+	lda	>R_X
 	lsr
 	clc
-	adc	>$027A0C
-	sta	>$027A0C
+	adc	>R_DEST
+	sta	>R_DEST
 	rts
 
 GenOddSprites
 	php
 	rep	#$30
 	lda	#0
-	sta	>$027A10
-]spr	lda	>$027A10
+	sta	>R_IDX
+]spr	lda	>R_IDX
 	jsr	Mul84
-	sta	>$027A0A
+	sta	>R_OFF
 	lda	#12
-	sta	>$027A0E
+	sta	>R_ROW
 ]row	jsr	ShiftOneRow
-	lda	>$027A0A
+	lda	>R_OFF
 	clc
 	adc	#7
-	sta	>$027A0A
-	lda	>$027A0E
+	sta	>R_OFF
+	lda	>R_ROW
 	dec
-	sta	>$027A0E
+	sta	>R_ROW
 	bne	]row
-	lda	>$027A10
+	lda	>R_IDX
 	inc
-	sta	>$027A10
-	lda	>$027A10
+	sta	>R_IDX
+	lda	>R_IDX
 	cmp	#64
 	bcc	]spr
 	plp
@@ -134,60 +134,60 @@ GenOddSprites
 ShiftOneRow
 	php
 	rep	#$30			; 16-bit A/X to fetch offset
-	lda	>$027A0A
+	lda	>R_OFF
 	tax
 	sep	#$20			; 8-bit A for pixel work; X stays 16-bit
 	lda	#0
-	sta	>$027A12
+	sta	>R_CARRY
 	ldy	#7
-]p	lda	>$031200,x
+]p	lda	>AST_SPR_EVEN,x
 	pha
-	lda	>$027A12
+	lda	>R_CARRY
 	asl
 	asl
 	asl
 	asl
-	sta	>$027A14
+	sta	>R_TMP
 	pla
 	pha
 	lsr
 	lsr
 	lsr
 	lsr
-	ora	>$027A14
-	sta	>$033C00,x
+	ora	>R_TMP
+	sta	>AST_SPR_ODD,x
 	pla
 	and	#$0F
-	sta	>$027A12
+	sta	>R_CARRY
 	inx
 	dey
 	bne	]p
 	rep	#$20
-	lda	>$027A0A
+	lda	>R_OFF
 	tax
 	sep	#$20
 	lda	#0
-	sta	>$027A12
+	sta	>R_CARRY
 	ldy	#7
-]m	lda	>$032700,x
+]m	lda	>AST_MSK_EVEN,x
 	pha
-	lda	>$027A12
+	lda	>R_CARRY
 	asl
 	asl
 	asl
 	asl
-	sta	>$027A14
+	sta	>R_TMP
 	pla
 	pha
 	lsr
 	lsr
 	lsr
 	lsr
-	ora	>$027A14
-	sta	>$035100,x
+	ora	>R_TMP
+	sta	>AST_MSK_ODD,x
 	pla
 	and	#$0F
-	sta	>$027A12
+	sta	>R_CARRY
 	inx
 	dey
 	bne	]m
@@ -202,38 +202,38 @@ DrawTile
 	pha
 	plb
 	rep	#$30
-	lda	>$027A04
+	lda	>R_TX
 	asl
 	clc
-	adc	>$027A04
+	adc	>R_TX
 	asl
 	clc
-	adc	#76
-	sta	>$027A00
-	lda	>$027A06
+	adc	#PF_ORIGIN_X
+	sta	>R_X
+	lda	>R_TY
 	asl
 	clc
-	adc	>$027A06
+	adc	>R_TY
 	asl
 	clc
-	adc	#7
-	sta	>$027A02
+	adc	#PF_ORIGIN_Y
+	sta	>R_Y
 	jsr	ScreenXY
-	lda	>$027A08
+	lda	>R_TILE
 	and	#$00FF
 	jsr	Mul18
 	tax
 	lda	#6
-	sta	>$027A0E
-	lda	>$027A0C
+	sta	>R_ROW
+	lda	>R_DEST
 	tay
 * 8-bit stores — 16-bit sta would write a 4th byte past each 6px tile
 ]tr	sep	#$20
-	lda	>$030000,x
+	lda	>AST_TILES,x
 	sta	$2000,y
-	lda	>$030001,x
+	lda	>AST_TILES+1,x
 	sta	$2001,y
-	lda	>$030002,x
+	lda	>AST_TILES+2,x
 	sta	$2002,y
 	rep	#$20
 	txa
@@ -242,11 +242,11 @@ DrawTile
 	tax
 	tya
 	clc
-	adc	#160
+	adc	#SHR_ROW_BYTES
 	tay
-	lda	>$027A0E
+	lda	>R_ROW
 	dec
-	sta	>$027A0E
+	sta	>R_ROW
 	bne	]tr
 	plb
 	plp
@@ -263,55 +263,55 @@ DrawMaze
 	plb
 	rep	#$30
 	lda	#0
-	sta	>$027A06
+	sta	>R_TY
 ]my	lda	#0
-	sta	>$027A04
-]mx	lda	>$027A04
+	sta	>R_TX
+]mx	lda	>R_TX
 	asl
 	clc
-	adc	>$027A04
+	adc	>R_TX
 	asl
 	clc
-	adc	#76
-	sta	>$027A00
-	lda	>$027A06
+	adc	#PF_ORIGIN_X
+	sta	>R_X
+	lda	>R_TY
 	asl
 	clc
-	adc	>$027A06
+	adc	>R_TY
 	asl
 	clc
-	adc	#7
-	sta	>$027A02
+	adc	#PF_ORIGIN_Y
+	sta	>R_Y
 	jsr	ScreenXY
-	lda	>$027A06
+	lda	>R_TY
 	asl
 	asl
 	asl
 	asl
 	asl
-	sta	>$027A14
-	lda	>$027A06
+	sta	>R_TMP
+	lda	>R_TY
 	asl
 	asl
-	sta	>$027A0A
-	lda	>$027A14
+	sta	>R_OFF
+	lda	>R_TMP
 	sec
-	sbc	>$027A0A
+	sbc	>R_OFF
 	clc
-	adc	>$027A04
+	adc	>R_TX
 	jsr	Mul18
 	tax
 	lda	#6
-	sta	>$027A0E
-	lda	>$027A0C
+	sta	>R_ROW
+	lda	>R_DEST
 	tay
 * 8-bit stores — 16-bit sta spills 2px past the rightmost column
 ]mc	sep	#$20
-	lda	>$037000,x
+	lda	>AST_MAZE_CELLS,x
 	sta	$2000,y
-	lda	>$037001,x
+	lda	>AST_MAZE_CELLS+1,x
 	sta	$2001,y
-	lda	>$037002,x
+	lda	>AST_MAZE_CELLS+2,x
 	sta	$2002,y
 	rep	#$20
 	txa
@@ -320,23 +320,23 @@ DrawMaze
 	tax
 	tya
 	clc
-	adc	#160
+	adc	#SHR_ROW_BYTES
 	tay
-	lda	>$027A0E
+	lda	>R_ROW
 	dec
-	sta	>$027A0E
+	sta	>R_ROW
 	bne	]mc
-	lda	>$027A04
+	lda	>R_TX
 	inc
-	sta	>$027A04
-	lda	>$027A04
+	sta	>R_TX
+	lda	>R_TX
 	cmp	#28
 	bcs	:ny
 	brl	]mx
-:ny	lda	>$027A06
+:ny	lda	>R_TY
 	inc
-	sta	>$027A06
-	lda	>$027A06
+	sta	>R_TY
+	lda	>R_TY
 	cmp	#31
 	bcs	:mdone
 	brl	]my
@@ -344,187 +344,121 @@ DrawMaze
 	plp
 	rts
 
-* Sort actor indices at R_SORT by ACT_Y ascending (beam-race order).
-SortActorsByY
-* Bubble-sort actor indices at $7A20 (bank $02 / DB) by ACT_Y.
-* Merlin32 long addr is X-only — use abs,x with DB=$02.
-	php
-	sep	#$30
-	lda	#0
-	sta	>$027A20
-	lda	#1
-	sta	>$027A21
-	lda	#2
-	sta	>$027A22
-	lda	#3
-	sta	>$027A23
-	lda	#0
-	sta	>R_SI
-]si	lda	#0
-	sta	>R_SJ
-]sj	lda	>R_SJ
-	tax
-	lda	$7A20,x			; idx[j]
-	jsr	:yOf
-	sta	>R_BTMP
-	lda	>R_SJ
-	inc
-	tax
-	lda	$7A20,x			; idx[j+1]
-	jsr	:yOf
-	cmp	>R_BTMP
-	bcs	:noswap
-	lda	>R_SJ
-	tax
-	lda	$7A20,x
-	sta	>R_BTMP
-	lda	$7A21,x
-	sta	$7A20,x
-	lda	>R_BTMP
-	sta	$7A21,x
-:noswap	lda	>R_SJ
-	inc
-	sta	>R_SJ
-	cmp	#NUM_ACTORS-1
-	bcc	]sj
-	lda	>R_SI
-	inc
-	sta	>R_SI
-	cmp	#NUM_ACTORS-1
-	bcc	]si
-	plp
-	rts
-
-:yOf	asl				; A=actor idx → ACT_Y low in A
-	asl
-	asl
-	asl
-	tax
-	lda	$7402,x
-	rts
-
 EraseAllSprites
-* Y-sorted + WaitBeamSafe so erase finishes before the beam hits each sprite.
+* Erase at ACT_OX/OY (old / last drawn).
 	php
 	rep	#$30
-	jsr	SortActorsByY
-	lda	#0
-	sta	>R_SI
-]e	sep	#$20
-	lda	>R_SI
-	tax
-	lda	$7A20,x
+	lda	#NUM_ACTORS-1
 	sta	>R_ACT
-	rep	#$20
-	and	#$00FF
-	asl
-	asl
-	asl
-	asl
-	tax
-	lda	>$020002,x		; ACT_Y
-	sta	>R_SAFEY
-	jsr	WaitBeamSafe
-	lda	>R_ACT
-	and	#$00FF
+]e	lda	>R_ACT
 	jsr	EraseSprite
-	lda	>R_SI
-	inc
-	sta	>R_SI
-	cmp	#NUM_ACTORS
-	bcc	]e
+	lda	>R_ACT
+	dec
+	sta	>R_ACT
+	bpl	]e
 	plp
 	rts
 
 DrawAllSprites
+* Draw at ACT_X/Y (new).
 	php
 	rep	#$30
-	jsr	SortActorsByY
 	lda	#0
-	sta	>R_SI
-]d	sep	#$20
-	lda	>R_SI
-	tax
-	lda	$7A20,x
 	sta	>R_ACT
-	rep	#$20
-	and	#$00FF
-	asl
-	asl
-	asl
-	asl
-	tax
-	lda	>$020002,x
-	sta	>R_SAFEY
-	jsr	WaitBeamSafe
-	lda	>R_ACT
-	and	#$00FF
+]d	lda	>R_ACT
 	jsr	DrawSprite
-	lda	>R_SI
+	lda	>R_ACT
 	inc
-	sta	>R_SI
+	sta	>R_ACT
 	cmp	#NUM_ACTORS
 	bcc	]d
 	plp
 	rts
 
-EraseSprite
-* A = actor index — must save before PHB bank switch clobbers it
+CopySpritePos
+* After draw: old ← new so next erase hits the on-screen pose.
 	php
 	rep	#$30
-	sta	>$027A16
+	lda	#0
+	sta	>R_ACT
+]c	lda	>R_ACT
+	asl
+	asl
+	asl
+	asl
+	clc
+	adc	#ACTORS16
+	tax
+	lda	>BANK2+ACT_X,x
+	sta	>BANK2+ACT_OX,x
+	lda	>BANK2+ACT_Y,x
+	sta	>BANK2+ACT_OY,x
+	lda	>R_ACT
+	inc
+	sta	>R_ACT
+	cmp	#NUM_ACTORS
+	bcc	]c
+	plp
+	rts
+
+EraseSprite
+* A = actor index — must save before PHB bank switch clobbers it
+* Position from ACT_OX/OY (old).
+	php
+	rep	#$30
+	sta	>R_ACT
 	phb
 	sep	#$20
 	lda	#$01
 	pha
 	plb
 	rep	#$30
-	lda	>$027A16
+	lda	>R_ACT
 	asl
 	asl
 	asl
 	asl
 	clc
-	adc	#$7400
-	sta	>$027A18
+	adc	#ACTORS16
+	sta	>R_BASE
 	tax
-	lda	>$020009,x
+	lda	>BANK2+ACT_FLAGS,x
 	and	#$0001
 	bne	:er
 	plb
 	plp
 	rts
-:er	lda	>$020000,x
-	sta	>$027A00
-	lda	>$020002,x
-	sta	>$027A02
+:er	lda	>BANK2+ACT_OX,x
+	sta	>R_X
+	lda	>BANK2+ACT_OY,x
+	sta	>R_Y
 	jsr	ScreenXY
-	lda	>$027A16
+	lda	>R_ACT
 	jsr	Mul84
 	clc
-	adc	#$7500
-	sta	>$027A1A
+	adc	#SAVEUNDER16
+	sta	>R_SAVE
 	lda	#12
-	sta	>$027A0E
-	lda	>$027A1A
+	sta	>R_ROW
+	lda	>R_SAVE
 	tax
-	lda	>$027A0C
+	lda	>R_DEST
 	tay
 * 8-bit — 16-bit sta $2006,y would clobber the next screen byte
 ]er	sep	#$20
-	lda	>$020000,x
+	lda	>BANK2,x
 	sta	$2000,y
-	lda	>$020001,x
+	lda	>BANK2+1,x
 	sta	$2001,y
-	lda	>$020002,x
+	lda	>BANK2+2,x
 	sta	$2002,y
-	lda	>$020003,x
+	lda	>BANK2+3,x
 	sta	$2003,y
-	lda	>$020004,x
+	lda	>BANK2+4,x
 	sta	$2004,y
-	lda	>$020005,x
+	lda	>BANK2+5,x
 	sta	$2005,y
-	lda	>$020006,x
+	lda	>BANK2+6,x
 	sta	$2006,y
 	rep	#$20
 	txa
@@ -533,18 +467,18 @@ EraseSprite
 	tax
 	tya
 	clc
-	adc	#160
+	adc	#SHR_ROW_BYTES
 	tay
-	lda	>$027A0E
+	lda	>R_ROW
 	dec
-	sta	>$027A0E
+	sta	>R_ROW
 	bne	]er
-	lda	>$027A18
+	lda	>R_BASE
 	tax
 	sep	#$20
-	lda	>$020009,x
+	lda	>BANK2+ACT_FLAGS,x
 	and	#$FE
-	sta	>$020009,x
+	sta	>BANK2+ACT_FLAGS,x
 	plb
 	plp
 	rts
@@ -553,60 +487,60 @@ DrawSprite
 * A = actor index — must save before PHB bank switch clobbers it
 	php
 	rep	#$30
-	sta	>$027A16
+	sta	>R_ACT
 	phb
 	sep	#$20
 	lda	#$01
 	pha
 	plb
 	rep	#$30
-	lda	>$027A16
+	lda	>R_ACT
 	asl
 	asl
 	asl
 	asl
 	clc
-	adc	#$7400
-	sta	>$027A18
+	adc	#ACTORS16
+	sta	>R_BASE
 	tax
-	lda	>$020000,x
-	sta	>$027A00
-	lda	>$020002,x
-	sta	>$027A02
-	lda	>$020008,x
+	lda	>BANK2+ACT_X,x
+	sta	>R_X
+	lda	>BANK2+ACT_Y,x
+	sta	>R_Y
+	lda	>BANK2+ACT_SPR,x
 	and	#$00FF
-	sta	>$027A10
-	lda	>$02000B,x		; ACT_COLOR
+	sta	>R_IDX
+	lda	>BANK2+ACT_COLOR,x
 	and	#$000F
 	sta	>R_BODY
 	jsr	ScreenXY
-	lda	>$027A16
+	lda	>R_ACT
 	jsr	Mul84
 	clc
-	adc	#$7500
-	sta	>$027A1A
+	adc	#SAVEUNDER16
+	sta	>R_SAVE
 	lda	#12
-	sta	>$027A0E
-	lda	>$027A1A
+	sta	>R_ROW
+	lda	>R_SAVE
 	tax
-	lda	>$027A0C
+	lda	>R_DEST
 	tay
 * 8-bit save-under — 16-bit stores overlapped rows (byte 7 = next row)
 ]su	sep	#$20
 	lda	$2000,y
-	sta	>$020000,x
+	sta	>BANK2,x
 	lda	$2001,y
-	sta	>$020001,x
+	sta	>BANK2+1,x
 	lda	$2002,y
-	sta	>$020002,x
+	sta	>BANK2+2,x
 	lda	$2003,y
-	sta	>$020003,x
+	sta	>BANK2+3,x
 	lda	$2004,y
-	sta	>$020004,x
+	sta	>BANK2+4,x
 	lda	$2005,y
-	sta	>$020005,x
+	sta	>BANK2+5,x
 	lda	$2006,y
-	sta	>$020006,x
+	sta	>BANK2+6,x
 	rep	#$20
 	txa
 	clc
@@ -614,28 +548,28 @@ DrawSprite
 	tax
 	tya
 	clc
-	adc	#160
+	adc	#SHR_ROW_BYTES
 	tay
-	lda	>$027A0E
+	lda	>R_ROW
 	dec
-	sta	>$027A0E
+	sta	>R_ROW
 	bne	]su
-	lda	>$027A10
+	lda	>R_IDX
 	jsr	Mul84
-	sta	>$027A0A
-	lda	>$027A00
+	sta	>R_OFF
+	lda	>R_X
 	bit	#$0001
 	bne	:oddDraw
 	jsr	MaskedBlitEven
 	bra	:mark
 :oddDraw
 	jsr	MaskedBlitOdd
-:mark	lda	>$027A18
+:mark	lda	>R_BASE
 	tax
 	sep	#$20
-	lda	>$020009,x
+	lda	>BANK2+ACT_FLAGS,x
 	ora	#$01
-	sta	>$020009,x
+	sta	>BANK2+ACT_FLAGS,x
 	plb
 	plp
 	rts
@@ -656,23 +590,23 @@ RemapBodyByte
 	bra	:hi
 :hiOk	lda	>R_BTMP
 	and	#$F0
-:hi	sta	>$027A12
+:hi	sta	>R_CARRY
 	lda	>R_BTMP
 	and	#$0F
 	cmp	#BODY_PEN
 	bne	:loOk
 	lda	>R_BODY
-:loOk	ora	>$027A12
+:loOk	ora	>R_CARRY
 	plp
 	rts
 
 MaskedBlitEven
 	rep	#$30
 	lda	#12
-	sta	>$027A0E
-	lda	>$027A0A
+	sta	>R_ROW
+	lda	>R_OFF
 	tax
-	lda	>$027A0C
+	lda	>R_DEST
 	tay
 ]be	jsr	MaskByteE
 	inx
@@ -697,26 +631,26 @@ MaskedBlitEven
 	iny
 	tya
 	clc
-	adc	#160-7
+	adc	#SHR_ROW_BYTES-7
 	tay
-	lda	>$027A0E
+	lda	>R_ROW
 	dec
-	sta	>$027A0E
+	sta	>R_ROW
 	bne	]be
 	rts
 
 MaskByteE
 	sep	#$20
-	lda	>$032700,x
+	lda	>AST_MSK_EVEN,x
 	eor	#$FF
 	and	$2000,y
-	sta	>$027A14
-	lda	>$031200,x
+	sta	>R_TMP
+	lda	>AST_SPR_EVEN,x
 	jsr	RemapBodyByte
 	sta	>R_BTMP
-	lda	>$032700,x
+	lda	>AST_MSK_EVEN,x
 	and	>R_BTMP
-	ora	>$027A14
+	ora	>R_TMP
 	sta	$2000,y
 	rep	#$20
 	rts
@@ -724,10 +658,10 @@ MaskByteE
 MaskedBlitOdd
 	rep	#$30
 	lda	#12
-	sta	>$027A0E
-	lda	>$027A0A
+	sta	>R_ROW
+	lda	>R_OFF
 	tax
-	lda	>$027A0C
+	lda	>R_DEST
 	tay
 ]bo	jsr	MaskByteO
 	inx
@@ -752,26 +686,26 @@ MaskedBlitOdd
 	iny
 	tya
 	clc
-	adc	#160-7
+	adc	#SHR_ROW_BYTES-7
 	tay
-	lda	>$027A0E
+	lda	>R_ROW
 	dec
-	sta	>$027A0E
+	sta	>R_ROW
 	bne	]bo
 	rts
 
 MaskByteO
 	sep	#$20
-	lda	>$035100,x
+	lda	>AST_MSK_ODD,x
 	eor	#$FF
 	and	$2000,y
-	sta	>$027A14
-	lda	>$033C00,x
+	sta	>R_TMP
+	lda	>AST_SPR_ODD,x
 	jsr	RemapBodyByte
 	sta	>R_BTMP
-	lda	>$035100,x
+	lda	>AST_MSK_ODD,x
 	and	>R_BTMP
-	ora	>$027A14
+	ora	>R_TMP
 	sta	$2000,y
 	rep	#$20
 	rts
@@ -779,111 +713,111 @@ MaskByteO
 ApplyDirty
 	php
 	rep	#$30
-	lda	>$027800
+	lda	>DIRTY_COUNT
 	beq	:adone
-	sta	>$027A0E
+	sta	>R_ROW
 	ldx	#0
-]ad	lda	>$027802,x
+]ad	lda	>DIRTY_LIST,x
 	and	#$00FF
-	sta	>$027A04
-	lda	>$027803,x
+	sta	>R_TX
+	lda	>DIRTY_LIST+1,x
 	and	#$00FF
-	sta	>$027A06
+	sta	>R_TY
 	phx
-	lda	>$027A06
+	lda	>R_TY
 	asl
 	asl
 	asl
 	asl
 	asl
-	sta	>$027A14
-	lda	>$027A06
+	sta	>R_TMP
+	lda	>R_TY
 	asl
 	asl
-	sta	>$027A0A
-	lda	>$027A14
+	sta	>R_OFF
+	lda	>R_TMP
 	sec
-	sbc	>$027A0A
+	sbc	>R_OFF
 	clc
-	adc	>$027A04
+	adc	>R_TX
 	tax
-	lda	>$027000,x
+	lda	>TILEMAP,x
 	and	#$00FF
-	sta	>$027A08
+	sta	>R_TILE
 	jsr	DrawTile
 	plx
 	inx
 	inx
-	lda	>$027A0E
+	lda	>R_ROW
 	dec
-	sta	>$027A0E
+	sta	>R_ROW
 	bne	]ad
 	lda	#0
-	sta	>$027800
+	sta	>DIRTY_COUNT
 :adone	plp
 	rts
 
 DirtyEatDemo
 	php
 	rep	#$30
-	lda	>$027900
+	lda	>FRAME_COUNT
 	and	#$0007
 	beq	:doEat
 	plp
 	rts
 :doEat
-	lda	>$027902
-	sta	>$027A14
-]find	lda	>$027A14
+	lda	>EAT_INDEX
+	sta	>R_TMP
+]find	lda	>R_TMP
 	cmp	#868
 	bcc	:chk
 	plp
 	rts
 :chk	tax
-	lda	>$027000,x
+	lda	>TILEMAP,x
 	and	#$00FF
 	cmp	#$0010
 	beq	:eat
-	lda	>$027A14
+	lda	>R_TMP
 	inc
-	sta	>$027A14
+	sta	>R_TMP
 	bra	]find
 :eat	sep	#$20
 	lda	#$40
-	sta	>$027000,x
+	sta	>TILEMAP,x
 	rep	#$20
-	lda	>$027A14
-	sta	>$027902
-	lda	>$027902
+	lda	>R_TMP
+	sta	>EAT_INDEX
+	lda	>EAT_INDEX
 	inc
-	sta	>$027902
-	lda	>$027A14
-	sta	>$027A0A
+	sta	>EAT_INDEX
+	lda	>R_TMP
+	sta	>R_OFF
 	lda	#0
-	sta	>$027A06
-]div	lda	>$027A0A
+	sta	>R_TY
+]div	lda	>R_OFF
 	cmp	#28
 	bcc	:got
 	sec
 	sbc	#28
-	sta	>$027A0A
-	lda	>$027A06
+	sta	>R_OFF
+	lda	>R_TY
 	inc
-	sta	>$027A06
+	sta	>R_TY
 	bra	]div
-:got	lda	>$027A0A
-	sta	>$027A04
-	lda	>$027800
+:got	lda	>R_OFF
+	sta	>R_TX
+	lda	>DIRTY_COUNT
 	asl
 	tax
 	sep	#$20
-	lda	>$027A04
-	sta	>$027802,x
-	lda	>$027A06
-	sta	>$027803,x
+	lda	>R_TX
+	sta	>DIRTY_LIST,x
+	lda	>R_TY
+	sta	>DIRTY_LIST+1,x
 	rep	#$20
-	lda	>$027800
+	lda	>DIRTY_COUNT
 	inc
-	sta	>$027800
+	sta	>DIRTY_COUNT
 	plp
 	rts

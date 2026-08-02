@@ -75,28 +75,3 @@ WaitVBL
 	bne	:outer2
 :done	plp
 	rts
-
-GetScanLine
-* Mega II 9-bit vertical counter → scanline in A (TN #39).
-	php
-	sep	#$20
-	lda	>HORIZCNT
-	asl				; VA → C
-	lda	>VERTCNT
-	rol
-	plp
-	rts
-
-WaitBeamSafe
-* Spin until beam is in VBL (line ≥ 192) or still above R_SAFEY.
-* Lets erase/draw finish before the raster hits that sprite band.
-	php
-	sep	#$20
-]w	jsr	GetScanLine
-	cmp	#192
-	bcs	:ok
-	cmp	>R_SAFEY
-	bcc	:ok
-	bra	]w
-:ok	plp
-	rts

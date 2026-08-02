@@ -216,25 +216,27 @@ flowchart TB
 
 ### Decision
 
-**VBL-synced erase → dirty tiles → redraw sprites.** Do not trail the beam in v1. Do not require the entire hot path to finish inside the blanking interval alone — sync to the VBL edge, then spend the frame budget.
+**Erase(old) → draw(new) → commit old←new → logic → WaitVBL.** Actor registers hold both **new** (`ACT_X`/`ACT_Y`, written by game/rails) and **old** (`ACT_OX`/`ACT_OY`, last drawn). Move/logic must not sit between erase and draw (that lengthens the invisible hole and flickers). Do not trail the beam with per-sprite scanline waits in v1.
 
 ### Per-frame loop
 
-1. `waitForVbl` (poll input while waiting).
-2. Erase actors at **previous** positions (restore save-under buffers).
-3. Apply dirty playfield tiles (dot eaten, power-pill blink, rare maze flash).
-4. Draw fruit / pac / ghosts at **new** positions.
-5. Run logic / sound / score dirty updates (may continue past blanking).
+1. Erase actors at **old** positions (`ACT_OX`/`ACT_OY` — restore save-under).
+2. Apply dirty playfield tiles when present (dot eaten, power-pill blink).
+3. Draw actors at **new** positions (`ACT_X`/`ACT_Y`).
+4. `CopySpritePos`: old ← new.
+5. Run logic / rails / sound (writes next **new** XY only).
+6. `WaitVBL` (poll input around this edge), then loop.
 
-Level start (and rare full rebuilds) draw maze tiles, dots/power pills, and side HUD once; the per-frame path never full-clears the playfield.
+Level start draws maze once, draws sprites at initial new (== old), commits, then enters the loop.
 
 ### Why this shape
 
 | Approach | Verdict |
 |----------|---------|
 | Finish all erase/draw inside ~4.5 ms VBL only | Rejected for v1. At 2.8 MHz that is ~12k cycles — tight for masked erase+draw of 6×12×12. |
-| Sync to VBL, then erase/draw/logic on the full frame | **Chosen.** ~41–46k cycles/frame at 60 Hz is enough for six small sprites plus sparse dirty tiles. |
-| Trail the beam (draw only behind the raster) | Deferred. More complex; revisit only if tearing or missed frames show up under measurement (e.g. border-color timing). |
+| Erase → move → draw (move in the hole) | Rejected — long invisible gap → flicker. |
+| Erase(old) → draw(new) → commit → logic → VBL | **Chosen.** Tight blit pair; logic publishes next frame’s new regs after sprites are visible. |
+| Trail the beam (per-sprite scanline waits) | Not used in v1 — deferred redraws caused worse flicker than tear. |
 
 ### Cycle-budget sketch
 
@@ -344,7 +346,7 @@ make iigs-test   # spawn GSSquared, inject, CALL 768, dump build/iigs/frame.png
 
 Harness maze tiles must match `make gfx` upright orientation (CW + row XOR 3). Ground-truth previews: `build/gfx/ppm/maze1_8x8_upright.png` / `maze1_6x6_upright.png`.
 
-**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`py/gen_ghost_rails.py` → `iigs/rails_data.s`). Motion only **writes** `ACT_X`/`ACT_Y`; soft-sprite erase/draw **reads** them. Bodies use `ACT_COLOR` (Blinky/Pinky/Inky/Clyde pens 5/7/9/11) substituted for marker pen 6 at blit. Erase/draw are **Y-sorted** with `WaitBeamSafe` (Mega II `$C02E`/`$C02F`) so updates stay ahead of the raster. Loop runs until a key at `$C000`/`$C010`, or host sets `DEMO_FREEZE` (`$02/7904`) before SHR capture.
+**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`py/gen_ghost_rails.py` → `iigs/rails_data.s`). Rails write **new** `ACT_X`/`ACT_Y` only; erase reads **old** `ACT_OX`/`ACT_OY`, draw reads new, then commit. Bodies use `ACT_COLOR` (Blinky/Pinky/Inky/Clyde pens 5/7/9/11) at blit. Loop: erase→draw→commit→rails→VBL until a key at `$C000`/`$C010`, or host sets `DEMO_FREEZE` (`$02/7904`) before SHR capture.
 
 ---
 

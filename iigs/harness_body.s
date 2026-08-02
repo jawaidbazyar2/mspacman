@@ -26,7 +26,7 @@ TileToScreenY
 
 SetActorAtWP
 * X = actor base ($7400+); A = waypoint index (0..RAIL_LEN-1)
-* Sets ACT_WP, ACT_X, ACT_Y from RailPath
+* Sets ACT_WP, ACT_X/Y (new), and ACT_OX/OY = new (old)
 	php
 	sep	#$20
 	sta	>$02000A,x		; ACT_WP
@@ -37,12 +37,14 @@ SetActorAtWP
 	lda	RailPath,y
 	and	#$00FF
 	jsr	TileToScreenX
-	sta	>$020000,x
+	sta	>$020000,x		; ACT_X
+	sta	>$020004,x		; ACT_OX = new
 	iny
 	lda	RailPath,y
 	and	#$00FF
 	jsr	TileToScreenY
-	sta	>$020002,x
+	sta	>$020002,x		; ACT_Y
+	sta	>$020006,x		; ACT_OY = new
 	plp
 	rts
 
@@ -53,9 +55,6 @@ InitActors
 	ldx	#$7400
 	lda	#RAIL_START0
 	jsr	SetActorAtWP
-	lda	#0
-	sta	>$020004,x
-	sta	>$020006,x
 	sep	#$20
 	lda	#$20
 	sta	>$020008,x
@@ -68,9 +67,6 @@ InitActors
 	ldx	#$7410
 	lda	#RAIL_START1
 	jsr	SetActorAtWP
-	lda	#0
-	sta	>$020004,x
-	sta	>$020006,x
 	sep	#$20
 	lda	#$22
 	sta	>$020008,x
@@ -83,9 +79,6 @@ InitActors
 	ldx	#$7420
 	lda	#RAIL_START2
 	jsr	SetActorAtWP
-	lda	#0
-	sta	>$020004,x
-	sta	>$020006,x
 	sep	#$20
 	lda	#$24
 	sta	>$020008,x
@@ -98,9 +91,6 @@ InitActors
 	ldx	#$7430
 	lda	#RAIL_START3
 	jsr	SetActorAtWP
-	lda	#0
-	sta	>$020004,x
-	sta	>$020006,x
 	sep	#$20
 	lda	#$26
 	sta	>$020008,x
@@ -113,7 +103,7 @@ InitActors
 	rts
 
 AdvanceRails
-* For each actor: step ACT_X/ACT_Y 1px toward current waypoint; on arrival advance WP.
+* Writes ACT_X/ACT_Y (new) only; does not touch ACT_OX/OY.
 	php
 	rep	#$30
 	lda	#0
