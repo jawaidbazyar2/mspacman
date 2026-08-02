@@ -134,7 +134,7 @@ SetGhostSprFromDir
 	rts
 
 InitActors
-* Four ghosts; waypoint phases from rails_data.s (RAIL_START0..3)
+* Four ghosts + fixed fruit; waypoint phases from rails_data.s (RAIL_START0..3)
 	php
 	rep	#$30
 	ldx	#$7400
@@ -180,11 +180,59 @@ InitActors
 	lda	#COL_CLYDE
 	sta	>$02000B,x
 	rep	#$20
+
+* Fruit actor 4 — fixed tile; ACT_SPR = fruit type 0..7
+	ldx	#$7440
+	lda	#FRUIT_TILE_X
+	jsr	TileToScreenX
+	sta	>$020000,x		; ACT_X
+	sta	>$020004,x		; ACT_OX
+	lda	#FRUIT_TILE_Y
+	jsr	TileToScreenY
+	sta	>$020002,x		; ACT_Y
+	sta	>$020006,x		; ACT_OY
+	sep	#$20
+	lda	#0
+	sta	>$020008,x		; ACT_SPR = cherry
+	sta	>$020009,x		; ACT_FLAGS
+	sta	>$02000A,x		; ACT_WP unused
+	sta	>$02000B,x		; ACT_COLOR unused
+	rep	#$20
 	plp
+	rts
+
+AdvanceFruit
+* When FRAME_COUNT is a multiple of FRUIT_PERIOD (and ≠0), next fruit type.
+	php
+	rep	#$30
+	lda	>FRAME_COUNT
+	beq	:frDone
+	sta	>$027A14
+	lda	#FRUIT_PERIOD
+	sta	>$027A16
+* 16-bit remainder: A = FRAME_COUNT % FRUIT_PERIOD (do not AND #$00FF —
+* remainder 256 would falsely look like 0).
+	lda	>$027A14
+:frDiv	cmp	>$027A16
+	bcc	:frRem
+	sec
+	sbc	>$027A16
+	bra	:frDiv
+:frRem	cmp	#0
+	bne	:frDone
+	ldx	#$7440			; fruit actor base
+	sep	#$20
+	lda	>$020008,x		; ACT_SPR
+	inc
+	and	#$07
+	sta	>$020008,x
+	rep	#$20
+:frDone	plp
 	rts
 
 AdvanceRails
 * Writes ACT_X/ACT_Y (new) and ACT_SPR on move; does not touch ACT_OX/OY.
+* Ghosts only (NUM_GHOSTS); fruit stays fixed.
 	php
 	rep	#$30
 	lda	#0
@@ -251,7 +299,7 @@ AdvanceRails
 :arNext	lda	>$027A16
 	inc
 	sta	>$027A16
-	cmp	#NUM_ACTORS
+	cmp	#NUM_GHOSTS
 	bcs	:arDone
 	jmp	]ar
 :arDone	plp

@@ -70,10 +70,11 @@ MainLoop
 	lda	#BRD_RAILS
 	jsr	SetBorder
 	rep	#$30
-	jsr	AdvanceRails		; write new XY only
+	jsr	AdvanceRails		; write new XY only (ghosts)
 	lda	>FRAME_COUNT
 	inc
 	sta	>FRAME_COUNT
+	jsr	AdvanceFruit		; cycle fruit type every FRUIT_PERIOD
 	jsr	WaitVBL			; border black while waiting
 	bra	MainLoop
 :frozen	sep	#$20
@@ -98,7 +99,9 @@ ExitDemo
 	put	shr_body.s
 	put	render_body.s
 	put	compiled_ghosts.s
-	mx	%00			; compiled blits end mid-sep; restore before harness
+	mx	%00			; compiled blits end mid-sep; restore before fruit
+	put	compiled_fruits.s
+	mx	%00			; fruit blits end mid-sep; restore before harness
 	put	harness_body.s
 	put	rails_data.s
 * Palette data last so it is not accidentally DP-addressed if |abs is missed

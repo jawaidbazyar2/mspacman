@@ -5,7 +5,7 @@ Design notes for porting arcade Ms. Pac-Man (`mspacmab`) to the Apple IIgs. This
 | Section | Status |
 |---------|--------|
 | §1 Display & tile scale | **Locked** |
-| §2 Color / SHR palette | TBD (provisional pens in harness) |
+| §2 Color / SHR palette | **Capacity locked** (13/16; target pack + fruit prebake live) |
 | §3 Sprite drawing | **Locked (v1)** |
 | §3.1 Frame loop & VBL | **Locked (v1)** |
 | §3.2 Graphics asset pipeline | **Locked (v1)** |
@@ -110,9 +110,9 @@ Treating IIgs framebuffer pixels as square, that mismatch is small enough to ign
 
 ## 2. Color / SHR palette
 
-### Decision (harness v1)
+### Decision
 
-Map the arcade **color PROM** (`82s123.7f`) and **palette PROM** (`82s126.4a`) into **SHR palette 0**.
+Map the arcade **color PROM** (`82s123.7f`) and **palette PROM** (`82s126.4a`) into **one SHR palette 0** (16 pens). **Capacity is locked: everything fits.**
 
 With SHR **shadowing on**, the harness owns bank `$01`:
 
@@ -121,14 +121,96 @@ With SHR **shadowing on**, the harness owns bank `$01`:
 | `$9D00–$9DFF` | SCB — one byte per scanline; low nibble selects palette 0–15 (we use **0**, 320 mode) |
 | `$9E00–$9FFF` | 16 palettes × 32 bytes; **palette 0** at `$9E00` holds pens 0–15 |
 
-| Palette-0 pens | Source |
-|----------------|--------|
-| 0–3 | Maze palette **`#1D`** (level-1 walls / dots / power pills) |
-| 4–15 | Color-ROM entries 0–11 (scratch for sprites later) |
-
-Build: `make palette` → `build/gfx/palette.bin` + generated `iigs/palette_data.s` ([`py/gen_palette.py`](../py/gen_palette.py)). Tile assets store pens 0–3; `LoadPalette` writes palette 0 at `$01/9E00` only (no `$E1` poke).
+Build: `make palette` → `build/gfx/palette.bin` + generated `iigs/palette_data.s` ([`py/gen_palette.py`](../py/gen_palette.py)). `LoadPalette` writes palette 0 at `$01/9E00` only (no `$E1` poke).
 
 Scanline palette tricks (SCB ≠ 0) remain optional later.
+
+### Capacity verdict (locked)
+
+The color PROM has only **12 unique non-black RGBs** (four of its 16 entries are duplicate black). Every maze wall bank, ghost, fruit, Ms. Pac, and HUD color in Ms. Pac-Man is chosen from that set.
+
+| Budget | Count |
+|--------|------:|
+| Black / transparency | 1 |
+| Distinct arcade chromatic RGBs | 12 |
+| **Required** | **13** |
+| SHR pens available | 16 |
+| **Free** | **3** |
+
+Those free pens cover `COL_POWER` fade (animates an existing pale RGB — does not invent a 13th hue), optional markers, and one spare.
+
+Fruit, ghosts, and maze **share** many RGBs (cherry red = Blinky red, Clyde orange = peach fruit accent, eye pale = pellet pale, etc.). Pinky pink and Inky cyan are ghost-only; green / pear-teal are fruit-only. Sharing is required and desirable — one global pen per RGB.
+
+**Not a capacity problem:** arcade hardware gives each tile/sprite cell its own 4-entry palette bank via color RAM. SHR cannot. We solve that by **prebaking** final SHR pen indices into pixel data (below), not by allocating a private bank per object.
+
+### Prebake model (asset pipeline)
+
+Arcade graphics are **2bpp**: each pixel is palette-bank pen 0–3. At runtime the hardware looks up that pen in the cell’s color-RAM bank. On the IIgs there is no per-cell bank — only palette 0.
+
+**Pipeline rule:** Python asset generators resolve `(sprite_or_tile, arcade_color_bank, 2bpp_pen) → SHR pen` using the known color tables, and write **4bpp bitmaps already indexed into palette 0**.
+
+| Source | Known color choice | Prebake does |
+|--------|-------------------|--------------|
+| Maze tiles | Level maze bank from `#95AE` (`#1D`, `#16`, `#14`, `#07`, `#18`, …) | Map bank pens 0–3 → SHR pens for that maze (level start may rewrite palette words 0–3; tile pixels stay on fixed SHR indices for ink roles) |
+| Dots `#10` | Maze pale | SHR pen **1** |
+| Power pills `#14`/`#15` | Same pale as dots on arcade; dedicated fade pen on IIgs | SHR pen **14** (`COL_POWER`) |
+| Ghosts `$20–$27` | Sprite color `#01/#03/#05/#07` (body) + eyes | Eye white → pen 1; pupil → pen 15; body → pens **5/7/9/11** (`COL_*`); compiled blits bake body color |
+| Frightened `#11`/`#12` | Blue / flash banks | Prebake or swap body pens to the matching PROM RGBs already in the table |
+| Moving fruit `$00–$07` | Ms. Pac table `#879D` (sprite + color bank) | Even/odd compiled blits with **all four bank pens resolved to SHR indices** (no runtime recolor) |
+| HUD fruit strip | Tile bases `#90+` + colors at `#3B08` (max **7** icons; tiles, not actors) | Precolored HUD bitmaps / tile blits from the same RGB→pen map |
+| Ms. Pac | Yellow bank `#09` (and related) | Prebake yellow / red / blue accents onto pens **13** / **5** / **15** etc. |
+
+Harness today still uses a partial pack (`gen_palette.py` maze `#1D` in 0–3 + color-ROM 0–11 in 4–15, omitting green/teal). That is demo scaffolding. The **target** is: one fixed RGB→pen map covering all 12 chromatic colors; generators emit correct indices; runtime almost never remaps pixels.
+
+### Full arcade RGB set → target SHR pens
+
+Decoded with MAME `pacman` weights from `82s123.7f`. Color-ROM indices in brackets.
+
+| Pen | SHR `$0RGB` | RGB | Color ROM | Roles |
+|-----|-------------|-----|-----------|--------|
+| **0** | `$0000` | `(0,0,0)` | 0/4/8/10 | Black, empty path, sprite transparency |
+| **1** | `$0DDF` | `(222,222,255)` | 15 | Dots, eye white, fruit highlight, many maze pen1s |
+| **2** | `$0FBA` | `(255,184,174)` | 14 | Maze `#1D` wall fill; some chrome / frightened accents |
+| **3** | `$0F00` | `(255,0,0)` | 1 | Maze `#1D` wall ink; **shared with Blinky / cherry red** (alias ok — same RGB as pen 5) |
+| **4** | `$00F0` | `(0,255,0)` | 12 | **Green** — strawberry leaf, peach leaf, pear, frightened-bank accents |
+| **5** | `$0F00` | `(255,0,0)` | 1 | `COL_BLINKY`; cherry / strawberry / apple body |
+| **6** | `$0D95` | `(222,151,81)` | 2 | Brown — fruit stems, maze `#14` accents; ghost `BODY_PEN` marker when needed |
+| **7** | `$0FBF` | `(255,184,255)` | 3 | `COL_PINKY`; maze `#18` pink |
+| **8** | `$04BA` | `(71,184,174)` | 13 | **Teal** — pear HUD bank `#17` |
+| **9** | `$00FF` | `(0,255,255)` | 5 | `COL_INKY`; maze `#18` cyan |
+| **10** | `$04BF` | `(71,184,255)` | 6 | Light blue — banana / maze `#16` |
+| **11** | `$0FB5` | `(255,184,81)` | 7 | `COL_CLYDE`; peach / pretzel orange; maze `#07` |
+| **12** | — | — | — | **Spare** |
+| **13** | `$0FF0` | `(255,255,0)` | 9 | Ms. Pac body; banana; maze `#16`/`#18` yellow |
+| **14** | `$0DDF` → fade | `(222,222,255)` base | 15 | **`COL_POWER`** — power-pill fade (same RGB as pen 1 at full bright) |
+| **15** | `$022F` | `(33,33,255)` | 11 | Ghost pupils; pretzel blue; maze `#07` deep blue |
+
+| Consumer | Pens (target) |
+|----------|----------------|
+| Maze tiles | 0 + level bank’s three chromatics (subset of 1–3, 6–7, 9–11, 13, 15, …) |
+| Dots | 0, **1** |
+| Power pills | 0, **14** |
+| Ghosts | 0, 1, 15, body **5/7/9/11** |
+| Fruit (actor + HUD) | baked mix of 1, 4–6, 8, 10–11, 13, 15 (and red via 5) |
+| Ms. Pac | 0, 13 (yellow), plus 5 / 15 accents as bank `#09` requires |
+
+Pens **3** and **5** may hold the same red word; keeping both simplifies “maze ink” vs `COL_BLINKY` naming. Pen **12** is the leftover spare after green/teal/`COL_POWER` claim the former duplicate-black holes.
+
+### Harness note
+
+`gen_palette.py` emits the §2 target map (green/teal/`COL_POWER` included). Fruit compiled blits prebake bank colors into those pens. Power-pill tiles still use pen **1** until fade remap lands.
+
+### Power-pill fade
+
+Arcade blinks energizers by toggling **color RAM** between the maze color and black every 10 VBLANKs (`#0C0D` → Ms. Pac `FLASHEN` at `#9524`). On SHR: pixels use pen **14**; each fade step rewrites `$01/9E00 + 14*2` only. All four pills stay in sync; dots on pen **1** stay steady.
+
+| Item | Choice |
+|------|--------|
+| Pen | **14** (`COL_POWER`) |
+| Full-bright RGB | Same as pen 1 (`$0DDF`) |
+| Asset | Prebake `#14`/`#15` tiles to pen 14 |
+| Timing default | 10-frame envelope (arcade counter `#4DCF` / `#0A`) unless playtest changes it |
+| Maze bank swap | Refresh pen 14’s full-bright base when maze pale changes |
 
 ---
 
@@ -190,8 +272,9 @@ SHR **320** mode stores **two pixels per byte** (4 bits each). That constrains h
 
 ### Blit implementation sequence
 
-1. **Ghosts (current):** build-time **compiled** masked blits (`py/gen_compiled_ghosts.py`) for walk frames `$20–$27` × 4 body colors × even/odd; save-under still unrolled data copies.
-2. **Other actors (later):** same pattern for Ms. Pac / fruit when those soft sprites land; keep erase as save-under restore.
+1. **Ghosts:** build-time **compiled** masked blits (`py/gen_compiled_ghosts.py`) for walk frames `$20–$27` × 4 body colors × even/odd; save-under still unrolled data copies.
+2. **Fruit (demo):** `py/gen_compiled_fruits.py` — 8 types × even/odd, colors prebaked from `#879D`. Harness actor 4 sits at fixed tile (14,17); `AdvanceFruit` cycles `ACT_SPR` every 360 frames. HUD fruit strip still TBD (precolored tiles, not actors).
+3. **Ms. Pac (later):** same compiled-blit pattern; keep erase as save-under restore.
 
 ```mermaid
 flowchart TB
@@ -270,7 +353,7 @@ Write SHR through bank `$01` shadow at full CPU speed. Avoid long poke loops int
 
 ### Non-goals (still)
 
-- No final palette (§2) — harness uses a provisional 16-color table.
+- Power-pill fade remap (pen 14) and HUD fruit strip not wired yet.
 - No beam-trailing plan beyond “measure first, then consider.”
 - No full game logic / Z80 translation yet.
 
@@ -299,7 +382,7 @@ Scale factor is \(6/8 = 0.75\) for both (8→6, 16→12). Sprites are then padde
 6. Maze build also emits **`maze1_cells.bin`**: per-cell 6×6 copies with shared-edge stitching (narrow lines meet at corners).
 7. Optional: write **PPM** contact sheets under `build/gfx/ppm/` for eyeballing (uses color/palette PROMs when present).
 
-Pen 0 remains transparency for sprites. Final SHR palette mapping is still §2; assets store pen indices in the low bits of each nibble.
+Pen 0 remains transparency for sprites. Asset generators **prebake** §2 target pen indices into each nibble (resolve arcade 2bpp + color bank → SHR pen); do not ship raw bank-local 0–3 indices for actors/fruit/HUD.
 
 ### Build
 
@@ -347,7 +430,7 @@ make iigs-test   # spawn GSSquared, inject, CALL 768, dump build/iigs/frame.png
 
 Harness maze tiles must match `make gfx` upright orientation (CW + row XOR 3). Ground-truth previews: `build/gfx/ppm/maze1_8x8_upright.png` / `maze1_6x6_upright.png`.
 
-**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`py/gen_ghost_rails.py` → `iigs/rails_data.s`). Rails write **new** `ACT_X`/`ACT_Y` and `ACT_SPR` (arcade facing `$20–$27`: `dir×2 + ((FRAME_COUNT>>3)&1) + $20`). Draw uses **compiled** masked blits (`py/gen_compiled_ghosts.py` → `GhostBlitTable`, color×frame×parity); no per-frame `PrepOneGhost` / `SPR_WORK*`. Erase reads **old** `ACT_OX`/`ACT_OY`, draw reads new, then commit. Bodies are baked into the compiled routines from `ACT_COLOR` pens 5/7/9/11. Loop: erase→draw→commit→rails→VBL until a key at `$C000`/`$C010`, or host sets `DEMO_FREEZE` (`$02/7904`) before SHR capture. **Border** (`$C034`) changes per phase (red/green/blue/orange/black) for visual timing — see `BRD_*` in `equates.s` / [`UserTesting.md`](../UserTesting.md).
+**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`py/gen_ghost_rails.py` → `iigs/rails_data.s`). Rails write **new** `ACT_X`/`ACT_Y` and `ACT_SPR` (arcade facing `$20–$27`: `dir×2 + ((FRAME_COUNT>>3)&1) + $20`). Draw uses **compiled** masked blits (`py/gen_compiled_ghosts.py` → `GhostBlitTable`, color×frame×parity); no per-frame `PrepOneGhost` / `SPR_WORK*`. A fifth actor (fruit) sits at fixed tile (14,17) with prebaked `FruitBlitTable` blits; `AdvanceFruit` cycles type `$00–$07` every 360 frames. Erase reads **old** `ACT_OX`/`ACT_OY`, draw reads new, then commit. Ghost bodies are baked from `ACT_COLOR` pens 5/7/9/11. Loop: erase→draw→commit→rails→fruit→VBL until a key at `$C000`/`$C010`, or host sets `DEMO_FREEZE` (`$02/7904`) before SHR capture. **Border** (`$C034`) changes per phase (red/green/blue/orange/black) for visual timing — see `BRD_*` in `equates.s` / [`UserTesting.md`](../UserTesting.md).
 
 ---
 

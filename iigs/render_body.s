@@ -365,14 +365,13 @@ SortActorsByY
 	and	#$00FF
 	sta	>R_YOFF
 	sep	#$30
-	lda	#0
-	sta	>R_SORT
-	lda	#1
-	sta	>R_SORT+1
-	lda	#2
-	sta	>R_SORT+2
-	lda	#3
-	sta	>R_SORT+3
+* Seed R_SORT[i] = i for all actors (must cover NUM_ACTORS, not hard-coded 4)
+	ldx	#0
+]seed	txa
+	sta	>R_SORT,x
+	inx
+	cpx	#NUM_ACTORS
+	bcc	]seed
 	lda	#0
 	sta	>R_SI
 ]si	lda	#0
@@ -633,7 +632,7 @@ EraseSprite
 
 DrawSprite
 * A = actor index — must save before PHB bank switch clobbers it
-* Save-under then compiled ghost blit (GhostBlitTable); no SPR_WORK / remap.
+* Save-under then compiled ghost or fruit blit; no SPR_WORK / remap.
 	php
 	rep	#$30
 	sta	>R_ACT
@@ -763,7 +762,10 @@ DrawSprite
 	sta	>BANK2+81,x
 	lda	$2005+1760,y
 	sta	>BANK2+82,x
-* Compiled blit: index = color_slot*16 + (ACT_SPR&7)*2 + (X&1)
+	lda	>R_ACT
+	cmp	#FRUIT_ACTOR
+	beq	:fruitBlit
+* Ghost: index = color_slot*16 + (ACT_SPR&7)*2 + (X&1)
 	lda	>R_BASE
 	tax
 	lda	>BANK2+ACT_COLOR,x
@@ -790,6 +792,24 @@ DrawSprite
 	lda	>R_DEST
 	tay
 	jsr	GhostBlitGo
+	bra	:blitDone
+:fruitBlit
+* Fruit: index = (ACT_SPR&7)*2 + (X&1)
+	lda	>R_BASE
+	tax
+	lda	>BANK2+ACT_SPR,x
+	and	#$0007
+	asl				; type*2
+	sta	>R_OFF
+	lda	>R_X
+	and	#$0001
+	ora	>R_OFF
+	asl				; word index
+	tax
+	lda	>R_DEST
+	tay
+	jsr	FruitBlitGo
+:blitDone
 	lda	>R_BASE
 	tax
 	sep	#$20

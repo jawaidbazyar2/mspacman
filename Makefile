@@ -21,6 +21,8 @@ BOOTS     := boot1 boot2 boot3 boot4 boot5 boot6
 GFX_DIR   := $(BUILD_DIR)/gfx
 TILE_ROM  := mspacman-orig/5e
 SPRITE_ROM := mspacman-orig/5f
+COLOR_ROM := mspacman-orig/82s123.7f
+PALETTE_ROM := mspacman-orig/82s126.4a
 
 MERLIN32  ?= $(HOME)/src/Merlin32_v1.1/MacOs/Merlin32
 MERLIN_LIB ?= $(HOME)/src/Merlin32_v1.1/Library
@@ -92,12 +94,16 @@ tiles-preview: maze
 		--out $(GFX_DIR)/ppm
 
 # Assemble IIgs render harness with Merlin32 → build/iigs/harness.bin
-iigs: palette rails gfx $(IIGS_DIR)/compiled_ghosts.s $(IIGS_BIN)
+iigs: palette rails gfx $(IIGS_DIR)/compiled_ghosts.s $(IIGS_DIR)/compiled_fruits.s $(IIGS_BIN)
 
 $(IIGS_DIR)/compiled_ghosts.s: py/gen_compiled_ghosts.py \
 		$(GFX_DIR)/sprites14x12.bin $(GFX_DIR)/sprites14x12.mask.bin \
 		$(GFX_DIR)/sprites14x12.odd.bin $(GFX_DIR)/sprites14x12.odd.mask.bin
 	python3 py/gen_compiled_ghosts.py --gfx $(GFX_DIR) -o $(IIGS_DIR)/compiled_ghosts.s
+
+$(IIGS_DIR)/compiled_fruits.s: py/gen_compiled_fruits.py \
+		$(SPRITE_ROM) $(COLOR_ROM) $(PALETTE_ROM) py/gen_shr_gfx.py py/gen_palette.py
+	python3 py/gen_compiled_fruits.py --sprites $(SPRITE_ROM) -o $(IIGS_DIR)/compiled_fruits.s
 
 $(IIGS_DIR)/ghost_work_blit.s: py/gen_ghost_work_blit.py
 	python3 py/gen_ghost_work_blit.py -o $(IIGS_DIR)/ghost_work_blit.s
@@ -107,7 +113,7 @@ $(IIGS_BUILD):
 
 $(IIGS_BIN): $(IIGS_DIR)/link.s $(IIGS_DIR)/all.s $(IIGS_DIR)/equates.s \
 		$(IIGS_DIR)/shr_body.s $(IIGS_DIR)/render_body.s \
-		$(IIGS_DIR)/compiled_ghosts.s \
+		$(IIGS_DIR)/compiled_ghosts.s $(IIGS_DIR)/compiled_fruits.s \
 		$(IIGS_DIR)/harness_body.s $(IIGS_DIR)/rails_data.s \
 		$(IIGS_DIR)/palette_data.s \
 		$(MERLIN32) | $(IIGS_BUILD)

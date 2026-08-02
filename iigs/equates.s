@@ -55,7 +55,12 @@ SPR_BYTES      equ 84
 SPR_BASE_X     equ 72		; PF_ORIGIN_X - 4
 SPR_BASE_Y     equ 4		; PF_ORIGIN_Y - 3
 NUM_SPRITES    equ 64
-NUM_ACTORS     equ 4		; Blinky / Pinky / Inky / Clyde
+NUM_GHOSTS     equ 4		; Blinky / Pinky / Inky / Clyde (rails)
+NUM_ACTORS     equ 5		; ghosts + fruit demo actor
+FRUIT_ACTOR    equ 4
+FRUIT_PERIOD   equ 360		; frames between fruit-type changes
+FRUIT_TILE_X   equ 14		; fixed demo tile (below ghost house)
+FRUIT_TILE_Y   equ 17
 * actors × 84-byte save-under; keep under DIRTY at $7800
 
 NUM_TILES      equ 256

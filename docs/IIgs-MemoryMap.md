@@ -75,10 +75,10 @@ Merlin `org $0000` → loaded at `$02/0000`.
 | `$02/6000`–`$02/653F` | (free) | 1344 | Was `SPR_WORK*`; ghosts use compiled blits now |
 | `$02/7000`–`$02/7363` | `TILEMAP` | 868 | 28×31 tile codes (copy of `AST_MAZE`) |
 | `$02/7364`–`$02/73FF` | — | — | Unused pad to actors |
-| `$02/7400`–`$02/743F` | `ACTORS` | 64 | 4 actors × 16 bytes |
-| `$02/7440`–`$02/74FF` | — | — | Reserved for actors 4–5 (pac/fruit) later |
-| `$02/7500`–`$02/764F` | `SAVEUNDER` | 336 | 4 × 84-byte (14×12) underlays |
-| `$02/7650`–`$02/77FF` | — | — | Free (must stay below dirty) |
+| `$02/7400`–`$02/744F` | `ACTORS` | 80 | 5 actors × 16 bytes (4 ghosts + fruit) |
+| `$02/7450`–`$02/74FF` | — | — | Reserved for actor 5 (Ms. Pac) later |
+| `$02/7500`–`$02/76A3` | `SAVEUNDER` | 420 | 5 × 84-byte (14×12) underlays |
+| `$02/76A4`–`$02/77FF` | — | — | Free (must stay below dirty) |
 
 ### Actor record (`ACT_SIZE` = 16)
 
@@ -90,10 +90,10 @@ Base = `$027400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | +2 | `ACT_Y` | word | rails / logic (**new**) | `DrawSprite` |
 | +4 | `ACT_OX` | word | `CopySpritePos` / init (**old**) | `EraseSprite` |
 | +6 | `ACT_OY` | word | `CopySpritePos` / init (**old**) | `EraseSprite` |
-| +8 | `ACT_SPR` | byte | rails / init (facing + 8-frame anim) | `DrawSprite` → `GhostBlitTable` |
+| +8 | `ACT_SPR` | byte | rails / fruit cycle (ghost `$20–$27` or fruit `$00–$07`) | `DrawSprite` → ghost/fruit blit table |
 | +9 | `ACT_FLAGS` | byte | render (`FLAG_DRAWN`) | render |
-| +10 | `ACT_WP` | byte | rails (waypoint index) | rails only |
-| +11 | `ACT_COLOR` | byte | init (body pen 5/7/9/11) | `DrawSprite` → `GhostBlitTable` |
+| +10 | `ACT_WP` | byte | rails (waypoint index; ghosts only) | rails only |
+| +11 | `ACT_COLOR` | byte | init (ghost body pen 5/7/9/11; unused for fruit) | `DrawSprite` → `GhostBlitTable` |
 | +12…15 | — | — | reserved | — |
 
 ### Frame / dirty / demo control
@@ -127,7 +127,7 @@ Base = `$027400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | `$02/7A1A` | `R_SAVE` | Save-under pointer |
 | `$02/7A1C` | `R_BODY` | Body pen for remap |
 | `$02/7A1E` | `R_BTMP` | Blit temp |
-| `$02/7A20`–`$02/7A23` | `R_SORT` | Y-sorted actor indices (4) |
+| `$02/7A20`–`$02/7A24` | `R_SORT` | Y-sorted actor indices (`NUM_ACTORS`) |
 | `$02/7A28` | `R_SI` | Sort / draw walk index |
 | `$02/7A2A` | `R_SJ` | Sort inner index |
 | `$02/7A2C` | `R_YOFF` | `ACT_Y` / `ACT_OY` field for sort |
