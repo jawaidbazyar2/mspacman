@@ -17,10 +17,11 @@ BORDCOLOR      equ $00C034	; low nibble = border (preserve high clock bits)
 TXTCLR         equ $00C050
 
 * MainLoop phase border colors (classic 16; keep far apart — avoid orange+red→“yellow”)
-BRD_ERASE      equ $03		; purple — EraseAllSprites
-BRD_DRAW       equ $0C		; green — DrawAllSprites
+BRD_ERASE      equ $03		; purple — EraseSprite entry
+BRD_DRAW       equ $0C		; green — DrawSprite entry
 BRD_COPY       equ $07		; light blue — CopySpritePos
 BRD_RAILS      equ $09		; orange — AdvanceRails
+BRD_SORT       equ $0D		; yellow — SortActorsByY (before WaitVBL)
 BRD_VBL        equ $00		; black — WaitVBL slack (absent ⇒ no headroom / possible miss)
 BRD_FREEZE     equ $0F		; white — DEMO_FREEZE spin
 

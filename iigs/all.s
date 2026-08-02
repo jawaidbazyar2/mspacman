@@ -32,7 +32,7 @@ Start
 	sta	>DEMO_FREEZE
 	jsr	InitActors
 	jsr	DrawMaze
-	jsr	DrawAllSprites		; new (== old at start)
+	jsr	DrawAllSprites		; new (== old at start); fills R_SORT
 	jsr	CopySpritePos
 	lda	#0
 	sta	>FRAME_COUNT
@@ -40,7 +40,7 @@ Start
 	jsr	WaitVBL			; sync before first erase/draw
 
 MainLoop
-* erase(old) → draw(new) → old←new → move(new) → WaitVBL
+* refresh → old←new → move → sort(next) → WaitVBL
 * Border color = phase profiler (see BRD_* in equates.s).
 	sep	#$20
 	lda	>KBD
@@ -51,16 +51,8 @@ MainLoop
 	lda	>DEMO_FREEZE
 	and	#$00FF
 	bne	:frozen
-	sep	#$20
-	lda	#BRD_ERASE
-	jsr	SetBorder
 	rep	#$30
-	jsr	EraseAllSprites		; ACT_OX/OY
-	sep	#$20
-	lda	#BRD_DRAW
-	jsr	SetBorder
-	rep	#$30
-	jsr	DrawAllSprites		; ACT_X/Y
+	jsr	RefreshAllSprites	; erase/draw set BRD_ERASE / BRD_DRAW
 	sep	#$20
 	lda	#BRD_COPY
 	jsr	SetBorder
@@ -75,6 +67,8 @@ MainLoop
 	inc
 	sta	>FRAME_COUNT
 	jsr	AdvanceFruit		; cycle fruit type every FRUIT_PERIOD
+	lda	#ACT_OY
+	jsr	SortActorsByY		; yellow; order for next refresh
 	jsr	WaitVBL			; border black while waiting
 	bra	MainLoop
 :frozen	sep	#$20

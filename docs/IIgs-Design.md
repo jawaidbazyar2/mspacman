@@ -323,12 +323,11 @@ flowchart TB
 
 ### Per-frame loop
 
-1. Erase actors at **old** positions (`ACT_OX`/`ACT_OY` — restore 14×12 from bank `$04` mirror).
-2. Apply dirty playfield tiles when present (dot eaten, power-pill blink).
-3. Draw actors at **new** positions (`ACT_X`/`ACT_Y`).
-4. `CopySpritePos`: old ← new.
-5. Run logic / rails / sound (writes next **new** XY; rails also update `ACT_SPR`).
-6. `WaitVBL` (poll input around this edge), then loop.
+1. `RefreshAllSprites`: for each actor top→bottom by `ACT_OY`, erase(old) then draw(new) — `$04`→`$01` restore, then masked blit. Closes upper holes before the beam.
+2. Apply dirty playfield tiles when present (update `$01` and `$04`; order vs refresh TBD when dots land).
+3. `CopySpritePos`: old ← new.
+4. Run logic / rails / sound (writes next **new** XY; rails also update `ACT_SPR`).
+5. `WaitVBL` (poll input around this edge), then loop.
 
 Level start draws maze once, draws sprites at initial new (== old), commits, then enters the loop.
 
@@ -340,7 +339,7 @@ Level start draws maze once, draws sprites at initial new (== old), commits, the
 | Erase → move → draw (move in the hole) | Rejected — long invisible gap → flicker. |
 | Erase(old) → draw(new) → commit → logic → VBL | **Chosen.** Tight blit pair; logic publishes next frame’s new regs after sprites are visible. |
 | Trail the beam (per-sprite scanline waits) | Not used in v1 — deferred redraws caused worse flicker than tear. |
-| Y-sort erase/draw (no beam wait) | **Used** — erase by `ACT_OY`, draw by `ACT_Y`, top→bottom so upper sprites update before the beam reaches them. |
+| Y-sort erase/draw (no beam wait) | **Used** — `RefreshAllSprites` erases then draws each actor top→bottom by `ACT_OY`. |
 
 ### Cycle-budget sketch
 

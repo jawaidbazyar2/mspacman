@@ -60,20 +60,21 @@ PYTHONPATH=$HOME/src/gssquared/clients/python/src \
 
 - Maze 1 in SHR 320×200 (pink/red walls, pellets).  
 - Four ghosts on a shared waypoint loop: **red / pink / cyan / orange**, spaced around the path.  
-- Smooth erase → draw → commit → rails (move is outside the blit hole).  
+- Smooth refresh (erase+draw by Y) → commit → rails (move is outside the blit hole).  
 - Ghost draw uses **compiled** 65816 blits (`compiled_ghosts.s`); eyes/walk anim via `ACT_SPR` only.  
 - **Border color = phase profiler** (width of each color ≈ time in that phase):
 
 | Border | Phase |
 |--------|--------|
-| Purple | `EraseAllSprites` (fast after unroll — easy to miss) |
-| Green | `DrawAllSprites` (usually the wide band) |
+| Purple | `EraseSprite` (each actor erase) |
+| Green | `DrawSprite` (each actor draw) |
 | Light blue | `CopySpritePos` |
 | Orange | `AdvanceRails` |
-| Black | `WaitVBL` slack — **no black ⇒ work fills the frame** (orange→purple can look “yellow”) |
+| Yellow | `SortActorsByY` (order for next frame; before VBL) |
+| Black | `WaitVBL` slack — **no black ⇒ work fills the frame** |
 | White | `DEMO_FREEZE` (host capture) |
 
-Order in time: purple → green → light blue → orange → **black** → (repeat). Yellowish flash at the wrap usually means orange+purple with **no black** (budget full), not a mystery fifth color.
+Order in time: purple/green toggle → light blue → orange → yellow → **black** → (repeat). Sort runs before `WaitVBL` so purple starts at blank.
 
 ## Useful flags
 

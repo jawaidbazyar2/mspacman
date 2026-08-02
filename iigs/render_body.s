@@ -385,10 +385,14 @@ ActorYLow
 SortActorsByY
 * A = actor-field offset (ACT_Y or ACT_OY). Bubble-sort indices into R_SORT
 * ascending by Y so top-of-screen sprites update first (beam race).
+* Border yellow while sorting (MainLoop runs this before WaitVBL).
 	php
 	rep	#$30
 	and	#$00FF
 	sta	>R_YOFF
+	sep	#$20
+	lda	#BRD_SORT
+	jsr	SetBorder
 	sep	#$30
 * Seed R_SORT[i] = i for all actors (must cover NUM_ACTORS, not hard-coded 4)
 	ldx	#0
@@ -435,7 +439,7 @@ SortActorsByY
 	rts
 
 EraseAllSprites
-* Erase at ACT_OX/OY (old), top→bottom by ACT_OY.
+* Erase at ACT_OX/OY (old), top→bottom by ACT_OY. (init / tools)
 	php
 	rep	#$30
 	lda	#ACT_OY
@@ -458,7 +462,7 @@ EraseAllSprites
 	rts
 
 DrawAllSprites
-* Draw at ACT_X/Y (new), top→bottom by ACT_Y.
+* Draw at ACT_X/Y (new), top→bottom by ACT_Y. (level start)
 	php
 	rep	#$30
 	lda	#ACT_Y
@@ -477,6 +481,31 @@ DrawAllSprites
 	sta	>R_SI
 	cmp	#NUM_ACTORS
 	bcc	]d
+	plp
+	rts
+
+RefreshAllSprites
+* Per actor top→bottom using R_SORT (filled before WaitVBL).
+* Erase(old) then draw(new); closes upper holes before the beam.
+	php
+	rep	#$30
+	lda	#0
+	sta	>R_SI
+]r	sep	#$30
+	lda	>R_SI
+	tax
+	lda	>R_SORT,x
+	rep	#$30
+	and	#$00FF
+	sta	>R_ACT
+	jsr	EraseSprite
+	lda	>R_ACT
+	jsr	DrawSprite
+	lda	>R_SI
+	inc
+	sta	>R_SI
+	cmp	#NUM_ACTORS
+	bcc	]r
 	plp
 	rts
 
@@ -508,11 +537,20 @@ CopySpritePos
 
 EraseSprite
 * A = actor index. Position from ACT_OX/OY (old).
-* Restore 14×12 from BG_PIXELS ($04) → SHR_PIXELS ($01) via long,X
-* (65816 has no absolute-long,Y mode).
+* Restore 14×12: long load from BG ($04) + abs,y store with DBR=$01.
+* X = Y = dest (no absolute-long,Y mode).
 	php
 	rep	#$30
 	sta	>R_ACT
+	sep	#$20
+	lda	#BRD_ERASE
+	jsr	SetBorder
+	phb
+	lda	#BANK_SHR
+	pha
+	plb
+	rep	#$30
+	lda	>R_ACT
 	asl
 	asl
 	asl
@@ -524,6 +562,7 @@ EraseSprite
 	lda	>BANK2+ACT_FLAGS,x
 	and	#$0001
 	bne	:er
+	plb
 	plp
 	rts
 :er	lda	>BANK2+ACT_OX,x
@@ -533,109 +572,112 @@ EraseSprite
 	jsr	ScreenXY
 	lda	>R_DEST
 	tax
+	tay
 * Unrolled 12×7: BG → SHR. Words @0,2,4 + @5 per row (no 8th byte).
+* |SHR_PIXELS forces abs (low 16 of $012000 → $2000) with DBR=$01.
 	lda	>BG_PIXELS,x
-	sta	>SHR_PIXELS,x
+	sta	|SHR_PIXELS,y
 	lda	>BG_PIXELS+2,x
-	sta	>SHR_PIXELS+2,x
+	sta	|SHR_PIXELS+2,y
 	lda	>BG_PIXELS+4,x
-	sta	>SHR_PIXELS+4,x
+	sta	|SHR_PIXELS+4,y
 	lda	>BG_PIXELS+5,x
-	sta	>SHR_PIXELS+5,x
+	sta	|SHR_PIXELS+5,y
 	lda	>BG_PIXELS+160,x
-	sta	>SHR_PIXELS+160,x
+	sta	|SHR_PIXELS+160,y
 	lda	>BG_PIXELS+162,x
-	sta	>SHR_PIXELS+162,x
+	sta	|SHR_PIXELS+162,y
 	lda	>BG_PIXELS+164,x
-	sta	>SHR_PIXELS+164,x
+	sta	|SHR_PIXELS+164,y
 	lda	>BG_PIXELS+165,x
-	sta	>SHR_PIXELS+165,x
+	sta	|SHR_PIXELS+165,y
 	lda	>BG_PIXELS+320,x
-	sta	>SHR_PIXELS+320,x
+	sta	|SHR_PIXELS+320,y
 	lda	>BG_PIXELS+322,x
-	sta	>SHR_PIXELS+322,x
+	sta	|SHR_PIXELS+322,y
 	lda	>BG_PIXELS+324,x
-	sta	>SHR_PIXELS+324,x
+	sta	|SHR_PIXELS+324,y
 	lda	>BG_PIXELS+325,x
-	sta	>SHR_PIXELS+325,x
+	sta	|SHR_PIXELS+325,y
 	lda	>BG_PIXELS+480,x
-	sta	>SHR_PIXELS+480,x
+	sta	|SHR_PIXELS+480,y
 	lda	>BG_PIXELS+482,x
-	sta	>SHR_PIXELS+482,x
+	sta	|SHR_PIXELS+482,y
 	lda	>BG_PIXELS+484,x
-	sta	>SHR_PIXELS+484,x
+	sta	|SHR_PIXELS+484,y
 	lda	>BG_PIXELS+485,x
-	sta	>SHR_PIXELS+485,x
+	sta	|SHR_PIXELS+485,y
 	lda	>BG_PIXELS+640,x
-	sta	>SHR_PIXELS+640,x
+	sta	|SHR_PIXELS+640,y
 	lda	>BG_PIXELS+642,x
-	sta	>SHR_PIXELS+642,x
+	sta	|SHR_PIXELS+642,y
 	lda	>BG_PIXELS+644,x
-	sta	>SHR_PIXELS+644,x
+	sta	|SHR_PIXELS+644,y
 	lda	>BG_PIXELS+645,x
-	sta	>SHR_PIXELS+645,x
+	sta	|SHR_PIXELS+645,y
 	lda	>BG_PIXELS+800,x
-	sta	>SHR_PIXELS+800,x
+	sta	|SHR_PIXELS+800,y
 	lda	>BG_PIXELS+802,x
-	sta	>SHR_PIXELS+802,x
+	sta	|SHR_PIXELS+802,y
 	lda	>BG_PIXELS+804,x
-	sta	>SHR_PIXELS+804,x
+	sta	|SHR_PIXELS+804,y
 	lda	>BG_PIXELS+805,x
-	sta	>SHR_PIXELS+805,x
+	sta	|SHR_PIXELS+805,y
 	lda	>BG_PIXELS+960,x
-	sta	>SHR_PIXELS+960,x
+	sta	|SHR_PIXELS+960,y
 	lda	>BG_PIXELS+962,x
-	sta	>SHR_PIXELS+962,x
+	sta	|SHR_PIXELS+962,y
 	lda	>BG_PIXELS+964,x
-	sta	>SHR_PIXELS+964,x
+	sta	|SHR_PIXELS+964,y
 	lda	>BG_PIXELS+965,x
-	sta	>SHR_PIXELS+965,x
+	sta	|SHR_PIXELS+965,y
 	lda	>BG_PIXELS+1120,x
-	sta	>SHR_PIXELS+1120,x
+	sta	|SHR_PIXELS+1120,y
 	lda	>BG_PIXELS+1122,x
-	sta	>SHR_PIXELS+1122,x
+	sta	|SHR_PIXELS+1122,y
 	lda	>BG_PIXELS+1124,x
-	sta	>SHR_PIXELS+1124,x
+	sta	|SHR_PIXELS+1124,y
 	lda	>BG_PIXELS+1125,x
-	sta	>SHR_PIXELS+1125,x
+	sta	|SHR_PIXELS+1125,y
 	lda	>BG_PIXELS+1280,x
-	sta	>SHR_PIXELS+1280,x
+	sta	|SHR_PIXELS+1280,y
 	lda	>BG_PIXELS+1282,x
-	sta	>SHR_PIXELS+1282,x
+	sta	|SHR_PIXELS+1282,y
 	lda	>BG_PIXELS+1284,x
-	sta	>SHR_PIXELS+1284,x
+	sta	|SHR_PIXELS+1284,y
 	lda	>BG_PIXELS+1285,x
-	sta	>SHR_PIXELS+1285,x
+	sta	|SHR_PIXELS+1285,y
 	lda	>BG_PIXELS+1440,x
-	sta	>SHR_PIXELS+1440,x
+	sta	|SHR_PIXELS+1440,y
 	lda	>BG_PIXELS+1442,x
-	sta	>SHR_PIXELS+1442,x
+	sta	|SHR_PIXELS+1442,y
 	lda	>BG_PIXELS+1444,x
-	sta	>SHR_PIXELS+1444,x
+	sta	|SHR_PIXELS+1444,y
 	lda	>BG_PIXELS+1445,x
-	sta	>SHR_PIXELS+1445,x
+	sta	|SHR_PIXELS+1445,y
 	lda	>BG_PIXELS+1600,x
-	sta	>SHR_PIXELS+1600,x
+	sta	|SHR_PIXELS+1600,y
 	lda	>BG_PIXELS+1602,x
-	sta	>SHR_PIXELS+1602,x
+	sta	|SHR_PIXELS+1602,y
 	lda	>BG_PIXELS+1604,x
-	sta	>SHR_PIXELS+1604,x
+	sta	|SHR_PIXELS+1604,y
 	lda	>BG_PIXELS+1605,x
-	sta	>SHR_PIXELS+1605,x
+	sta	|SHR_PIXELS+1605,y
 	lda	>BG_PIXELS+1760,x
-	sta	>SHR_PIXELS+1760,x
+	sta	|SHR_PIXELS+1760,y
 	lda	>BG_PIXELS+1762,x
-	sta	>SHR_PIXELS+1762,x
+	sta	|SHR_PIXELS+1762,y
 	lda	>BG_PIXELS+1764,x
-	sta	>SHR_PIXELS+1764,x
+	sta	|SHR_PIXELS+1764,y
 	lda	>BG_PIXELS+1765,x
-	sta	>SHR_PIXELS+1765,x
+	sta	|SHR_PIXELS+1765,y
 	lda	>R_BASE
 	tax
 	sep	#$20
 	lda	>BANK2+ACT_FLAGS,x
 	and	#$FE
 	sta	>BANK2+ACT_FLAGS,x
+	plb
 	plp
 	rts
 
@@ -645,8 +687,10 @@ DrawSprite
 	php
 	rep	#$30
 	sta	>R_ACT
-	phb
 	sep	#$20
+	lda	#BRD_DRAW
+	jsr	SetBorder
+	phb
 	lda	#BANK_SHR
 	pha
 	plb
