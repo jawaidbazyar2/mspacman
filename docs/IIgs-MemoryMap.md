@@ -127,7 +127,10 @@ Base = `$027400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | `$02/7A1A` | `R_SAVE` | Save-under pointer |
 | `$02/7A1C` | `R_BODY` | Body pen for remap |
 | `$02/7A1E` | `R_BTMP` | Blit temp |
-| `$02/7A20`–… | — | Further scratch if needed |
+| `$02/7A20`–`$02/7A23` | `R_SORT` | Y-sorted actor indices (4) |
+| `$02/7A28` | `R_SI` | Sort / draw walk index |
+| `$02/7A2A` | `R_SJ` | Sort inner index |
+| `$02/7A2C` | `R_YOFF` | `ACT_Y` / `ACT_OY` field for sort |
 
 `BANK2` = `$020000` (long base for `,x` with 16-bit offset).  
 `ACTORS16` = `$7400`, `SAVEUNDER16` = `$7500`.

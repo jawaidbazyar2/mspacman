@@ -18,6 +18,10 @@ R_BASE         equ $027A18
 R_SAVE         equ $027A1A
 R_BODY         equ $027A1C	; ACT_COLOR nibble for RemapBodyByte
 R_BTMP         equ $027A1E
+R_SORT         equ $027A20	; NUM_ACTORS actor indices, Y-sorted
+R_SI           equ $027A28
+R_SJ           equ $027A2A
+R_YOFF         equ $027A2C	; ACT_Y or ACT_OY offset for SortActorsByY
 * Bank $02 long base: >BANK2+field,x with X = ACTORS16 / SAVEUNDER16
 BANK2          equ $020000
 ACTORS16       equ $7400
@@ -336,32 +340,117 @@ DrawMaze
 	plp
 	rts
 
-EraseAllSprites
-* Erase at ACT_OX/OY (old / last drawn).
+ActorYLow
+* A = actor index. R_YOFF = ACT_Y or ACT_OY. Returns A = Y low; leaves M=8.
+	rep	#$30
+	and	#$00FF
+	asl
+	asl
+	asl
+	asl
+	clc
+	adc	#ACTORS16
+	clc
+	adc	>R_YOFF
+	tax
+	lda	>BANK2,x
+	sep	#$30
+	rts
+
+SortActorsByY
+* A = actor-field offset (ACT_Y or ACT_OY). Bubble-sort indices into R_SORT
+* ascending by Y so top-of-screen sprites update first (beam race).
 	php
 	rep	#$30
-	lda	#NUM_ACTORS-1
-	sta	>R_ACT
-]e	lda	>R_ACT
+	and	#$00FF
+	sta	>R_YOFF
+	sep	#$30
+	lda	#0
+	sta	>R_SORT
+	lda	#1
+	sta	>R_SORT+1
+	lda	#2
+	sta	>R_SORT+2
+	lda	#3
+	sta	>R_SORT+3
+	lda	#0
+	sta	>R_SI
+]si	lda	#0
+	sta	>R_SJ
+]sj	lda	>R_SJ
+	tax
+	lda	>R_SORT,x			; idx[j]
+	jsr	ActorYLow
+	sta	>R_BTMP
+	lda	>R_SJ
+	inc
+	tax
+	lda	>R_SORT,x			; idx[j+1]
+	jsr	ActorYLow
+	cmp	>R_BTMP
+	bcs	:noswap
+	lda	>R_SJ
+	tax
+	lda	>R_SORT,x
+	sta	>R_CARRY
+	lda	>R_SORT+1,x
+	sta	>R_SORT,x
+	lda	>R_CARRY
+	sta	>R_SORT+1,x
+:noswap	lda	>R_SJ
+	inc
+	sta	>R_SJ
+	cmp	#NUM_ACTORS-1
+	bcc	]sj
+	lda	>R_SI
+	inc
+	sta	>R_SI
+	cmp	#NUM_ACTORS-1
+	bcc	]si
+	plp
+	rts
+
+EraseAllSprites
+* Erase at ACT_OX/OY (old), top→bottom by ACT_OY.
+	php
+	rep	#$30
+	lda	#ACT_OY
+	jsr	SortActorsByY
+	lda	#0
+	sta	>R_SI
+]e	sep	#$30
+	lda	>R_SI
+	tax
+	lda	>R_SORT,x
+	rep	#$30
+	and	#$00FF
 	jsr	EraseSprite
-	lda	>R_ACT
-	dec
-	sta	>R_ACT
-	bpl	]e
+	lda	>R_SI
+	inc
+	sta	>R_SI
+	cmp	#NUM_ACTORS
+	bcc	]e
 	plp
 	rts
 
 DrawAllSprites
-* Draw at ACT_X/Y (new).
+* Draw at ACT_X/Y (new), top→bottom by ACT_Y.
 	php
 	rep	#$30
+	lda	#ACT_Y
+	jsr	SortActorsByY
 	lda	#0
-	sta	>R_ACT
-]d	lda	>R_ACT
+	sta	>R_SI
+]d	sep	#$30
+	lda	>R_SI
+	tax
+	lda	>R_SORT,x
+	rep	#$30
+	and	#$00FF
 	jsr	DrawSprite
-	lda	>R_ACT
+	lda	>R_SI
 	inc
-	sta	>R_ACT
+	sta	>R_SI
 	cmp	#NUM_ACTORS
 	bcc	]d
 	plp

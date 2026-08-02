@@ -237,6 +237,7 @@ Level start draws maze once, draws sprites at initial new (== old), commits, the
 | Erase → move → draw (move in the hole) | Rejected — long invisible gap → flicker. |
 | Erase(old) → draw(new) → commit → logic → VBL | **Chosen.** Tight blit pair; logic publishes next frame’s new regs after sprites are visible. |
 | Trail the beam (per-sprite scanline waits) | Not used in v1 — deferred redraws caused worse flicker than tear. |
+| Y-sort erase/draw (no beam wait) | **Used** — erase by `ACT_OY`, draw by `ACT_Y`, top→bottom so upper sprites update before the beam reaches them. |
 
 ### Cycle-budget sketch
 
