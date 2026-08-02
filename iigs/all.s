@@ -32,7 +32,7 @@ Start
 	sta	>DEMO_FREEZE
 	jsr	InitActors
 	jsr	DrawMaze
-	jsr	DrawAllSprites		; new (== old at start); fills R_SORT
+	jsr	DrawAllSprites		; new (== old at start); fills DP_SORT
 	jsr	CopySpritePos
 	lda	#0
 	sta	>FRAME_COUNT

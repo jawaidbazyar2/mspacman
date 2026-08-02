@@ -18,10 +18,14 @@ R_BASE         equ $028A18
 R_SAVE         equ $028A1A
 R_BODY         equ $028A1C	; ACT_COLOR nibble for RemapBodyByte
 R_BTMP         equ $028A1E
-R_SORT         equ $028A20	; NUM_ACTORS actor indices, Y-sorted
-R_SI           equ $028A28
-R_SJ           equ $028A2A
-R_YOFF         equ $028A2C	; ACT_Y or ACT_OY offset for SortActorsByY
+* High DP (DP=$0000): Y-sort keys — actor records are never moved
+DP_KEYI        equ $EA		; insertion: actor index being placed
+DP_KEYY        equ $EB		; insertion: its Y
+DP_YOFF        equ $EC		; word: ACT_Y or ACT_OY field offset
+DP_I           equ $EE
+DP_J           equ $EF
+DP_SORT        equ $F0		; 6 bytes: actor indices, Y-ascending
+DP_YKEY        equ $F6		; 6 bytes: Y low for actor 0..5 (by actor #)
 * Bank $02 long base: >BANK2+field,x with X = ACTORS16
 BANK2          equ $020000
 ACTORS16       equ $8400
@@ -365,9 +369,25 @@ DrawMaze
 	plp
 	rts
 
-ActorYLow
-* A = actor index. R_YOFF = ACT_Y or ACT_OY. Returns A = Y low; leaves M=8.
+SortActorsByY
+* A = ACT_Y or ACT_OY field offset.
+* Insertion-sort actor *indices* into DP_SORT (high DP) by that Y.
+* Actor records stay put; DP_YKEY[i] = Y of actor i (lookup only).
+	php
 	rep	#$30
+	and	#$00FF
+	sta	<DP_YOFF
+	sep	#$20
+	lda	#BRD_SORT
+	jsr	SetBorder
+* One long Y read per actor → DP_YKEY; seed DP_SORT[i]=i
+	sep	#$30
+	ldx	#0
+]bld	txa
+	sta	<DP_I
+	sta	<DP_SORT,x
+	rep	#$30
+	lda	<DP_I			; 16-bit clean (avoid B junk after rep)
 	and	#$00FF
 	asl
 	asl
@@ -376,65 +396,52 @@ ActorYLow
 	clc
 	adc	#ACTORS16
 	clc
-	adc	>R_YOFF
+	adc	<DP_YOFF
 	tax
-	lda	>BANK2,x
+	lda	>BANK2,x			; Y word
 	sep	#$30
-	rts
-
-SortActorsByY
-* A = actor-field offset (ACT_Y or ACT_OY). Bubble-sort indices into R_SORT
-* ascending by Y so top-of-screen sprites update first (beam race).
-* Border yellow while sorting (MainLoop runs this before WaitVBL).
-	php
-	rep	#$30
-	and	#$00FF
-	sta	>R_YOFF
-	sep	#$20
-	lda	#BRD_SORT
-	jsr	SetBorder
-	sep	#$30
-* Seed R_SORT[i] = i for all actors (must cover NUM_ACTORS, not hard-coded 4)
-	ldx	#0
-]seed	txa
-	sta	>R_SORT,x
+	ldx	<DP_I
+	sta	<DP_YKEY,x			; low byte only
 	inx
 	cpx	#NUM_ACTORS
-	bcc	]seed
-	lda	#0
-	sta	>R_SI
-]si	lda	#0
-	sta	>R_SJ
-]sj	lda	>R_SJ
+	bcc	]bld
+* Insertion sort DP_SORT[1..n) by DP_YKEY[DP_SORT[]]
+	lda	#1
+]outer	sta	<DP_I
 	tax
-	lda	>R_SORT,x			; idx[j]
-	jsr	ActorYLow
-	sta	>R_BTMP
-	lda	>R_SJ
-	inc
+	lda	<DP_SORT,x
+	sta	<DP_KEYI			; key index
+	tay
+	lda	<DP_YKEY,y
+	sta	<DP_KEYY			; key Y
+	lda	<DP_I
+	sta	<DP_J			; j = i
+]inner	lda	<DP_J
+	beq	:place			; j == 0
+	dec
+	tax				; X = j-1
+	lda	<DP_SORT,x
+	tay
+	lda	<DP_YKEY,y			; Y of SORT[j-1]
+	cmp	<DP_KEYY
+	bcc	:place			; SORT[j-1].Y < key → done
+	beq	:place			; equal → stable
+	ldx	<DP_J
+	dex				; X = j-1
+	lda	<DP_SORT,x
+	inx				; X = j
+	sta	<DP_SORT,x			; SORT[j] = SORT[j-1]
+	dex
+	stx	<DP_J			; j--
+	bra	]inner
+:place	lda	<DP_J
 	tax
-	lda	>R_SORT,x			; idx[j+1]
-	jsr	ActorYLow
-	cmp	>R_BTMP
-	bcs	:noswap
-	lda	>R_SJ
-	tax
-	lda	>R_SORT,x
-	sta	>R_CARRY
-	lda	>R_SORT+1,x
-	sta	>R_SORT,x
-	lda	>R_CARRY
-	sta	>R_SORT+1,x
-:noswap	lda	>R_SJ
+	lda	<DP_KEYI
+	sta	<DP_SORT,x
+	lda	<DP_I
 	inc
-	sta	>R_SJ
-	cmp	#NUM_ACTORS-1
-	bcc	]sj
-	lda	>R_SI
-	inc
-	sta	>R_SI
-	cmp	#NUM_ACTORS-1
-	bcc	]si
+	cmp	#NUM_ACTORS
+	bcc	]outer
 	plp
 	rts
 
@@ -444,19 +451,17 @@ EraseAllSprites
 	rep	#$30
 	lda	#ACT_OY
 	jsr	SortActorsByY
-	lda	#0
-	sta	>R_SI
-]e	sep	#$30
-	lda	>R_SI
-	tax
-	lda	>R_SORT,x
+	sep	#$30
+	ldx	#0
+]e	lda	<DP_SORT,x
+	phx
 	rep	#$30
 	and	#$00FF
 	jsr	EraseSprite
-	lda	>R_SI
-	inc
-	sta	>R_SI
-	cmp	#NUM_ACTORS
+	sep	#$30
+	plx
+	inx
+	cpx	#NUM_ACTORS
 	bcc	]e
 	plp
 	rts
@@ -467,44 +472,39 @@ DrawAllSprites
 	rep	#$30
 	lda	#ACT_Y
 	jsr	SortActorsByY
-	lda	#0
-	sta	>R_SI
-]d	sep	#$30
-	lda	>R_SI
-	tax
-	lda	>R_SORT,x
+	sep	#$30
+	ldx	#0
+]d	lda	<DP_SORT,x
+	phx
 	rep	#$30
 	and	#$00FF
 	jsr	DrawSprite
-	lda	>R_SI
-	inc
-	sta	>R_SI
-	cmp	#NUM_ACTORS
+	sep	#$30
+	plx
+	inx
+	cpx	#NUM_ACTORS
 	bcc	]d
 	plp
 	rts
 
 RefreshAllSprites
-* Per actor top→bottom using R_SORT (filled before WaitVBL).
+* Per actor top→bottom using DP_SORT (filled before WaitVBL).
 * Erase(old) then draw(new); closes upper holes before the beam.
 	php
-	rep	#$30
-	lda	#0
-	sta	>R_SI
-]r	sep	#$30
-	lda	>R_SI
-	tax
-	lda	>R_SORT,x
+	sep	#$30
+	ldx	#0
+]r	lda	<DP_SORT,x
+	phx
 	rep	#$30
 	and	#$00FF
 	sta	>R_ACT
 	jsr	EraseSprite
 	lda	>R_ACT
 	jsr	DrawSprite
-	lda	>R_SI
-	inc
-	sta	>R_SI
-	cmp	#NUM_ACTORS
+	sep	#$30
+	plx
+	inx
+	cpx	#NUM_ACTORS
 	bcc	]r
 	plp
 	rts

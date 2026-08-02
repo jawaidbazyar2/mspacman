@@ -43,6 +43,18 @@ $04  BG pixel mirror (same offsets as $01/2000)
 
 Stack pointer initialized to `$01FF` at `Start`.
 
+### Direct page (`DP = $0000`)
+
+High DP holds the Y-order key arrays (actor records are not moved):
+
+| DP | Symbol | Size | Notes |
+|----|--------|------|-------|
+| `$EA`–`$EB` | `DP_KEYI` / `DP_KEYY` | 2 | insertion temps |
+| `$EC`–`$ED` | `DP_YOFF` | 2 | `ACT_Y` / `ACT_OY` field offset |
+| `$EE`–`$EF` | `DP_I` / `DP_J` | 2 | sort loop indices |
+| `$F0`–`$F5` | `DP_SORT` | 6 | actor indices, Y-ascending |
+| `$F6`–`$FB` | `DP_YKEY` | 6 | Y low for actor `0..5` (by actor #) |
+
 ---
 
 ## Bank `$01` — SHR (shadow write target)
