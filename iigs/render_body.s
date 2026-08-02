@@ -632,13 +632,26 @@ EraseSprite
 	rts
 
 PrepGhostWork
-* Bake each actor into SPR_WORK*: remap body pen → ACT_COLOR, copy masks.
-* Actor i base = SPR_WORK16 + i*SPR_WORK_ACTOR; even then odd (spr+mask each).
+* Bake all actors into SPR_WORK* (body pen → ACT_COLOR).
 	php
 	rep	#$30
 	lda	#0
+]pw	pha
+	jsr	PrepOneGhost
+	pla
+	inc
+	cmp	#NUM_ACTORS
+	bcc	]pw
+	plp
+	rts
+
+PrepOneGhost
+* A = actor index — bake even+odd spr/mask into that actor's SPR_WORK*.
+* Actor i base = SPR_WORK16 + i*SPR_WORK_ACTOR; even then odd (spr+mask each).
+	php
+	rep	#$30
+	and	#$00FF
 	sta	>R_ACT
-]act	lda	>R_ACT
 	jsr	Mul84
 	asl
 	asl				; *336
@@ -757,18 +770,12 @@ PrepGhostWork
 	sta	>R_IDX
 	cmp	#SPR_BYTES
 	bcc	]om
-	lda	>R_ACT
-	inc
-	sta	>R_ACT
-	cmp	#NUM_ACTORS
-	bcs	:pdone
-	jmp	]act
-:pdone	plp
+	plp
 	rts
 
 DrawSprite
 * A = actor index — must save before PHB bank switch clobbers it
-* Masked blit from pre-colored SPR_WORK* (PrepGhostWork); no per-byte remap.
+* Masked blit from pre-colored SPR_WORK* (PrepOneGhost); no per-byte remap.
 	php
 	rep	#$30
 	sta	>R_ACT

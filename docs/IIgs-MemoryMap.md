@@ -72,7 +72,7 @@ Merlin `org $0000` → loaded at `$02/0000`.
 
 | Address | Symbol | Size | Notes |
 |---------|--------|------|-------|
-| `$02/6000`–`$02/653F` | `SPR_WORK*` | 1344 | 4 actors × 336 (even+odd spr/mask, body pen baked) |
+| `$02/6000`–`$02/653F` | `SPR_WORK*` | 1344 | 4 actors × 336 (even+odd spr/mask, body pen baked via `PrepOneGhost`) |
 | `$02/7000`–`$02/7363` | `TILEMAP` | 868 | 28×31 tile codes (copy of `AST_MAZE`) |
 | `$02/7364`–`$02/73FF` | — | — | Unused pad to actors |
 | `$02/7400`–`$02/743F` | `ACTORS` | 64 | 4 actors × 16 bytes |
@@ -90,10 +90,10 @@ Base = `$027400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | +2 | `ACT_Y` | word | rails / logic (**new**) | `DrawSprite` |
 | +4 | `ACT_OX` | word | `CopySpritePos` / init (**old**) | `EraseSprite` |
 | +6 | `ACT_OY` | word | `CopySpritePos` / init (**old**) | `EraseSprite` |
-| +8 | `ACT_SPR` | byte | init / logic | `DrawSprite` |
+| +8 | `ACT_SPR` | byte | rails / init (facing + 8-frame anim) | `PrepOneGhost` → `SPR_WORK*` |
 | +9 | `ACT_FLAGS` | byte | render (`FLAG_DRAWN`) | render |
 | +10 | `ACT_WP` | byte | rails (waypoint index) | rails only |
-| +11 | `ACT_COLOR` | byte | init (body pen) | `DrawSprite` |
+| +11 | `ACT_COLOR` | byte | init (body pen) | `PrepOneGhost` → `SPR_WORK*` |
 | +12…15 | — | — | reserved | — |
 
 ### Frame / dirty / demo control
@@ -174,7 +174,7 @@ Formula: `SAVEUNDER16 + index × 84`. One cell = 7 bytes × 12 rows.
 |--------|-----------|----------|
 | `ACT_X`/`ACT_Y` (new) | Rails / game logic | Draw |
 | `ACT_OX`/`ACT_OY` (old) | `CopySpritePos` after draw | Erase |
-| `ACT_SPR` / `ACT_COLOR` | Logic / init | Draw |
+| `ACT_SPR` / `ACT_COLOR` | Rails / init | `PrepOneGhost` (rebake on `ACT_SPR` change); `DrawSprite` reads `SPR_WORK*` |
 | `ACT_WP` | Rails | Rails only |
 | `ACT_FLAGS` | Render | Render |
 | `TILEMAP` / dirty list | Game logic | Tile redraw |

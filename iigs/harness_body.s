@@ -1,8 +1,13 @@
 *
 * Actor init + rail tour
-* Rails write ACT_X / ACT_Y only; renderer reads them (no SHR here).
+* Rails write ACT_X / ACT_Y and ACT_SPR (facing); renderer reads them (no SHR here).
 *
 	mx	%00			; force 16-bit asm (ghost_work_blit sep must not leak)
+
+DIR_RIGHT      equ 0
+DIR_DOWN       equ 1
+DIR_LEFT       equ 2
+DIR_UP         equ 3
 
 * A = tile coord → screen pixel in A (X variant)
 TileToScreenX
@@ -49,6 +54,95 @@ SetActorAtWP
 	plp
 	rts
 
+DirToNextWP
+* X = actor base with ACT_WP set. Returns A = DIR_* toward next waypoint.
+	php
+	rep	#$30
+	lda	>$02000A,x		; ACT_WP
+	and	#$00FF
+	asl
+	tay
+	lda	RailPath,y
+	and	#$00FF
+	sta	>$027A04		; R_TX = cur tile X
+	iny
+	lda	RailPath,y
+	and	#$00FF
+	sta	>$027A06		; R_TY = cur tile Y
+	lda	>$02000A,x
+	and	#$00FF
+	inc
+	cmp	#RAIL_LEN
+	bcc	:nx
+	lda	#0
+:nx	asl
+	tay
+	lda	RailPath,y
+	and	#$00FF
+	cmp	>$027A04
+	beq	:yDir
+	bcc	:left
+	lda	#DIR_RIGHT
+	bra	:out
+:left	lda	#DIR_LEFT
+	bra	:out
+:yDir	iny
+	lda	RailPath,y
+	and	#$00FF
+	cmp	>$027A06
+	bcc	:up
+	lda	#DIR_DOWN
+	bra	:out
+:up	lda	#DIR_UP
+:out	plp
+	rts
+
+InitGhostSprFacing
+* X = actor base; set ACT_SPR from dir to next WP (anim phase 0). No rebake.
+	php
+	jsr	DirToNextWP
+	rep	#$30
+	and	#$0003
+	asl				; dir * 2
+	clc
+	adc	#$0020
+	sep	#$20
+	sta	>$020008,x		; ACT_SPR
+	plp
+	rts
+
+SetGhostSprFromDir
+* A = DIR_*; X = actor base; R_ACT ($027A16) = actor index.
+* ACT_SPR = dir*2 + ((FRAME_COUNT>>3)&1) + $20; PrepOneGhost if changed.
+	php
+	rep	#$30
+	and	#$0003
+	asl
+	sta	>$027A14		; R_TMP = dir*2
+	lda	>FRAME_COUNT
+	lsr
+	lsr
+	lsr
+	and	#$0001
+	clc
+	adc	>$027A14
+	clc
+	adc	#$0020
+	sep	#$20
+	cmp	>$020008,x
+	beq	:same
+	sta	>$020008,x
+	rep	#$30
+	phx
+	lda	>$027A16		; actor index (AdvanceRails loop)
+	pha
+	jsr	PrepOneGhost
+	pla
+	sta	>$027A16
+	plx
+:same	plp
+	rts
+
 InitActors
 * Four ghosts; waypoint phases from rails_data.s (RAIL_START0..3)
 	php
@@ -56,9 +150,8 @@ InitActors
 	ldx	#$7400
 	lda	#RAIL_START0
 	jsr	SetActorAtWP
+	jsr	InitGhostSprFacing
 	sep	#$20
-	lda	#$20
-	sta	>$020008,x
 	lda	#0
 	sta	>$020009,x
 	lda	#COL_BLINKY
@@ -68,9 +161,8 @@ InitActors
 	ldx	#$7410
 	lda	#RAIL_START1
 	jsr	SetActorAtWP
+	jsr	InitGhostSprFacing
 	sep	#$20
-	lda	#$22
-	sta	>$020008,x
 	lda	#0
 	sta	>$020009,x
 	lda	#COL_PINKY
@@ -80,9 +172,8 @@ InitActors
 	ldx	#$7420
 	lda	#RAIL_START2
 	jsr	SetActorAtWP
+	jsr	InitGhostSprFacing
 	sep	#$20
-	lda	#$24
-	sta	>$020008,x
 	lda	#0
 	sta	>$020009,x
 	lda	#COL_INKY
@@ -92,9 +183,8 @@ InitActors
 	ldx	#$7430
 	lda	#RAIL_START3
 	jsr	SetActorAtWP
+	jsr	InitGhostSprFacing
 	sep	#$20
-	lda	#$26
-	sta	>$020008,x
 	lda	#0
 	sta	>$020009,x
 	lda	#COL_CLYDE
@@ -104,7 +194,7 @@ InitActors
 	rts
 
 AdvanceRails
-* Writes ACT_X/ACT_Y (new) only; does not touch ACT_OX/OY.
+* Writes ACT_X/ACT_Y (new) and ACT_SPR on move; does not touch ACT_OX/OY.
 	php
 	rep	#$30
 	lda	#0
@@ -138,9 +228,13 @@ AdvanceRails
 	bcc	:goRight
 	dec
 	sta	>$020000,x
+	lda	#DIR_LEFT
+	jsr	SetGhostSprFromDir
 	bra	:arNext
 :goRight	inc
 	sta	>$020000,x
+	lda	#DIR_RIGHT
+	jsr	SetGhostSprFromDir
 	bra	:arNext
 :yAxis	lda	>$020002,x
 	cmp	>$027A02
@@ -148,9 +242,13 @@ AdvanceRails
 	bcc	:goDown
 	dec
 	sta	>$020002,x
+	lda	#DIR_UP
+	jsr	SetGhostSprFromDir
 	bra	:arNext
 :goDown	inc
 	sta	>$020002,x
+	lda	#DIR_DOWN
+	jsr	SetGhostSprFromDir
 	bra	:arNext
 :hit	sep	#$20
 	lda	>$02000A,x
