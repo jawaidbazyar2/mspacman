@@ -55,7 +55,7 @@ SPR_BYTES      equ 84
 SPR_BASE_X     equ 72		; PF_ORIGIN_X - 4
 SPR_BASE_Y     equ 4		; PF_ORIGIN_Y - 3
 NUM_SPRITES    equ 64
-NUM_ACTORS     equ 1		; sanity: was 4; masked blit cost scales with this
+NUM_ACTORS     equ 4		; Blinky / Pinky / Inky / Clyde
 * actors × 84-byte save-under; keep under DIRTY at $7800
 
 NUM_TILES      equ 256
@@ -69,6 +69,11 @@ AST_SPR_ODD    equ $033C00
 AST_MSK_ODD    equ $035100
 AST_MAZE       equ $036600
 AST_MAZE_CELLS equ $037000	; 868 × 18 stitched 6×6 cells
+
+* Pre-colored ghost work (bank $02): per actor, even then odd (spr+mask each)
+SPR_WORK16     equ $6000
+SPR_WORK_PAIR  equ 168		; spr+mask one parity
+SPR_WORK_ACTOR equ 336		; even pair + odd pair (NUM_ACTORS × this)
 
 TILEMAP        equ $027000
 ACTORS         equ $027400

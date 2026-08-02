@@ -2,6 +2,7 @@
 * Actor init + rail tour
 * Rails write ACT_X / ACT_Y only; renderer reads them (no SHR here).
 *
+	mx	%00			; force 16-bit asm (ghost_work_blit sep must not leak)
 
 * A = tile coord → screen pixel in A (X variant)
 TileToScreenX

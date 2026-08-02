@@ -542,8 +542,144 @@ EraseSprite
 	plp
 	rts
 
+PrepGhostWork
+* Bake each actor into SPR_WORK*: remap body pen → ACT_COLOR, copy masks.
+* Actor i base = SPR_WORK16 + i*SPR_WORK_ACTOR; even then odd (spr+mask each).
+	php
+	rep	#$30
+	lda	#0
+	sta	>R_ACT
+]act	lda	>R_ACT
+	jsr	Mul84
+	asl
+	asl				; *336
+	clc
+	adc	#SPR_WORK16
+	sta	>R_SAVE			; work base (Mul84 clobbers R_OFF — do this first)
+	lda	>R_ACT
+	asl
+	asl
+	asl
+	asl
+	clc
+	adc	#ACTORS16
+	tax
+	lda	>BANK2+ACT_SPR,x
+	and	#$00FF
+	jsr	Mul84
+	sta	>R_OFF			; sprite byte offset in AST_* sheets
+	lda	>BANK2+ACT_COLOR,x
+	and	#$000F
+	sta	>R_BODY
+	lda	#0
+	sta	>R_IDX
+]es	lda	>R_OFF
+	clc
+	adc	>R_IDX
+	tax
+	sep	#$20
+	lda	>AST_SPR_EVEN,x
+	jsr	RemapBodyByte
+	pha
+	rep	#$20
+	lda	>R_IDX
+	clc
+	adc	>R_SAVE
+	tax
+	sep	#$20
+	pla
+	sta	>BANK2,x
+	rep	#$20
+	lda	>R_IDX
+	inc
+	sta	>R_IDX
+	cmp	#SPR_BYTES
+	bcc	]es
+	lda	#0
+	sta	>R_IDX
+]em	lda	>R_OFF
+	clc
+	adc	>R_IDX
+	tax
+	sep	#$20
+	lda	>AST_MSK_EVEN,x
+	pha
+	rep	#$20
+	lda	>R_IDX
+	clc
+	adc	>R_SAVE
+	adc	#SPR_BYTES
+	tax
+	sep	#$20
+	pla
+	sta	>BANK2,x
+	rep	#$20
+	lda	>R_IDX
+	inc
+	sta	>R_IDX
+	cmp	#SPR_BYTES
+	bcc	]em
+	lda	#0
+	sta	>R_IDX
+]os	lda	>R_OFF
+	clc
+	adc	>R_IDX
+	tax
+	sep	#$20
+	lda	>AST_SPR_ODD,x
+	jsr	RemapBodyByte
+	pha
+	rep	#$20
+	lda	>R_IDX
+	clc
+	adc	>R_SAVE
+	adc	#SPR_WORK_PAIR
+	tax
+	sep	#$20
+	pla
+	sta	>BANK2,x
+	rep	#$20
+	lda	>R_IDX
+	inc
+	sta	>R_IDX
+	cmp	#SPR_BYTES
+	bcc	]os
+	lda	#0
+	sta	>R_IDX
+]om	lda	>R_OFF
+	clc
+	adc	>R_IDX
+	tax
+	sep	#$20
+	lda	>AST_MSK_ODD,x
+	pha
+	rep	#$20
+	lda	>R_IDX
+	clc
+	adc	>R_SAVE
+	adc	#SPR_WORK_PAIR+SPR_BYTES
+	tax
+	sep	#$20
+	pla
+	sta	>BANK2,x
+	rep	#$20
+	lda	>R_IDX
+	inc
+	sta	>R_IDX
+	cmp	#SPR_BYTES
+	bcc	]om
+	lda	>R_ACT
+	inc
+	sta	>R_ACT
+	cmp	#NUM_ACTORS
+	bcs	:pdone
+	jmp	]act
+:pdone	plp
+	rts
+
 DrawSprite
 * A = actor index — must save before PHB bank switch clobbers it
+* Masked blit from pre-colored SPR_WORK* (PrepGhostWork); no per-byte remap.
 	php
 	rep	#$30
 	sta	>R_ACT
@@ -566,12 +702,6 @@ DrawSprite
 	sta	>R_X
 	lda	>BANK2+ACT_Y,x
 	sta	>R_Y
-	lda	>BANK2+ACT_SPR,x
-	and	#$00FF
-	sta	>R_IDX
-	lda	>BANK2+ACT_COLOR,x
-	and	#$000F
-	sta	>R_BODY
 	jsr	ScreenXY
 	lda	>R_ACT
 	jsr	Mul84
@@ -679,16 +809,29 @@ DrawSprite
 	sta	>BANK2+81,x
 	lda	$2005+1760,y
 	sta	>BANK2+82,x
-	lda	>R_IDX
+* Pre-colored work buffer blit (unrolled MaskedBlitWork in ghost_work_blit.s)
+	lda	>R_ACT
 	jsr	Mul84
-	sta	>R_OFF
+	asl
+	asl				; actor * 336
+	clc
+	adc	#SPR_WORK16
+	sta	>R_TMP			; even work base
+	lda	>R_DEST
+	tay
 	lda	>R_X
 	bit	#$0001
 	bne	:oddDraw
-	jsr	MaskedBlitEven
+	lda	>R_TMP
+	tax
+	jsr	MaskedBlitWork
 	bra	:mark
 :oddDraw
-	jsr	MaskedBlitOdd
+	lda	>R_TMP
+	clc
+	adc	#SPR_WORK_PAIR
+	tax
+	jsr	MaskedBlitWork
 :mark	lda	>R_BASE
 	tax
 	sep	#$20
@@ -700,6 +843,7 @@ DrawSprite
 	rts
 
 * A = packed sprite byte; replace BODY_PEN ($6) nibbles with R_BODY.
+* Used at PrepGhostWork only — not in the per-frame blit.
 RemapBodyByte
 	php
 	sep	#$20
@@ -723,116 +867,6 @@ RemapBodyByte
 	lda	>R_BODY
 :loOk	ora	>R_CARRY
 	plp
-	rts
-
-MaskedBlitEven
-	rep	#$30
-	lda	#12
-	sta	>R_ROW
-	lda	>R_OFF
-	tax
-	lda	>R_DEST
-	tay
-]be	jsr	MaskByteE
-	inx
-	iny
-	jsr	MaskByteE
-	inx
-	iny
-	jsr	MaskByteE
-	inx
-	iny
-	jsr	MaskByteE
-	inx
-	iny
-	jsr	MaskByteE
-	inx
-	iny
-	jsr	MaskByteE
-	inx
-	iny
-	jsr	MaskByteE
-	inx
-	iny
-	tya
-	clc
-	adc	#SHR_ROW_BYTES-7
-	tay
-	lda	>R_ROW
-	dec
-	sta	>R_ROW
-	bne	]be
-	rts
-
-MaskByteE
-	sep	#$20
-	lda	>AST_MSK_EVEN,x
-	eor	#$FF
-	and	$2000,y
-	sta	>R_TMP
-	lda	>AST_SPR_EVEN,x
-	jsr	RemapBodyByte
-	sta	>R_BTMP
-	lda	>AST_MSK_EVEN,x
-	and	>R_BTMP
-	ora	>R_TMP
-	sta	$2000,y
-	rep	#$20
-	rts
-
-MaskedBlitOdd
-	rep	#$30
-	lda	#12
-	sta	>R_ROW
-	lda	>R_OFF
-	tax
-	lda	>R_DEST
-	tay
-]bo	jsr	MaskByteO
-	inx
-	iny
-	jsr	MaskByteO
-	inx
-	iny
-	jsr	MaskByteO
-	inx
-	iny
-	jsr	MaskByteO
-	inx
-	iny
-	jsr	MaskByteO
-	inx
-	iny
-	jsr	MaskByteO
-	inx
-	iny
-	jsr	MaskByteO
-	inx
-	iny
-	tya
-	clc
-	adc	#SHR_ROW_BYTES-7
-	tay
-	lda	>R_ROW
-	dec
-	sta	>R_ROW
-	bne	]bo
-	rts
-
-MaskByteO
-	sep	#$20
-	lda	>AST_MSK_ODD,x
-	eor	#$FF
-	and	$2000,y
-	sta	>R_TMP
-	lda	>AST_SPR_ODD,x
-	jsr	RemapBodyByte
-	sta	>R_BTMP
-	lda	>AST_MSK_ODD,x
-	and	>R_BTMP
-	ora	>R_TMP
-	sta	$2000,y
-	rep	#$20
 	rts
 
 ApplyDirty

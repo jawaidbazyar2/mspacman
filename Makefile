@@ -92,13 +92,17 @@ tiles-preview: maze
 		--out $(GFX_DIR)/ppm
 
 # Assemble IIgs render harness with Merlin32 → build/iigs/harness.bin
-iigs: palette rails $(IIGS_BIN)
+iigs: palette rails $(IIGS_DIR)/ghost_work_blit.s $(IIGS_BIN)
+
+$(IIGS_DIR)/ghost_work_blit.s: py/gen_ghost_work_blit.py
+	python3 py/gen_ghost_work_blit.py -o $(IIGS_DIR)/ghost_work_blit.s
 
 $(IIGS_BUILD):
 	mkdir -p $(IIGS_BUILD)
 
 $(IIGS_BIN): $(IIGS_DIR)/link.s $(IIGS_DIR)/all.s $(IIGS_DIR)/equates.s \
 		$(IIGS_DIR)/shr_body.s $(IIGS_DIR)/render_body.s \
+		$(IIGS_DIR)/ghost_work_blit.s \
 		$(IIGS_DIR)/harness_body.s $(IIGS_DIR)/rails_data.s \
 		$(IIGS_DIR)/palette_data.s \
 		$(MERLIN32) | $(IIGS_BUILD)

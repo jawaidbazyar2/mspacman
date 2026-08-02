@@ -72,6 +72,7 @@ Merlin `org $0000` → loaded at `$02/0000`.
 
 | Address | Symbol | Size | Notes |
 |---------|--------|------|-------|
+| `$02/6000`–`$02/653F` | `SPR_WORK*` | 1344 | 4 actors × 336 (even+odd spr/mask, body pen baked) |
 | `$02/7000`–`$02/7363` | `TILEMAP` | 868 | 28×31 tile codes (copy of `AST_MAZE`) |
 | `$02/7364`–`$02/73FF` | — | — | Unused pad to actors |
 | `$02/7400`–`$02/743F` | `ACTORS` | 64 | 4 actors × 16 bytes |
