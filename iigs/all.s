@@ -31,7 +31,6 @@ Start
 	lda	#0
 	sta	>DEMO_FREEZE
 	jsr	InitActors
-	jsr	PrepGhostWork		; bake ACT_COLOR into work spr+mask
 	jsr	DrawMaze
 	jsr	DrawAllSprites		; new (== old at start)
 	jsr	CopySpritePos
@@ -98,8 +97,8 @@ ExitDemo
 
 	put	shr_body.s
 	put	render_body.s
-	put	ghost_work_blit.s
-	mx	%00			; blit file ends mid-sep; restore before harness
+	put	compiled_ghosts.s
+	mx	%00			; compiled blits end mid-sep; restore before harness
 	put	harness_body.s
 	put	rails_data.s
 * Palette data last so it is not accidentally DP-addressed if |abs is missed

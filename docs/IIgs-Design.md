@@ -190,8 +190,8 @@ SHR **320** mode stores **two pixels per byte** (4 bits each). That constrains h
 
 ### Blit implementation sequence
 
-1. **v1:** table-driven masked soft blit over the fixed 7-byte-wide even/odd forms + save-under (prove the frame budget in §3.1).
-2. **Later (if measured need):** compile hot draw/erase paths to unrolled **65816** from the same even masters (odd still generated at startup, or baked by the generator). Do not hand-maintain a huge compiled sheet first.
+1. **Ghosts (current):** build-time **compiled** masked blits (`py/gen_compiled_ghosts.py`) for walk frames `$20–$27` × 4 body colors × even/odd; save-under still unrolled data copies.
+2. **Other actors (later):** same pattern for Ms. Pac / fruit when those soft sprites land; keep erase as save-under restore.
 
 ```mermaid
 flowchart TB
@@ -224,7 +224,7 @@ flowchart TB
 2. Apply dirty playfield tiles when present (dot eaten, power-pill blink).
 3. Draw actors at **new** positions (`ACT_X`/`ACT_Y`).
 4. `CopySpritePos`: old ← new.
-5. Run logic / rails / sound (writes next **new** XY; rails also update `ACT_SPR` and rebake work on change).
+5. Run logic / rails / sound (writes next **new** XY; rails also update `ACT_SPR`).
 6. `WaitVBL` (poll input around this edge), then loop.
 
 Level start draws maze once, draws sprites at initial new (== old), commits, then enters the loop.
@@ -347,7 +347,7 @@ make iigs-test   # spawn GSSquared, inject, CALL 768, dump build/iigs/frame.png
 
 Harness maze tiles must match `make gfx` upright orientation (CW + row XOR 3). Ground-truth previews: `build/gfx/ppm/maze1_8x8_upright.png` / `maze1_6x6_upright.png`.
 
-**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`py/gen_ghost_rails.py` → `iigs/rails_data.s`). Rails write **new** `ACT_X`/`ACT_Y` and `ACT_SPR` (arcade facing `$20–$27`: `dir×2 + ((FRAME_COUNT>>3)&1) + $20`); on sprite change, `PrepOneGhost` rebakes that actor’s `SPR_WORK*`. Erase reads **old** `ACT_OX`/`ACT_OY`, draw reads new, then commit. Bodies use `ACT_COLOR` (Blinky/Pinky/Inky/Clyde pens 5/7/9/11) at bake. Loop: erase→draw→commit→rails→VBL until a key at `$C000`/`$C010`, or host sets `DEMO_FREEZE` (`$02/7904`) before SHR capture. **Border** (`$C034`) changes per phase (red/green/blue/orange/black) for visual timing — see `BRD_*` in `equates.s` / [`UserTesting.md`](../UserTesting.md).
+**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`py/gen_ghost_rails.py` → `iigs/rails_data.s`). Rails write **new** `ACT_X`/`ACT_Y` and `ACT_SPR` (arcade facing `$20–$27`: `dir×2 + ((FRAME_COUNT>>3)&1) + $20`). Draw uses **compiled** masked blits (`py/gen_compiled_ghosts.py` → `GhostBlitTable`, color×frame×parity); no per-frame `PrepOneGhost` / `SPR_WORK*`. Erase reads **old** `ACT_OX`/`ACT_OY`, draw reads new, then commit. Bodies are baked into the compiled routines from `ACT_COLOR` pens 5/7/9/11. Loop: erase→draw→commit→rails→VBL until a key at `$C000`/`$C010`, or host sets `DEMO_FREEZE` (`$02/7904`) before SHR capture. **Border** (`$C034`) changes per phase (red/green/blue/orange/black) for visual timing — see `BRD_*` in `equates.s` / [`UserTesting.md`](../UserTesting.md).
 
 ---
 

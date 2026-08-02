@@ -61,6 +61,7 @@ PYTHONPATH=$HOME/src/gssquared/clients/python/src \
 - Maze 1 in SHR 320×200 (pink/red walls, pellets).  
 - Four ghosts on a shared waypoint loop: **red / pink / cyan / orange**, spaced around the path.  
 - Smooth erase → draw → commit → rails (move is outside the blit hole).  
+- Ghost draw uses **compiled** 65816 blits (`compiled_ghosts.s`); eyes/walk anim via `ACT_SPR` only.  
 - **Border color = phase profiler** (width of each color ≈ time in that phase):
 
 | Border | Phase |

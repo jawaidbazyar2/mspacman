@@ -631,151 +631,9 @@ EraseSprite
 	plp
 	rts
 
-PrepGhostWork
-* Bake all actors into SPR_WORK* (body pen → ACT_COLOR).
-	php
-	rep	#$30
-	lda	#0
-]pw	pha
-	jsr	PrepOneGhost
-	pla
-	inc
-	cmp	#NUM_ACTORS
-	bcc	]pw
-	plp
-	rts
-
-PrepOneGhost
-* A = actor index — bake even+odd spr/mask into that actor's SPR_WORK*.
-* Actor i base = SPR_WORK16 + i*SPR_WORK_ACTOR; even then odd (spr+mask each).
-	php
-	rep	#$30
-	and	#$00FF
-	sta	>R_ACT
-	jsr	Mul84
-	asl
-	asl				; *336
-	clc
-	adc	#SPR_WORK16
-	sta	>R_SAVE			; work base (Mul84 clobbers R_OFF — do this first)
-	lda	>R_ACT
-	asl
-	asl
-	asl
-	asl
-	clc
-	adc	#ACTORS16
-	tax
-	lda	>BANK2+ACT_SPR,x
-	and	#$00FF
-	jsr	Mul84
-	sta	>R_OFF			; sprite byte offset in AST_* sheets
-	lda	>BANK2+ACT_COLOR,x
-	and	#$000F
-	sta	>R_BODY
-	lda	#0
-	sta	>R_IDX
-]es	lda	>R_OFF
-	clc
-	adc	>R_IDX
-	tax
-	sep	#$20
-	lda	>AST_SPR_EVEN,x
-	jsr	RemapBodyByte
-	pha
-	rep	#$20
-	lda	>R_IDX
-	clc
-	adc	>R_SAVE
-	tax
-	sep	#$20
-	pla
-	sta	>BANK2,x
-	rep	#$20
-	lda	>R_IDX
-	inc
-	sta	>R_IDX
-	cmp	#SPR_BYTES
-	bcc	]es
-	lda	#0
-	sta	>R_IDX
-]em	lda	>R_OFF
-	clc
-	adc	>R_IDX
-	tax
-	sep	#$20
-	lda	>AST_MSK_EVEN,x
-	pha
-	rep	#$20
-	lda	>R_IDX
-	clc
-	adc	>R_SAVE
-	adc	#SPR_BYTES
-	tax
-	sep	#$20
-	pla
-	sta	>BANK2,x
-	rep	#$20
-	lda	>R_IDX
-	inc
-	sta	>R_IDX
-	cmp	#SPR_BYTES
-	bcc	]em
-	lda	#0
-	sta	>R_IDX
-]os	lda	>R_OFF
-	clc
-	adc	>R_IDX
-	tax
-	sep	#$20
-	lda	>AST_SPR_ODD,x
-	jsr	RemapBodyByte
-	pha
-	rep	#$20
-	lda	>R_IDX
-	clc
-	adc	>R_SAVE
-	adc	#SPR_WORK_PAIR
-	tax
-	sep	#$20
-	pla
-	sta	>BANK2,x
-	rep	#$20
-	lda	>R_IDX
-	inc
-	sta	>R_IDX
-	cmp	#SPR_BYTES
-	bcc	]os
-	lda	#0
-	sta	>R_IDX
-]om	lda	>R_OFF
-	clc
-	adc	>R_IDX
-	tax
-	sep	#$20
-	lda	>AST_MSK_ODD,x
-	pha
-	rep	#$20
-	lda	>R_IDX
-	clc
-	adc	>R_SAVE
-	adc	#SPR_WORK_PAIR+SPR_BYTES
-	tax
-	sep	#$20
-	pla
-	sta	>BANK2,x
-	rep	#$20
-	lda	>R_IDX
-	inc
-	sta	>R_IDX
-	cmp	#SPR_BYTES
-	bcc	]om
-	plp
-	rts
-
 DrawSprite
 * A = actor index — must save before PHB bank switch clobbers it
-* Masked blit from pre-colored SPR_WORK* (PrepOneGhost); no per-byte remap.
+* Save-under then compiled ghost blit (GhostBlitTable); no SPR_WORK / remap.
 	php
 	rep	#$30
 	sta	>R_ACT
@@ -905,63 +763,40 @@ DrawSprite
 	sta	>BANK2+81,x
 	lda	$2005+1760,y
 	sta	>BANK2+82,x
-* Pre-colored work buffer blit (unrolled MaskedBlitWork in ghost_work_blit.s)
-	lda	>R_ACT
-	jsr	Mul84
+* Compiled blit: index = color_slot*16 + (ACT_SPR&7)*2 + (X&1)
+	lda	>R_BASE
+	tax
+	lda	>BANK2+ACT_COLOR,x
+	and	#$00FF
+	sec
+	sbc	#5
+	lsr				; 5/7/9/11 → 0..3
+	and	#$0003
 	asl
-	asl				; actor * 336
-	clc
-	adc	#SPR_WORK16
-	sta	>R_TMP			; even work base
+	asl
+	asl
+	asl				; *16
+	sta	>R_TMP
+	lda	>BANK2+ACT_SPR,x
+	and	#$0007
+	asl				; frame*2
+	sta	>R_OFF
+	lda	>R_X
+	and	#$0001
+	ora	>R_OFF
+	ora	>R_TMP
+	asl				; word index
+	tax
 	lda	>R_DEST
 	tay
-	lda	>R_X
-	bit	#$0001
-	bne	:oddDraw
-	lda	>R_TMP
-	tax
-	jsr	MaskedBlitWork
-	bra	:mark
-:oddDraw
-	lda	>R_TMP
-	clc
-	adc	#SPR_WORK_PAIR
-	tax
-	jsr	MaskedBlitWork
-:mark	lda	>R_BASE
+	jsr	GhostBlitGo
+	lda	>R_BASE
 	tax
 	sep	#$20
 	lda	>BANK2+ACT_FLAGS,x
 	ora	#$01
 	sta	>BANK2+ACT_FLAGS,x
 	plb
-	plp
-	rts
-
-* A = packed sprite byte; replace BODY_PEN ($6) nibbles with R_BODY.
-* Used at PrepGhostWork only — not in the per-frame blit.
-RemapBodyByte
-	php
-	sep	#$20
-	sta	>R_BTMP
-	and	#$F0
-	cmp	#$60			; BODY_PEN in high nibble
-	bne	:hiOk
-	lda	>R_BODY
-	asl
-	asl
-	asl
-	asl
-	bra	:hi
-:hiOk	lda	>R_BTMP
-	and	#$F0
-:hi	sta	>R_CARRY
-	lda	>R_BTMP
-	and	#$0F
-	cmp	#BODY_PEN
-	bne	:loOk
-	lda	>R_BODY
-:loOk	ora	>R_CARRY
 	plp
 	rts
 

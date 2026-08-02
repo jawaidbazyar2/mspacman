@@ -112,13 +112,13 @@ InitGhostSprFacing
 	rts
 
 SetGhostSprFromDir
-* A = DIR_*; X = actor base; R_ACT ($027A16) = actor index.
-* ACT_SPR = dir*2 + ((FRAME_COUNT>>3)&1) + $20; PrepOneGhost if changed.
+* A = DIR_*; X = actor base.
+* ACT_SPR = dir*2 + ((FRAME_COUNT>>3)&1) + $20 (compiled blit; no rebake).
 	php
 	rep	#$30
 	and	#$0003
-	asl
-	sta	>$027A14		; R_TMP = dir*2
+	asl				; dir * 2
+	sta	>$027A14		; R_TMP
 	lda	>FRAME_COUNT
 	lsr
 	lsr
@@ -129,18 +129,8 @@ SetGhostSprFromDir
 	clc
 	adc	#$0020
 	sep	#$20
-	cmp	>$020008,x
-	beq	:same
-	sta	>$020008,x
-	rep	#$30
-	phx
-	lda	>$027A16		; actor index (AdvanceRails loop)
-	pha
-	jsr	PrepOneGhost
-	pla
-	sta	>$027A16
-	plx
-:same	plp
+	sta	>$020008,x		; ACT_SPR
+	plp
 	rts
 
 InitActors
