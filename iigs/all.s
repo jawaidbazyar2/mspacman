@@ -26,6 +26,7 @@ Start
 	plb
 
 	jsr	InitSHR
+	jsr	InitRowAddr		; Y→row-byte LUT for ScreenXY
 	jsr	CopyMaze
 * Odd sprite/mask forms are injected from host (sprites14x12.odd*.bin)
 	lda	#0

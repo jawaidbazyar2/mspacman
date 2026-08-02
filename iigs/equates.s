@@ -94,6 +94,7 @@ DIRTY_LIST     equ $028802
 FRAME_COUNT    equ $028900
 EAT_INDEX      equ $028902
 DEMO_FREEZE    equ $028904	; nonzero → MainLoop skips erase/rails/draw
+ROW_ADDR       equ $028B00	; 256 words: Y → Y*160 (ScreenXY); bank $02 long
 
 ACT_SIZE       equ 16
 ACT_X          equ 0		; new X (rails write; DrawSprite reads)

@@ -84,24 +84,29 @@ Mul18
 	adc	>R_OFF
 	rts
 
-ScreenXY
-	lda	>R_Y
-	asl
-	asl
-	asl
-	asl
-	asl
-	sta	>R_OFF
-	lda	>R_Y
-	asl
-	asl
-	asl
-	asl
-	asl
-	asl
-	asl
+InitRowAddr
+* ROW_ADDR[y] = y*160 for y=0..255 (word table @ $02/8B00).
+	php
+	rep	#$30
+	ldx	#0
+	lda	#0
+]i	sta	>ROW_ADDR,x
 	clc
-	adc	>R_OFF
+	adc	#160
+	inx
+	inx
+	cpx	#512
+	bcc	]i
+	plp
+	rts
+
+ScreenXY
+* R_DEST = ROW_ADDR[Y] + X/2. Long,X: DBR may be $01 during blit.
+	lda	>R_Y
+	and	#$00FF
+	asl
+	tax
+	lda	>ROW_ADDR,x
 	sta	>R_DEST
 	lda	>R_X
 	lsr

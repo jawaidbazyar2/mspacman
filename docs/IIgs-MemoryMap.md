@@ -118,6 +118,7 @@ Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | `$02/8902` | `EAT_INDEX` | 2 | Dirty-eat demo cursor |
 | `$02/8904` | `DEMO_FREEZE` | 1 | Host≠0 → skip erase/draw/rails |
 | `$02/8905`–`$02/89FF` | — | — | Free |
+| `$02/8B00`–`$02/8CFF` | `ROW_ADDR` | 512 | `ScreenXY` LUT: word `[y] = y*160` (`InitRowAddr`) |
 
 ### Render / harness scratch
 
@@ -129,7 +130,7 @@ Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | `$02/8A06` | `R_TY` | Tile Y |
 | `$02/8A08` | `R_TILE` | Tile code |
 | `$02/8A0A` | `R_OFF` | Byte offset / mul scratch |
-| `$02/8A0C` | `R_DEST` | SHR offset |
+| `$02/8A0C` | `R_DEST` | SHR offset (`ROW_ADDR[Y]+X/2`) |
 | `$02/8A0E` | `R_ROW` | Row counter |
 | `$02/8A10` | `R_IDX` | Sprite index |
 | `$02/8A12` | `R_CARRY` | Nibble / mul scratch |
@@ -139,10 +140,7 @@ Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | `$02/8A1A` | `R_SAVE` | Scratch (unused by erase) |
 | `$02/8A1C` | `R_BODY` | Body pen for remap |
 | `$02/8A1E` | `R_BTMP` | Blit temp |
-| `$02/8A20`–`$02/8A25` | `R_SORT` | Y-sorted actor indices (`NUM_ACTORS` = 6) |
-| `$02/8A28` | `R_SI` | Sort / draw walk index |
-| `$02/8A2A` | `R_SJ` | Sort inner index |
-| `$02/8A2C` | `R_YOFF` | `ACT_Y` / `ACT_OY` field for sort |
+| `$02/8A20`–`$02/8AFF` | — | Free (Y-sort keys live in high DP) |
 
 `BANK2` = `$020000` (long base for `,x` with 16-bit offset).  
 `ACTORS16` = `$8400`.
