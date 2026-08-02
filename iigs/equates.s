@@ -2,9 +2,9 @@
 * Ms. Pac-Man IIgs — shared equates (render harness v1)
 *
 * Assets in bank $03 come from make gfx / make maze:
-*   tiles6.bin     — upright 6×6 (CW then row XOR 3; see py/gen_shr_gfx.py)
+*   tiles6.bin / sprites14x12*.bin — upright (CW then row XOR 3)
 *   maze1_cells.bin — stitched per-cell copies of those tiles
-* Do not re-orient in 65816; blit as packed.
+* Do not re-orient in 65816; blit as packed (8-bit stores per row).
 *
 
 * Soft-switches as 24-bit bank $00 (DB may be $02 while running)
@@ -34,8 +34,14 @@ PF_PIX_H       equ 186
 
 SPR_CELL_W     equ 14
 SPR_CELL_H     equ 12
+SPR_ART_W      equ 12
+SPR_ART_H      equ 12
 SPR_BYTES_ROW  equ 7
 SPR_BYTES      equ 84
+* Center sprite cell on a 6×6 tile. Art is centered in the 14-wide cell
+* (opaque ~cols 2–11); -4 lines that band up with the 6px path.
+SPR_OFF_X      equ -4
+SPR_OFF_Y      equ -3
 NUM_SPRITES    equ 64
 NUM_ACTORS     equ 3
 

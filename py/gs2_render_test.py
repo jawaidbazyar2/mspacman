@@ -54,6 +54,8 @@ CODE_ADDR = 0x020000
 TILES_ADDR = 0x030000
 SPR_ADDR = 0x031200
 MSK_ADDR = 0x032700
+SPR_ODD_ADDR = 0x033C00
+MSK_ODD_ADDR = 0x035100
 MAZE_ADDR = 0x036600
 MAZE_CELLS_ADDR = 0x037000
 # With SHR shadowing on, bank $01 is authoritative; $E1 tracks it.
@@ -142,6 +144,8 @@ def inject_assets(client: Client, bin_path: Path, gfx: Path) -> None:
     tiles = (gfx / "tiles6.bin").read_bytes()
     sprites = (gfx / "sprites14x12.bin").read_bytes()
     masks = (gfx / "sprites14x12.mask.bin").read_bytes()
+    sprites_odd = (gfx / "sprites14x12.odd.bin").read_bytes()
+    masks_odd = (gfx / "sprites14x12.odd.mask.bin").read_bytes()
     maze = (gfx / "maze1_28x31.bin").read_bytes()
     cells = (gfx / "maze1_cells.bin").read_bytes()
 
@@ -153,6 +157,10 @@ def inject_assets(client: Client, bin_path: Path, gfx: Path) -> None:
     write_mem_chunked(client, MEM_MAIN, SPR_ADDR, sprites)
     print(f"inject masks {len(masks)} @ ${MSK_ADDR:06X}")
     write_mem_chunked(client, MEM_MAIN, MSK_ADDR, masks)
+    print(f"inject odd sprites {len(sprites_odd)} @ ${SPR_ODD_ADDR:06X}")
+    write_mem_chunked(client, MEM_MAIN, SPR_ODD_ADDR, sprites_odd)
+    print(f"inject odd masks {len(masks_odd)} @ ${MSK_ODD_ADDR:06X}")
+    write_mem_chunked(client, MEM_MAIN, MSK_ODD_ADDR, masks_odd)
     print(f"inject maze {len(maze)} @ ${MAZE_ADDR:06X}")
     write_mem_chunked(client, MEM_MAIN, MAZE_ADDR, maze)
     print(f"inject maze cells {len(cells)} @ ${MAZE_CELLS_ADDR:06X}")
@@ -199,6 +207,8 @@ def main() -> int:
         args.gfx / "tiles6.bin",
         args.gfx / "sprites14x12.bin",
         args.gfx / "sprites14x12.mask.bin",
+        args.gfx / "sprites14x12.odd.bin",
+        args.gfx / "sprites14x12.odd.mask.bin",
         args.gfx / "maze1_28x31.bin",
         args.gfx / "maze1_cells.bin",
     ):

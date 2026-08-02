@@ -170,17 +170,17 @@ Do **not** model the four power pills as soft sprites on the IIgs. Keep the soft
 
 ### Positioning & 4bpp packing (locked)
 
-SHR **320** mode stores **two pixels per byte** (4 bits each). That constrains horizontal blits, not gameplay motion.
+SHR **320** mode stores **two pixels per byte** (4 bits each). That constrains horizontal blits, not gameplay motion. Tile rows are **3 bytes** (6 px) and sprite rows **7 bytes** (14 px): always store those with **8-bit** `sta` (or an explicit last-byte store). A 16-bit `sta` while `m=0` writes one extra byte and spills past the playfield right edge / corrupts save-under rows.
 
 | Axis | Decision |
 |------|----------|
-| **X** | **Arbitrary pixel** positions (1 IIgs-pixel steps). Do **not** restrict sprites to byte boundaries (even X only). Byte-aligned-only would halve horizontal resolution on the 168-wide playfield and feel wrong against 6×6 tiles. |
-| **Y** | Arbitrary row — no packing constraint. |
+| **X** | **Arbitrary pixel** positions (1 IIgs-pixel steps). Do **not** restrict sprites to byte boundaries (even X only). To sit a sprite on a maze tile, use `PF_ORIGIN_X + tile*6 + SPR_OFF_X` with **`SPR_OFF_X = -4`** (art is centered in the 14-wide cell; left-aligning at the tile origin overhangs only the right wall). |
+| **Y** | **`SPR_OFF_Y = -3`** centers 12px art on the 6px tile. |
 
 **Asset storage (locked):**
 
-1. Ship / store only the **even** form of each frame: 14×12 pixels packed to **7 bytes × 12 rows**, plus a matching 7×12 mask (transparent padding in the two extra columns).
-2. At **startup**, generate the **odd** form from each even asset (nibble-shift pixels/mask one pixel right into the same 7-byte-wide cell).
+1. Ship / store only the **even** form of each frame: 14×12 pixels packed to **7 bytes × 12 rows**, plus a matching 7×12 mask. Art is **centered** in the cell (1 transparent column left + 1 right).
+2. **Odd** forms are precomputed by `py/gen_shr_gfx.py` (`sprites14x12.odd.bin` + `.odd.mask.bin`) — nibble-shift one pixel right into the same 7-byte cell — and injected with the even assets. (On-target `GenOddSprites` is deferred; host-side shift is the harness source of truth.)
 3. At draw time, pick even or odd by `X & 1`. Both forms are the same byte width — no variable-width blit path.
 
 | Sprite X | Screen start | Runtime asset |
@@ -289,7 +289,7 @@ Scale factor is \(6/8 = 0.75\) for both (8→6, 16→12). Sprites are then padde
 ### Algorithm
 
 1. Decode `5e` / `5f` with the MAME `pacman` char/sprite bit layouts → pen maps (indices 0–3).
-2. **Upright tiles:** rotate 90° CW (MAME `ROT90`), then **row XOR 3** (`out[i]=in[i^3]` — reverse each 4-row half). That fixes bevel direction without a full V-flip, which would open a black gap through two-tile horizontal walls (`DF`/`E5`). Sprites: CW only for now.
+2. **Upright tiles/sprites:** rotate 90° CW (MAME `ROT90`), then **row XOR 3** (`out[i]=in[i^3]` — reverse each 4-row half). That fixes bevel direction without a full V-flip, which would open a black gap through two-tile horizontal walls (`DF`/`E5`). Same transform for sprites so 16→12 scale does not sample empty gap rows.
 3. **Symmetric nearest subsample** 8→6 / 16→12 (keeps edge pixels for thin wall stems). Replace dot tiles `#10`/`#11` with a centered 2×2 and power pills `#14`/`#15` with a solid disc (ROM+scale otherwise yields a colon / H-bowtie).
 4. Pad each 12×12 sprite to 14×12; build a matching mask (opaque where pen ≠ 0).
 5. Pack SHR 320 **4bpp** (high nibble = left pixel).

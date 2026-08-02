@@ -3,51 +3,51 @@
 *
 
 InitActors
+* Three demo actors on pellet tiles (still). Screen coords:
+*   X = PF_ORIGIN_X + tile_x*6 + SPR_OFF_X (-4)
+*   Y = PF_ORIGIN_Y + tile_y*6 + SPR_OFF_Y (-3)
 	php
 	rep	#$30
 	ldx	#$7400
-	lda	#76+80
+	lda	#90			; 76+3*6-4; tile (3,20)
 	sta	>$020000,x
-	lda	#7+40
+	lda	#124			; 7+20*6-3
 	sta	>$020002,x
-	lda	#1
+	lda	#0
 	sta	>$020004,x
-	lda	#1
 	sta	>$020006,x
 	sep	#$20
-	lda	#0
+	lda	#$20			; ghost
 	sta	>$020008,x
 	lda	#0
 	sta	>$020009,x
 	rep	#$20
 
 	ldx	#$7410
-	lda	#76+40
+	lda	#126			; 76+9*6-4; tile (9,20)
 	sta	>$020000,x
-	lda	#7+100
+	lda	#124
 	sta	>$020002,x
-	lda	#2
+	lda	#0
 	sta	>$020004,x
-	lda	#$FFFF
 	sta	>$020006,x
 	sep	#$20
-	lda	#$20
+	lda	#$22			; ghost variant
 	sta	>$020008,x
 	lda	#0
 	sta	>$020009,x
 	rep	#$20
 
 	ldx	#$7420
-	lda	#76+120
+	lda	#181			; 76+18*6-3 odd (odd-path smoke test)
 	sta	>$020000,x
-	lda	#7+60
+	lda	#124
 	sta	>$020002,x
-	lda	#$FFFF
+	lda	#0
 	sta	>$020004,x
-	lda	#1
 	sta	>$020006,x
 	sep	#$20
-	lda	#4
+	lda	#$2C			; fruit-ish
 	sta	>$020008,x
 	lda	#0
 	sta	>$020009,x

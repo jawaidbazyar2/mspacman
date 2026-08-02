@@ -124,6 +124,11 @@ def upright_tile(img: list[list[int]]) -> list[list[int]]:
     return row_xor3(rot90_cw(img))
 
 
+def upright_sprite(img: list[list[int]]) -> list[list[int]]:
+    """Cabinet ROM → upright sprite (same CW + row XOR 3 as tiles)."""
+    return upright_tile(img)
+
+
 def area_resample(src: list[list[int]], dst_w: int, dst_h: int) -> list[list[int]]:
     """Coverage-weighted majority vote from src pens onto dst grid."""
     src_h = len(src)
@@ -193,18 +198,34 @@ def make_power_pill(size: int = 8) -> list[list[int]]:
 
 
 def pad_sprite_14x12(art: list[list[int]]) -> list[list[int]]:
-    """Left-align 12x12 art in a 14x12 cell; right two columns transparent (pen 0)."""
+    """Center 12×12 art in a 14×12 cell (1 transparent column on each side).
+
+    Left-aligning + 2 right pad columns made ghosts sit heavy on the right of
+    a 6px path when the actor X was the tile origin.
+    """
     if len(art) != SPRITE_ART or len(art[0]) != SPRITE_ART:
         raise ValueError("expected 12x12 art")
-    cell = []
-    for row in art:
-        cell.append(list(row) + [0, 0])
-    return cell
+    return [[0] + list(row) + [0] for row in art]
+
+
+def shift_odd_cell(img: list[list[int]]) -> list[list[int]]:
+    """Nibble-shift a 14×12 cell one pixel right (odd-X form)."""
+    return [[0] + row[:-1] for row in img]
 
 
 def mask_from_pens(img: list[list[int]]) -> list[list[int]]:
     """Per-pixel mask: 0xF where pen != 0, else 0 (nibble-oriented for packing)."""
     return [[0xF if p else 0 for p in row] for row in img]
+
+
+# Arcade sprite pens 1–3 → SHR pens that are not maze wall red/peach (2–3).
+# Palette slots 5–7 / 9 come from gen_palette.py (color ROM fill).
+_SPRITE_PEN_MAP = (0, 7, 9, 6)  # body → slot 6 ($0D95), not wall red at 3/5
+
+
+def remap_sprite_pens(img: list[list[int]]) -> list[list[int]]:
+    """Map 2bpp sprite pens into high SHR palette slots for maze contrast."""
+    return [[_SPRITE_PEN_MAP[p & 3] for p in row] for row in img]
 
 
 def pack_4bpp_rows(img: list[list[int]]) -> bytes:
@@ -352,27 +373,40 @@ def generate(
             raise SystemExit(f"{sprite_rom_path}: expected 4096 bytes, got {len(sprite_rom)}")
         spr_blob = bytearray()
         mask_blob = bytearray()
+        spr_odd = bytearray()
+        mask_odd = bytearray()
         for i in range(NUM_SPRITES):
-            s16 = rot90_cw(decode_sprite(sprite_rom, i))
+            s16 = upright_sprite(decode_sprite(sprite_rom, i))
             s12 = subsample_symmetric(s16, _SPR_SCALE_IDX)
             s14 = pad_sprite_14x12(s12)
             m14 = mask_from_pens(s14)
+            s14r = remap_sprite_pens(s14)
+            s14o = shift_odd_cell(s14r)
+            m14o = mask_from_pens(shift_odd_cell(s14))  # mask from pre-remap art
             sprites16.append(s16)
             sprites12.append(s12)
-            sprites14.append(s14)
-            packed = pack_4bpp_rows(s14)
+            sprites14.append(s14r)
+            packed = pack_4bpp_rows(s14r)
             mpacked = pack_4bpp_rows(m14)
             if len(packed) != SPRITE_CELL_H * BYTES_PER_SPRITE_ROW:
                 raise RuntimeError("sprite pack size mismatch")
             spr_blob.extend(packed)
             mask_blob.extend(mpacked)
+            spr_odd.extend(pack_4bpp_rows(s14o))
+            mask_odd.extend(pack_4bpp_rows(m14o))
         (out_dir / "sprites14x12.bin").write_bytes(spr_blob)
         (out_dir / "sprites14x12.mask.bin").write_bytes(mask_blob)
+        (out_dir / "sprites14x12.odd.bin").write_bytes(spr_odd)
+        (out_dir / "sprites14x12.odd.mask.bin").write_bytes(mask_odd)
         print(
             f"wrote {out_dir / 'sprites14x12.bin'} "
             f"({len(spr_blob)} bytes, {NUM_SPRITES} even frames)"
         )
         print(f"wrote {out_dir / 'sprites14x12.mask.bin'} ({len(mask_blob)} bytes)")
+        print(
+            f"wrote {out_dir / 'sprites14x12.odd.bin'} + .odd.mask.bin "
+            f"({len(spr_odd)} bytes each)"
+        )
 
     if write_ppm_flag:
         ppm_dir = out_dir / "ppm"

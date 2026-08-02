@@ -221,12 +221,15 @@ DrawTile
 	sta	>$027A0E
 	lda	>$027A0C
 	tay
-]tr	lda	>$030000,x
+* 8-bit stores — 16-bit sta would write a 4th byte past each 6px tile
+]tr	sep	#$20
+	lda	>$030000,x
 	sta	$2000,y
 	lda	>$030001,x
 	sta	$2001,y
 	lda	>$030002,x
 	sta	$2002,y
+	rep	#$20
 	txa
 	clc
 	adc	#3
@@ -296,12 +299,15 @@ DrawMaze
 	sta	>$027A0E
 	lda	>$027A0C
 	tay
-]mc	lda	>$037000,x
+* 8-bit stores — 16-bit sta spills 2px past the rightmost column
+]mc	sep	#$20
+	lda	>$037000,x
 	sta	$2000,y
 	lda	>$037001,x
 	sta	$2001,y
 	lda	>$037002,x
 	sta	$2002,y
+	rep	#$20
 	txa
 	clc
 	adc	#3
@@ -359,14 +365,17 @@ DrawAllSprites
 	rts
 
 EraseSprite
+* A = actor index — must save before PHB bank switch clobbers it
 	php
+	rep	#$30
+	sta	>$027A16
 	phb
 	sep	#$20
 	lda	#$01
 	pha
 	plb
 	rep	#$30
-	sta	>$027A16
+	lda	>$027A16
 	asl
 	asl
 	asl
@@ -397,7 +406,9 @@ EraseSprite
 	tax
 	lda	>$027A0C
 	tay
-]er	lda	>$020000,x
+* 8-bit — 16-bit sta $2006,y would clobber the next screen byte
+]er	sep	#$20
+	lda	>$020000,x
 	sta	$2000,y
 	lda	>$020001,x
 	sta	$2001,y
@@ -411,6 +422,7 @@ EraseSprite
 	sta	$2005,y
 	lda	>$020006,x
 	sta	$2006,y
+	rep	#$20
 	txa
 	clc
 	adc	#7
@@ -434,14 +446,17 @@ EraseSprite
 	rts
 
 DrawSprite
+* A = actor index — must save before PHB bank switch clobbers it
 	php
+	rep	#$30
+	sta	>$027A16
 	phb
 	sep	#$20
 	lda	#$01
 	pha
 	plb
 	rep	#$30
-	sta	>$027A16
+	lda	>$027A16
 	asl
 	asl
 	asl
@@ -469,7 +484,9 @@ DrawSprite
 	tax
 	lda	>$027A0C
 	tay
-]su	lda	$2000,y
+* 8-bit save-under — 16-bit stores overlapped rows (byte 7 = next row)
+]su	sep	#$20
+	lda	$2000,y
 	sta	>$020000,x
 	lda	$2001,y
 	sta	>$020001,x
@@ -483,6 +500,7 @@ DrawSprite
 	sta	>$020005,x
 	lda	$2006,y
 	sta	>$020006,x
+	rep	#$20
 	txa
 	clc
 	adc	#7

@@ -27,7 +27,7 @@ Start
 
 	jsr	InitSHR
 	jsr	CopyMaze
-	jsr	GenOddSprites
+* Odd sprite/mask forms are injected from host (sprites14x12.odd*.bin)
 	jsr	InitActors
 	jsr	DrawMaze
 	jsr	DrawAllSprites
@@ -36,11 +36,9 @@ Start
 	cli				; IRQs ok once frame path is live
 
 MainLoop
+* Demo actors are parked (dx=dy=0). Skip erase/redraw so GS2 frame
+* captures stay stable (pause often landed between erase and draw).
 	jsr	WaitVBL
-	jsr	EraseAllSprites
-* DirtyEatDemo disabled for now — keep pellets visible while validating gfx
-	jsr	UpdateActors
-	jsr	DrawAllSprites
 	lda	>$027900
 	inc
 	sta	>$027900
