@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Decode Pac-Man/Ms. Pac graphics ROMs and emit scaled IIgs SHR assets.
 
-Reads arcade 2bpp tiles (8x8) and sprites (16x16) from 5e/5f, area-resamples
-to 6x6 / 12x12 (scale 0.75), packs sprites into masked 14x12 even cells
-(7 bytes/row), and writes binary + optional PPM contact sheets for eyeballing.
+Reads arcade 2bpp tiles (8x8) and sprites (16x16) from 5e/5f, orients them
+for upright play (CW then row XOR 3), symmetrically subsamples to 6x6 / 12x12,
+packs sprites into masked 14x12 even cells (7 bytes/row), and writes binary +
+optional PPM contact sheets for eyeballing.
+
+For orientation checks *before* scaling, use py/preview_tiles_8x8.py.
 
 Usage:
   python3 py/gen_shr_gfx.py
@@ -90,6 +93,37 @@ def decode_sprite(rom: bytes, index: int) -> list[list[int]]:
     return out
 
 
+def rot90_cw(img: list[list[int]]) -> list[list[int]]:
+    """Rotate pen map 90° clockwise."""
+    n = len(img)
+    return [[img[n - 1 - x][y] for x in range(n)] for y in range(n)]
+
+
+def flip_v(img: list[list[int]]) -> list[list[int]]:
+    """Flip pen map vertically (top ↔ bottom)."""
+    return img[::-1]
+
+
+def row_xor3(img: list[list[int]]) -> list[list[int]]:
+    """Swap rows within each 4-row half: out[i] = in[i ^ 3].
+
+    Reverses bevel order inside each half without moving ink between halves,
+    so two-tile-tall horizontal walls still meet (unlike a full V-flip).
+    """
+    n = len(img)
+    return [img[i ^ 3][:] for i in range(n)]
+
+
+def upright_tile(img: list[list[int]]) -> list[list[int]]:
+    """Cabinet ROM → upright playfield tile.
+
+    90° CW (MAME ROT90), then row XOR 3 so line map is
+    0↔3, 1↔2, 4↔7, 5↔6. Do not full-V-flip: that packs horizontal walls
+    into opposite halves and opens a black gap through DF/E5 runs.
+    """
+    return row_xor3(rot90_cw(img))
+
+
 def area_resample(src: list[list[int]], dst_w: int, dst_h: int) -> list[list[int]]:
     """Coverage-weighted majority vote from src pens onto dst grid."""
     src_h = len(src)
@@ -120,6 +154,41 @@ def area_resample(src: list[list[int]], dst_w: int, dst_h: int) -> list[list[int
                         continue
                     weights[src[sy][sx]] += row_cov * col_cov
             out[y][x] = max(range(4), key=lambda p: weights[p])
+    return out
+
+
+# Symmetric 8→6 source indices (i[k] + i[5-k] == 7) so xor-1 H-flips stay matched
+# and both edge pixels of thin wall stems survive.
+_TILE_SCALE_IDX = (0, 1, 3, 4, 6, 7)
+# Symmetric 16→12 for sprites
+_SPR_SCALE_IDX = (0, 1, 2, 3, 5, 6, 9, 10, 12, 13, 14, 15)
+
+
+def subsample_symmetric(src: list[list[int]], idx: tuple[int, ...]) -> list[list[int]]:
+    """Nearest subsample with a symmetric index list (preserves edge ink)."""
+    return [[src[iy][ix] for ix in idx] for iy in idx]
+
+
+def make_centered_pellet(size: int = 8) -> list[list[int]]:
+    """Upright pellet: 2×2 pen-1 block centered (arcade 0x10 is colon-shaped after ROT90)."""
+    out = [[0] * size for _ in range(size)]
+    c0 = size // 2 - 1
+    for y in range(c0, c0 + 2):
+        for x in range(c0, c0 + 2):
+            out[y][x] = 1
+    return out
+
+
+def make_power_pill(size: int = 8) -> list[list[int]]:
+    """Solid octagon/disc pen-1 (ROM+scale pinches 0x14 into an H/bowtie)."""
+    out = [[0] * size for _ in range(size)]
+    # Radius-ish fill; works for 8×8 and survives symmetric 8→6 subsample.
+    mid = (size - 1) / 2.0
+    rad = size * 0.42
+    for y in range(size):
+        for x in range(size):
+            if (x - mid) ** 2 + (y - mid) ** 2 <= rad * rad:
+                out[y][x] = 1
     return out
 
 
@@ -258,8 +327,13 @@ def generate(
             raise SystemExit(f"{tile_rom_path}: expected 4096 bytes, got {len(tile_rom)}")
         tile_blob = bytearray()
         for i in range(NUM_TILES):
-            t8 = decode_tile(tile_rom, i)
-            t6 = area_resample(t8, TILE_DST, TILE_DST)
+            if i in (0x10, 0x11):
+                t8 = make_centered_pellet(TILE_SRC)
+            elif i in (0x14, 0x15):
+                t8 = make_power_pill(TILE_SRC)
+            else:
+                t8 = upright_tile(decode_tile(tile_rom, i))
+            t6 = subsample_symmetric(t8, _TILE_SCALE_IDX)
             tiles8.append(t8)
             tiles6.append(t6)
             packed = pack_4bpp_rows(t6)
@@ -279,8 +353,8 @@ def generate(
         spr_blob = bytearray()
         mask_blob = bytearray()
         for i in range(NUM_SPRITES):
-            s16 = decode_sprite(sprite_rom, i)
-            s12 = area_resample(s16, SPRITE_ART, SPRITE_ART)
+            s16 = rot90_cw(decode_sprite(sprite_rom, i))
+            s12 = subsample_symmetric(s16, _SPR_SCALE_IDX)
             s14 = pad_sprite_14x12(s12)
             m14 = mask_from_pens(s14)
             sprites16.append(s16)
@@ -347,7 +421,12 @@ def main() -> int:
         default=DEFAULT_PALETTE_ROM,
         help="82s126.4a for PPM pen mapping",
     )
-    ap.add_argument("--palette", type=int, default=1, help="hardware palette index for PPM (0–63)")
+    ap.add_argument(
+        "--palette",
+        type=int,
+        default=0x1D,
+        help="hardware palette index for PPM (default 0x1D maze-1)",
+    )
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT, help="output directory")
     ap.add_argument("--ppm", action="store_true", help="write PPM contact sheets under out/ppm/")
     ap.add_argument("--zoom", type=int, default=4, help="nearest-neighbor zoom for PPM (default 4)")

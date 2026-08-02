@@ -5,13 +5,14 @@ Design notes for porting arcade Ms. Pac-Man (`mspacmab`) to the Apple IIgs. This
 | Section | Status |
 |---------|--------|
 | §1 Display & tile scale | **Locked** |
-| §2 Color / SHR palette | TBD |
+| §2 Color / SHR palette | TBD (provisional pens in harness) |
 | §3 Sprite drawing | **Locked (v1)** |
 | §3.1 Frame loop & VBL | **Locked (v1)** |
 | §3.2 Graphics asset pipeline | **Locked (v1)** |
+| §3.3 Render harness (Merlin32) | **Scaffolding live** |
 | §4 Input | **Locked (v1 keyboard)** |
 | §5 Sound | TBD |
-| §6 CPU / memory model | TBD |
+| §6 CPU / memory model | **Harness map locked (v1)** |
 
 Related: [Rom.Files.md](../Rom.Files.md) (arcade hardware / ROM map), [AGENTS.md](../AGENTS.md) (repo conventions).
 
@@ -109,7 +110,25 @@ Treating IIgs framebuffer pixels as square, that mismatch is small enough to ign
 
 ## 2. Color / SHR palette
 
-TBD. Map arcade color PROM / tile attributes into SHR’s 16-color palette (from 4096). Scanline palette tricks are optional later.
+### Decision (harness v1)
+
+Map the arcade **color PROM** (`82s123.7f`) and **palette PROM** (`82s126.4a`) into **SHR palette 0**.
+
+With SHR **shadowing on**, the harness owns bank `$01`:
+
+| Range | Role |
+|-------|------|
+| `$9D00–$9DFF` | SCB — one byte per scanline; low nibble selects palette 0–15 (we use **0**, 320 mode) |
+| `$9E00–$9FFF` | 16 palettes × 32 bytes; **palette 0** at `$9E00` holds pens 0–15 |
+
+| Palette-0 pens | Source |
+|----------------|--------|
+| 0–3 | Maze palette **`#1D`** (level-1 walls / dots / power pills) |
+| 4–15 | Color-ROM entries 0–11 (scratch for sprites later) |
+
+Build: `make palette` → `build/gfx/palette.bin` + generated `iigs/palette_data.s` ([`py/gen_palette.py`](../py/gen_palette.py)). Tile assets store pens 0–3; `LoadPalette` writes palette 0 at `$01/9E00` only (no `$E1` poke).
+
+Scanline palette tricks (SCB ≠ 0) remain optional later.
 
 ---
 
@@ -244,13 +263,13 @@ Write SHR through bank `$01` shadow at full CPU speed. Avoid long poke loops int
 |-----------|----------------|
 | [GS.Pacman](https://github.com/peterhirschberg/GS.Pacman) (Peter Hirschberg) | Best Pac-Man-specific IIgs reference (external). ORCA/65816, SHR 320, `waitForVbl` → `eraseGhosts` / `erasePac` → `drawFruit` / `drawPac` / `drawGhosts` → logic/sound; maze drawn once in `drawMaze`. |
 | BuGS (local disks under `IIgsDisks/`) | Centipede soft-sprite / fixed-fps precedent (Mr. Sprite / John Brooks). Useful for blit technique, not maze semantics. |
-| This repo | No IIgs game code yet. Arcade truth remains `mspac.asm` + golden `boot1`–`boot6`. |
+| This repo | Merlin32 render module + GSSquared harness under [`iigs/`](../iigs/); arcade truth remains locked `mspac.asm` + `boot1`–`boot6`. |
 
-### Non-goals (this design pass)
+### Non-goals (still)
 
-- No 65816 implementation or IIgs scaffolding here (Z80 reassembly pipeline still comes first — see [AGENTS.md](../AGENTS.md)).
-- No final palette (§2).
+- No final palette (§2) — harness uses a provisional 16-color table.
 - No beam-trailing plan beyond “measure first, then consider.”
+- No full game logic / Z80 translation yet.
 
 ---
 
@@ -270,10 +289,12 @@ Scale factor is \(6/8 = 0.75\) for both (8→6, 16→12). Sprites are then padde
 ### Algorithm
 
 1. Decode `5e` / `5f` with the MAME `pacman` char/sprite bit layouts → pen maps (indices 0–3).
-2. **Area-resample** (coverage-weighted majority vote) to 6×6 / 12×12, keeping pens (not baked RGB).
-3. Pad each 12×12 sprite to 14×12; build a matching mask (opaque where pen ≠ 0).
-4. Pack SHR 320 **4bpp** (high nibble = left pixel).
-5. Optional: write **PPM** contact sheets under `build/gfx/ppm/` for eyeballing (uses color/palette PROMs when present).
+2. **Upright tiles:** rotate 90° CW (MAME `ROT90`), then **row XOR 3** (`out[i]=in[i^3]` — reverse each 4-row half). That fixes bevel direction without a full V-flip, which would open a black gap through two-tile horizontal walls (`DF`/`E5`). Sprites: CW only for now.
+3. **Symmetric nearest subsample** 8→6 / 16→12 (keeps edge pixels for thin wall stems). Replace dot tiles `#10`/`#11` with a centered 2×2 and power pills `#14`/`#15` with a solid disc (ROM+scale otherwise yields a colon / H-bowtie).
+4. Pad each 12×12 sprite to 14×12; build a matching mask (opaque where pen ≠ 0).
+5. Pack SHR 320 **4bpp** (high nibble = left pixel).
+6. Maze build also emits **`maze1_cells.bin`**: per-cell 6×6 copies with shared-edge stitching (narrow lines meet at corners).
+7. Optional: write **PPM** contact sheets under `build/gfx/ppm/` for eyeballing (uses color/palette PROMs when present).
 
 Pen 0 remains transparency for sprites. Final SHR palette mapping is still §2; assets store pen indices in the low bits of each nibble.
 
@@ -282,11 +303,46 @@ Pen 0 remains transparency for sprites. Final SHR palette mapping is still §2; 
 ```bash
 make gfx        # binaries only
 make gfx-ppm    # binaries + PPM previews (default zoom ×4)
+make tiles-preview              # 8×8 maze + sheet (production upright = CW+row^3)
+make tiles-preview COMPARE=native,cw,upright
 # or:
 python3 py/gen_shr_gfx.py --ppm --out build/gfx
+python3 py/preview_tiles_8x8.py --orient upright --compare native,cw
 ```
 
-Helper: [`py/gen_shr_gfx.py`](../py/gen_shr_gfx.py).
+
+Helpers: [`py/gen_shr_gfx.py`](../py/gen_shr_gfx.py), [`py/preview_tiles_8x8.py`](../py/preview_tiles_8x8.py) (8×8 only — validate rotate/flip before 6×6).
+
+Level-1 maze tilemap (walls RLE + dots + power pills → upright 28×31):
+
+```bash
+make maze    # → build/gfx/maze1_28x31.bin (+ maze1_color.bin)
+```
+
+Helper: [`py/gen_maze1.py`](../py/gen_maze1.py).
+
+---
+
+## 3.3 Render harness (Merlin32 + GSSquared)
+
+### Decision
+
+First on-target milestone: a **65816 soft-render module** (tiles + masked soft sprites + save-under) driven by a GSSquared inject/run test — not a full game.
+
+| Piece | Path |
+|-------|------|
+| Merlin32 sources | [`iigs/`](../iigs/) (`all.s` + `*_body.s`, link → `build/iigs/harness.bin`) |
+| Host driver | [`py/gs2_render_test.py`](../py/gs2_render_test.py) |
+| SHR → PNG | [`py/shr_dump_png.py`](../py/shr_dump_png.py) |
+
+```bash
+make iigs        # Merlin32 assemble
+make iigs-test   # spawn GSSquared, inject, CALL 768, dump build/iigs/frame.png
+```
+
+**Boot into Applesoft:** wait ~5s after spawn → **Control-Reset** (Ctrl+F12; not Control-OA-Reset) → BASIC `%` prompt → poke trampoline at `$00/0300` → type `CALL 768`.
+
+Harness maze tiles must match `make gfx` upright orientation (CW + row XOR 3). Ground-truth previews: `build/gfx/ppm/maze1_8x8_upright.png` / `maze1_6x6_upright.png`.
 
 ---
 
@@ -316,4 +372,16 @@ TBD. Arcade Namco WSG → IIgs Ensoniq DOC (or simpler square/noise approximatio
 
 ## 6. CPU / memory model
 
-TBD. 65816 organization, how much of the Z80 game logic is reimplemented vs translated, and where tilemaps / sprite sheets live in banked RAM / FastPath.
+Full Z80↔65816 strategy TBD. **Harness v1 memory map** (seed for the port):
+
+| Bank / range | Contents |
+|--------------|----------|
+| `$02/0000` | Code + actor state + save-under + scratch |
+| `$02/7000` | Logical tilemap 28×31 |
+| `$03/0000` | `tiles6.bin` + even sprites/masks; odd forms at startup; maze tilemap; stitched `maze1_cells.bin` @ `$037000` |
+| `$01/2000` | SHR shadow write target (**shadowing ON**) |
+| `$E1/2000` | Displayed SHR (capture / ground truth) |
+
+Playfield origin: **(76, 7)** for the 168×186 maze in 320×200. Side HUD unused in the harness.
+
+How much game logic is reimplemented vs translated remains open; soft-render replaces arcade tilemap + sprite hardware.

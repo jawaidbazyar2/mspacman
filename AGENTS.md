@@ -134,6 +134,9 @@ Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system
   - `py/fix_boot_mismatches.py` — targeted instruction/stub fixes where listing ≠ boots
   - `py/verify_boots.py` — compare `build/mspac.bin` slices to `boot1`–`boot6`
   - `py/gen_shr_gfx.py` — scale `5e`/`5f` → IIgs 6×6 tiles / 14×12 sprites (+ optional PPM previews)
+  - `py/preview_tiles_8x8.py` — native 8×8 maze/tile PPM+PNG to check rotate/flip before scale
+  - `py/gen_palette.py` — arcade PROMs → SHR palette 0 + `iigs/palette_data.s`
+  - `py/gen_maze1.py` — level-1 upright 28×31 tilemap + stitched 6×6 cells
 
 ## Working conventions for agents
 

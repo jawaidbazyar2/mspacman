@@ -22,7 +22,16 @@ GFX_DIR   := $(BUILD_DIR)/gfx
 TILE_ROM  := mspacman-orig/5e
 SPRITE_ROM := mspacman-orig/5f
 
-.PHONY: all clean verify sjasmplus-check gfx gfx-ppm
+MERLIN32  ?= $(HOME)/src/Merlin32_v1.1/MacOs/Merlin32
+MERLIN_LIB ?= $(HOME)/src/Merlin32_v1.1/Library
+IIGS_DIR  := iigs
+IIGS_BUILD := $(BUILD_DIR)/iigs
+IIGS_BIN  := $(IIGS_BUILD)/harness.bin
+
+GSSQUARED ?= $(HOME)/src/gssquared/build/GSSquared
+GS2_PY    := $(HOME)/src/gssquared/clients/python/src
+
+.PHONY: all clean verify sjasmplus-check gfx gfx-ppm palette maze tiles-preview iigs iigs-test
 
 all: $(BIN)
 
@@ -53,12 +62,52 @@ verify: $(BIN)
 	python3 py/verify_boots.py $(BIN)
 
 # Scale arcade 5e/5f graphics to IIgs 6x6 tiles / 14x12 even sprites.
-gfx: $(TILE_ROM) $(SPRITE_ROM)
+gfx: $(TILE_ROM) $(SPRITE_ROM) palette
 	python3 py/gen_shr_gfx.py --tiles $(TILE_ROM) --sprites $(SPRITE_ROM) --out $(GFX_DIR)
 
 # Same as gfx, plus PPM contact sheets under build/gfx/ppm/ for eyeballing.
-gfx-ppm: $(TILE_ROM) $(SPRITE_ROM)
+gfx-ppm: $(TILE_ROM) $(SPRITE_ROM) palette
 	python3 py/gen_shr_gfx.py --tiles $(TILE_ROM) --sprites $(SPRITE_ROM) --out $(GFX_DIR) --ppm
+
+# SHR palette from 82s123.7f / 82s126.4a (maze pal #1D in slots 0–3).
+palette:
+	python3 py/gen_palette.py --out $(GFX_DIR) --asm $(IIGS_DIR)/palette_data.s
+
+# Decode level-1 maze tilemap (28x31) + stitched cells (needs tiles6.bin).
+maze: boot1 boot2 boot3 boot4 boot5 boot6
+	python3 py/gen_maze1.py --out $(GFX_DIR)
+
+# Native 8×8 maze + tile sheet (no 6×6 scale) to validate rotate/flip.
+# Example: make tiles-preview COMPARE=native,cw,upright
+COMPARE ?=
+tiles-preview: maze
+	python3 py/preview_tiles_8x8.py --orient upright \
+		$(if $(COMPARE),--compare $(COMPARE),) \
+		--out $(GFX_DIR)/ppm
+
+# Assemble IIgs render harness with Merlin32 → build/iigs/harness.bin
+iigs: palette $(IIGS_BIN)
+
+$(IIGS_BUILD):
+	mkdir -p $(IIGS_BUILD)
+
+$(IIGS_BIN): $(IIGS_DIR)/link.s $(IIGS_DIR)/all.s $(IIGS_DIR)/equates.s \
+		$(IIGS_DIR)/shr_body.s $(IIGS_DIR)/render_body.s \
+		$(IIGS_DIR)/harness_body.s $(IIGS_DIR)/palette_data.s \
+		$(MERLIN32) | $(IIGS_BUILD)
+	cd $(IIGS_DIR) && $(MERLIN32) $(MERLIN_LIB) link.s
+	mv -f $(IIGS_DIR)/harness.bin $(IIGS_BIN)
+	@rm -f $(IIGS_DIR)/_FileInformation.txt $(IIGS_DIR)/harness.bin_Output.txt 2>/dev/null; true
+
+# Spawn GSSquared, inject harness + assets, dump SHR frame PNG.
+iigs-test: gfx maze iigs
+	PYTHONPATH=$(GS2_PY) python3 py/gs2_render_test.py \
+		--gs2 $(GSSQUARED) \
+		--bin $(IIGS_BIN) \
+		--gfx $(GFX_DIR) \
+		--out $(IIGS_BUILD)/frame.png
 
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -f $(IIGS_DIR)/harness.bin $(IIGS_DIR)/_FileInformation.txt \
+		$(IIGS_DIR)/*_Output.txt 2>/dev/null; true
