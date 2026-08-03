@@ -9,16 +9,23 @@ Merlin32 routines:
 
 Junior bank #00 is all-black in the PROM; override to #09 so it is visible.
 
+Adjacent opaque bytes are coalesced into 16-bit ops by py/blit_emit.py.
+
 Usage:
   python3 py/gen_compiled_fruits.py
   python3 py/gen_compiled_fruits.py --sprites mspacman-orig/5f -o iigs/compiled_fruits.s
+  python3 py/gen_compiled_fruits.py --no-word16    # 8-bit only, for A/B
 """
 
 from __future__ import annotations
 
 import argparse
 import importlib.util
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from blit_emit import BlitStats, check_equivalence, emit_blit  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SPRITE_ROM = ROOT / "mspacman-orig" / "5f"
@@ -27,10 +34,6 @@ DEFAULT_PALETTE_ROM = ROOT / "mspacman-orig" / "82s126.4a"
 DEFAULT_OUT = ROOT / "iigs" / "compiled_fruits.s"
 
 SPR_BYTES = 84
-ROWS = 12
-COLS = 7
-SHR_BASE = 0x2000
-ROW_BYTES = 160
 
 # Ms. Pac #879D: (sprite, color bank, name). Junior bank 0 → #09 override.
 FRUITS = (
@@ -94,35 +97,6 @@ def remap_img(img: list[list[int]], shr_map: tuple[int, ...]) -> list[list[int]]
     return [[shr_map[p & 3] for p in row] for row in img]
 
 
-def emit_blit(label: str, spr: bytes, msk: bytes) -> tuple[list[str], int, int]:
-    lines = [
-        label,
-        "\tphp",
-        "\tsep\t#$20",
-    ]
-    full = partial = 0
-    for row in range(ROWS):
-        for col in range(COLS):
-            i = row * COLS + col
-            m = msk[i]
-            if m == 0:
-                continue
-            addr = SHR_BASE + row * ROW_BYTES + col
-            s = spr[i] & m
-            if m == 0xFF:
-                lines.append(f"\tlda\t#${s:02X}")
-                lines.append(f"\tsta\t${addr:04X},y")
-                full += 1
-            else:
-                lines.append(f"\tlda\t${addr:04X},y")
-                lines.append(f"\tand\t#${m ^ 0xFF:02X}")
-                lines.append(f"\tora\t#${s:02X}")
-                lines.append(f"\tsta\t${addr:04X},y")
-                partial += 1
-    lines += ["\tplp", "\trts", ""]
-    return lines, full, partial
-
-
 def build_fruit_cell(gfx, rom: bytes, spr_code: int, shr_map: tuple[int, ...]):
     raw = gfx.decode_sprite(rom, spr_code)
     # Area resample keeps more fruit mass than nearest subsample (cherries were ~26 px).
@@ -143,6 +117,12 @@ def main() -> int:
     ap.add_argument("--color-rom", type=Path, default=DEFAULT_COLOR_ROM)
     ap.add_argument("--palette-rom", type=Path, default=DEFAULT_PALETTE_ROM)
     ap.add_argument("-o", "--out", type=Path, default=DEFAULT_OUT)
+    ap.add_argument(
+        "--no-word16",
+        dest="word16",
+        action="store_false",
+        help="emit 8-bit ops only (pre-optimization output, for A/B)",
+    )
     args = ap.parse_args()
 
     if not args.sprites.is_file():
@@ -177,17 +157,16 @@ def main() -> int:
 
     lines.append("")
     body: list[str] = []
-    total_full = total_part = 0
+    stats = BlitStats()
 
     for fi, (spr_code, bank, name) in enumerate(FRUITS):
         shr_map = bank_to_shr_map(args.palette_rom, bank)
         even_s, even_m, odd_s, odd_m = build_fruit_cell(gfx, rom, spr_code, shr_map)
         for tag, spr, msk in (("E", even_s, even_m), ("O", odd_s, odd_m)):
             lab = f"CF{fi}_{tag}"
-            blit, full, part = emit_blit(lab, spr, msk)
-            body.extend(blit)
-            total_full += full
-            total_part += part
+            if args.word16:
+                check_equivalence(bytes(spr), msk)
+            body.extend(emit_blit(lab, bytes(spr), msk, stats, word16=args.word16))
             print(f"  {lab}: {name} bank=#{bank:02X} map={shr_map}")
 
     lines.extend(body)
@@ -196,10 +175,7 @@ def main() -> int:
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text("\n".join(lines) + "\n", encoding="ascii")
-    print(
-        f"wrote {args.out} ({len(labels)} blits, "
-        f"{total_full} solid + {total_part} partial byte ops)"
-    )
+    print(f"wrote {args.out} ({len(labels)} blits, {stats})")
     return 0
 
 

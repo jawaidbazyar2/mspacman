@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Rewrite hard-coded long addresses in iigs/render_body.s to named equates.
 
+The R_* render scratch is no longer in bank $02 — it lives in low direct page
+and is spelled `<R_xxx`. py/dp_scratch_rewrite.py owns that mapping; the
+`$028Axx` entries were dropped from here so the two cannot disagree.
+
 Usage:
   python3 py/label_render_addrs.py
 """
@@ -33,22 +37,6 @@ REPLACEMENTS: list[tuple[str, str]] = [
     (r">\$028902", ">EAT_INDEX"),
     (r">\$028900", ">FRAME_COUNT"),
     (r">\$028000", ">TILEMAP"),
-    (r">\$028A1E", ">R_BTMP"),
-    (r">\$028A1C", ">R_BODY"),
-    (r">\$028A1A", ">R_SAVE"),
-    (r">\$028A18", ">R_BASE"),
-    (r">\$028A16", ">R_ACT"),
-    (r">\$028A14", ">R_TMP"),
-    (r">\$028A12", ">R_CARRY"),
-    (r">\$028A10", ">R_IDX"),
-    (r">\$028A0E", ">R_ROW"),
-    (r">\$028A0C", ">R_DEST"),
-    (r">\$028A0A", ">R_OFF"),
-    (r">\$028A08", ">R_TILE"),
-    (r">\$028A06", ">R_TY"),
-    (r">\$028A04", ">R_TX"),
-    (r">\$028A02", ">R_Y"),
-    (r">\$028A00", ">R_X"),
     # Actor fields (X = ACTORS16+…). Save-under rows fixed afterward.
     (r">\$02000B", ">BANK2+ACT_COLOR"),
     (r">\$020009", ">BANK2+ACT_FLAGS"),
@@ -70,13 +58,15 @@ REPLACEMENTS: list[tuple[str, str]] = [
 def ensure_bank2_equates(text: str) -> str:
     if re.search(r"^BANK2\s+equ\b", text, re.M):
         return text
-    return text.replace(
-        "R_BTMP         equ $028A1E\n",
-        "R_BTMP         equ $028A1E\n"
+    return re.sub(
+        r"(^R_BDEST\s+equ\b.*\n)",
+        r"\1"
         "* Bank $02 long base: >BANK2+field,x with X = ACTORS16\n"
         "BANK2          equ $020000\n"
         "ACTORS16       equ $8400\n",
-        1,
+        text,
+        count=1,
+        flags=re.M,
     )
 
 
@@ -113,7 +103,7 @@ def transform(text: str) -> str:
         text = re.sub(pat, repl, text)
     text = fix_saveunder_rows(text)
     # Screen Y origin only (row strides are adc #7 then tax/sta R_OFF, not sta R_Y)
-    text = re.sub(r"adc\t#7(\n\tsta\t>R_Y)", r"adc\t#PF_ORIGIN_Y\1", text)
+    text = re.sub(r"adc\t#7(\n\tsta\t<R_Y)", r"adc\t#PF_ORIGIN_Y\1", text)
     return text
 
 

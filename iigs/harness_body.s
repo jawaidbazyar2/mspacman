@@ -11,20 +11,20 @@ DIR_UP         equ 3
 
 * A = tile coord → screen pixel in A (X variant)
 TileToScreenX
-	sta	>$028A14
+	sta	<R_TMP
 	asl
 	clc
-	adc	>$028A14
+	adc	<R_TMP
 	asl				; tile * 6
 	clc
 	adc	#SPR_BASE_X
 	rts
 
 TileToScreenY
-	sta	>$028A14
+	sta	<R_TMP
 	asl
 	clc
-	adc	>$028A14
+	adc	<R_TMP
 	asl
 	clc
 	adc	#SPR_BASE_Y
@@ -64,11 +64,11 @@ DirToNextWP
 	tay
 	lda	RailPath,y
 	and	#$00FF
-	sta	>$028A04		; R_TX = cur tile X
+	sta	<R_TX		; cur tile X
 	iny
 	lda	RailPath,y
 	and	#$00FF
-	sta	>$028A06		; R_TY = cur tile Y
+	sta	<R_TY		; cur tile Y
 	lda	>$02000A,x
 	and	#$00FF
 	inc
@@ -79,7 +79,7 @@ DirToNextWP
 	tay
 	lda	RailPath,y
 	and	#$00FF
-	cmp	>$028A04
+	cmp	<R_TX
 	beq	:yDir
 	bcc	:left
 	lda	#DIR_RIGHT
@@ -89,7 +89,7 @@ DirToNextWP
 :yDir	iny
 	lda	RailPath,y
 	and	#$00FF
-	cmp	>$028A06
+	cmp	<R_TY
 	bcc	:up
 	lda	#DIR_DOWN
 	bra	:out
@@ -118,14 +118,14 @@ SetGhostSprFromDir
 	rep	#$30
 	and	#$0003
 	asl				; dir * 2
-	sta	>$028A14		; R_TMP
+	sta	<R_TMP
 	lda	>FRAME_COUNT
 	lsr
 	lsr
 	lsr
 	and	#$0001
 	clc
-	adc	>$028A14
+	adc	<R_TMP
 	clc
 	adc	#$0020
 	sep	#$20
@@ -154,7 +154,7 @@ SetMsPacSprFromDir
 	php
 	rep	#$30
 	and	#$0003
-	sta	>$028A14		; dir
+	sta	<R_TMP		; dir
 	bit	#$0001			; odd dir → Y axis
 	bne	:useY
 	lda	>$020000,x		; ACT_X
@@ -162,22 +162,22 @@ SetMsPacSprFromDir
 :useY	lda	>$020002,x		; ACT_Y
 :gotAxis	and	#$0007
 	lsr				; p = (axis&7)>>1
-	sta	>$028A16
-	lda	>$028A14
+	sta	<R_ACT
+	lda	<R_TMP
 	asl
 	asl				; dir*4
 	clc
-	adc	>$028A16		; +p
+	adc	<R_ACT		; +p
 	tay
 	lda	MsPacMouthTab,y
 	and	#$00FF
-	sta	>$028A16		; mouth
-	lda	>$028A14		; dir*3
+	sta	<R_ACT		; mouth
+	lda	<R_TMP		; dir*3
 	asl
 	clc
-	adc	>$028A14
+	adc	<R_TMP
 	clc
-	adc	>$028A16
+	adc	<R_ACT
 	sep	#$20
 	sta	>$020008,x		; ACT_SPR
 	plp
@@ -268,16 +268,16 @@ AdvanceFruit
 	rep	#$30
 	lda	>FRAME_COUNT
 	beq	:frDone
-	sta	>$028A14
+	sta	<R_TMP
 	lda	#FRUIT_PERIOD
-	sta	>$028A16
+	sta	<R_ACT
 * 16-bit remainder: A = FRAME_COUNT % FRUIT_PERIOD (do not AND #$00FF —
 * remainder 256 would falsely look like 0).
-	lda	>$028A14
-:frDiv	cmp	>$028A16
+	lda	<R_TMP
+:frDiv	cmp	<R_ACT
 	bcc	:frRem
 	sec
-	sbc	>$028A16
+	sbc	<R_ACT
 	bra	:frDiv
 :frRem	cmp	#0
 	bne	:frDone
@@ -297,8 +297,8 @@ AdvanceRails
 	php
 	rep	#$30
 	lda	#0
-	sta	>$028A16
-]ar	lda	>$028A16
+	sta	<R_ACT
+]ar	lda	<R_ACT
 	asl
 	asl
 	asl
@@ -308,9 +308,9 @@ AdvanceRails
 	tax
 	lda	#0			; 0 = ghost sprite setter
 	jsr	RailStepActor
-:arNext	lda	>$028A16
+:arNext	lda	<R_ACT
 	inc
-	sta	>$028A16
+	sta	<R_ACT
 	cmp	#NUM_GHOSTS
 	bcs	:arPac
 	jmp	]ar
@@ -324,7 +324,7 @@ RailStepActor
 * X = actor base; A = 0 ghost / nonzero Ms. Pac for ACT_SPR updates.
 	php
 	rep	#$30
-	sta	>$028A1E		; setter mode (R_BTMP; rails phase only)
+	sta	<R_BTMP		; setter mode (rails phase only)
 	phx
 	lda	>$02000A,x		; ACT_WP (byte in low)
 	and	#$00FF
@@ -333,15 +333,15 @@ RailStepActor
 	lda	RailPath,y
 	and	#$00FF
 	jsr	TileToScreenX
-	sta	>$028A00
+	sta	<R_X
 	iny
 	lda	RailPath,y
 	and	#$00FF
 	jsr	TileToScreenY
-	sta	>$028A02
+	sta	<R_Y
 	plx
 	lda	>$020000,x
-	cmp	>$028A00
+	cmp	<R_X
 	beq	:yAxis
 	bcc	:goRight
 	dec
@@ -355,7 +355,7 @@ RailStepActor
 	jsr	RailSetSpr
 	bra	:rsDone
 :yAxis	lda	>$020002,x
-	cmp	>$028A02
+	cmp	<R_Y
 	beq	:hit
 	bcc	:goDown
 	dec
@@ -380,11 +380,11 @@ RailStepActor
 	rts
 
 RailSetSpr
-* A = DIR_*; X = actor; $028A1E selects ghost vs Ms. Pac.
+* A = DIR_*; X = actor; R_BTMP selects ghost vs Ms. Pac.
 	php
 	rep	#$30
 	pha
-	lda	>$028A1E
+	lda	<R_BTMP
 	bne	:pac
 	pla
 	jsr	SetGhostSprFromDir

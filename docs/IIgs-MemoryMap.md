@@ -44,6 +44,32 @@ Stack pointer initialized to `$01FF` at `Start`.
 
 ### Direct page (`DP = $0000`)
 
+Low DP holds the render / harness scratch. It used to live at `$02/8A00` and be
+reached with long addressing; direct page is always bank `$00`, so it stays
+reachable across the `DB = $01` switch in the blits at 4 cycles / 2 bytes
+instead of 6 / 4. Always spell these with an explicit `<`.
+
+| DP | Symbol | Notes |
+|----|--------|-------|
+| `$10` | `R_X` | Screen / temp X |
+| `$12` | `R_Y` | Screen / temp Y |
+| `$14` | `R_TX` | Tile X |
+| `$16` | `R_TY` | Tile Y |
+| `$18` | `R_TILE` | Tile code |
+| `$1A` | `R_OFF` | Byte offset / mul scratch |
+| `$1C` | `R_DEST` | SHR offset (`ROW_ADDR[Y]+X/2`) |
+| `$1E` | `R_ROW` | Row counter |
+| `$20` | `R_IDX` | Sprite index |
+| `$22` | `R_CARRY` | Nibble / mul scratch |
+| `$24` | `R_TMP` | General temp |
+| `$26` | `R_ACT` | Actor index |
+| `$28` | `R_BASE` | Actor base (`ACTORS16+…`) |
+| `$2A` | `R_SAVE` | Scratch |
+| `$2C` | `R_BODY` | Body pen for remap |
+| `$2E` | `R_BTMP` | Blit temp |
+| `$30` | `R_BDEST` | BCK offset (`ROW_BCK[Y]+(X-72)/2`) |
+| `$32`–`$E9` | — | Free |
+
 High DP holds the Y-order key arrays (actor records are not moved):
 
 | DP | Symbol | Size | Notes |
@@ -53,6 +79,10 @@ High DP holds the Y-order key arrays (actor records are not moved):
 | `$EE`–`$EF` | `DP_I` / `DP_J` | 2 | sort loop indices |
 | `$F0`–`$F5` | `DP_SORT` | 6 | actor indices, Y-ascending |
 | `$F6`–`$FB` | `DP_YKEY` | 6 | Y low for actor `0..5` (by actor #) |
+
+Index these with **X**, never Y: the 65816 has no `LDA dp,Y`, and Merlin32
+silently demotes it to `LDA abs,Y`, which resolves against `DB = $02` and reads
+the code image instead of direct page.
 
 ---
 
@@ -122,28 +152,7 @@ Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | `$02/8B00`–`$02/8CFF` | `ROW_ADDR` | 512 | `ScreenXY` LUT: `[y] = y*S_SHR` |
 | `$02/8D00`–`$02/8EFF` | `ROW_BCK` | 512 | `BckXY` LUT: `[y] = y*S_BCK` |
 
-### Render / harness scratch
-
-| Address | Symbol | Notes |
-|---------|--------|-------|
-| `$02/8A00` | `R_X` | Screen / temp X |
-| `$02/8A02` | `R_Y` | Screen / temp Y |
-| `$02/8A04` | `R_TX` | Tile X |
-| `$02/8A06` | `R_TY` | Tile Y |
-| `$02/8A08` | `R_TILE` | Tile code |
-| `$02/8A0A` | `R_OFF` | Byte offset / mul scratch |
-| `$02/8A0C` | `R_DEST` | SHR offset (`ROW_ADDR[Y]+X/2`) |
-| `$02/8A0E` | `R_ROW` | Row counter |
-| `$02/8A10` | `R_IDX` | Sprite index |
-| `$02/8A12` | `R_CARRY` | Nibble / mul scratch |
-| `$02/8A14` | `R_TMP` | General temp |
-| `$02/8A16` | `R_ACT` | Actor index |
-| `$02/8A18` | `R_BASE` | Actor base (`ACTORS16+…`) |
-| `$02/8A1A` | `R_SAVE` | Scratch |
-| `$02/8A1C` | `R_BODY` | Body pen for remap |
-| `$02/8A1E` | `R_BTMP` | Blit temp |
-| `$02/8A20` | `R_BDEST` | BCK offset (`ROW_BCK[Y]+(X-72)/2`) |
-| `$02/8A22`–`$02/8AFF` | — | Free (Y-sort keys live in high DP) |
+| `$02/8A00`–`$02/8AFF` | — | — | Free (was `R_*`; scratch moved to low DP) |
 
 `BANK2` = `$020000` (long base for `,x` with 16-bit offset).  
 `ACTORS16` = `$8400`.

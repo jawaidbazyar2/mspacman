@@ -8,34 +8,35 @@ table indexed by:
   index = color_slot*16 + (ACT_SPR & 7)*2 + (X & 1)
   color_slot = (ACT_COLOR - 5) / 2   ; 5,7,9,11 → 0..3
 
-Transparent mask bytes are omitted; $FF mask uses lda #imm / sta; partial
-mask uses and/ora.
+Transparent mask bytes are omitted; adjacent opaque bytes are coalesced into
+16-bit ops by py/blit_emit.py.
 
 Usage:
   python3 py/gen_compiled_ghosts.py
   python3 py/gen_compiled_ghosts.py --gfx build/gfx -o iigs/compiled_ghosts.s
+  python3 py/gen_compiled_ghosts.py --no-word16    # 8-bit only, for A/B
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from blit_emit import BlitStats, check_equivalence, emit_blit  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_GFX = ROOT / "build" / "gfx"
 DEFAULT_OUT = ROOT / "iigs" / "compiled_ghosts.s"
 
 SPR_BYTES = 84
-ROWS = 12
-COLS = 7
 BODY_PEN = 6
 # color_slot 0..3
 COLORS = (5, 7, 9, 11)  # Blinky, Pinky, Inky, Clyde
 COLOR_NAMES = ("Blinky", "Pinky", "Inky", "Clyde")
 GHOST_BASE = 0x20
 NFRAMES = 8  # $20..$27
-SHR_BASE = 0x2000
-ROW_BYTES = 160
 
 
 def remap_body_byte(b: int, body: int) -> int:
@@ -56,40 +57,16 @@ def load_sheet(path: Path) -> bytes:
     return data
 
 
-def emit_blit(label: str, spr: bytes, msk: bytes) -> tuple[list[str], int, int]:
-    """Return (lines, full_replaces, partial_blits)."""
-    lines = [
-        label,
-        "\tphp",
-        "\tsep\t#$20",
-    ]
-    full = partial = 0
-    for row in range(ROWS):
-        for col in range(COLS):
-            i = row * COLS + col
-            m = msk[i]
-            if m == 0:
-                continue
-            addr = SHR_BASE + row * ROW_BYTES + col
-            s = spr[i] & m
-            if m == 0xFF:
-                lines.append(f"\tlda\t#${s:02X}")
-                lines.append(f"\tsta\t${addr:04X},y")
-                full += 1
-            else:
-                lines.append(f"\tlda\t${addr:04X},y")
-                lines.append(f"\tand\t#${m ^ 0xFF:02X}")
-                lines.append(f"\tora\t#${s:02X}")
-                lines.append(f"\tsta\t${addr:04X},y")
-                partial += 1
-    lines += ["\tplp", "\trts", ""]
-    return lines, full, partial
-
-
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--gfx", type=Path, default=DEFAULT_GFX)
     ap.add_argument("-o", "--out", type=Path, default=DEFAULT_OUT)
+    ap.add_argument(
+        "--no-word16",
+        dest="word16",
+        action="store_false",
+        help="emit 8-bit ops only (pre-optimization output, for A/B)",
+    )
     args = ap.parse_args()
 
     spr_e = load_sheet(args.gfx / "sprites14x12.bin")
@@ -124,7 +101,7 @@ def main() -> int:
                 )
 
     lines.append("")
-    total_full = total_part = 0
+    stats = BlitStats()
     body_lines: list[str] = []
 
     for ci, pen in enumerate(COLORS):
@@ -141,10 +118,11 @@ def main() -> int:
                 raw = spr_sheet[base : base + SPR_BYTES]
                 msk = msk_sheet[base : base + SPR_BYTES]
                 colored = bytes(remap_body_byte(b, pen) for b in raw)
-                blit, full, part = emit_blit(lab, colored, msk)
-                body_lines.extend(blit)
-                total_full += full
-                total_part += part
+                if args.word16:
+                    check_equivalence(colored, msk)
+                body_lines.extend(
+                    emit_blit(lab, colored, msk, stats, word16=args.word16)
+                )
 
     lines.extend(body_lines)
     # Restore assemble-time MX after sep #$20 routines
@@ -154,9 +132,7 @@ def main() -> int:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text("\n".join(lines) + "\n", encoding="ascii")
     n = len(labels)
-    print(
-        f"wrote {args.out} ({n} blits, {total_full} solid + {total_part} partial byte ops)"
-    )
+    print(f"wrote {args.out} ({n} blits, {stats})")
     return 0
 
 

@@ -2,23 +2,27 @@
 * Tile / sprite render (included from all.s)
 *
 
-R_X            equ $028A00
-R_Y            equ $028A02
-R_TX           equ $028A04
-R_TY           equ $028A06
-R_TILE         equ $028A08
-R_OFF          equ $028A0A
-R_DEST         equ $028A0C
-R_ROW          equ $028A0E
-R_IDX          equ $028A10
-R_CARRY        equ $028A12
-R_TMP          equ $028A14
-R_ACT          equ $028A16
-R_BASE         equ $028A18
-R_SAVE         equ $028A1A
-R_BODY         equ $028A1C	; ACT_COLOR nibble for RemapBodyByte
-R_BTMP         equ $028A1E
-R_BDEST        equ $028A20	; BCK strip offset (BckXY)
+* Render scratch in low DP (DP=$0000, set once by tcd in all.s). DP is always
+* bank $00, so these stay reachable across the DBR=$01 switch in the blits —
+* and cost 4 cycles / 2 bytes instead of the 6 / 4 of a long access to $02.
+* Always write these with an explicit `<`.
+R_X            equ $10
+R_Y            equ $12
+R_TX           equ $14
+R_TY           equ $16
+R_TILE         equ $18
+R_OFF          equ $1A
+R_DEST         equ $1C
+R_ROW          equ $1E
+R_IDX          equ $20
+R_CARRY        equ $22
+R_TMP          equ $24
+R_ACT          equ $26
+R_BASE         equ $28
+R_SAVE         equ $2A
+R_BODY         equ $2C		; ACT_COLOR nibble for RemapBodyByte
+R_BTMP         equ $2E
+R_BDEST        equ $30		; BCK strip offset (BckXY)
 * High DP (DP=$0000): Y-sort keys — actor records are never moved
 DP_KEYI        equ $EA		; insertion: actor index being placed
 DP_KEYY        equ $EB		; insertion: its Y
@@ -49,40 +53,40 @@ CopyMaze
 	rts
 
 Mul84
-	sta	>R_TMP
+	sta	<R_TMP
 	asl
 	asl
-	sta	>R_OFF
-	lda	>R_TMP
-	asl
-	asl
-	asl
-	asl
-	clc
-	adc	>R_OFF
-	sta	>R_OFF
-	lda	>R_TMP
-	asl
-	asl
+	sta	<R_OFF
+	lda	<R_TMP
 	asl
 	asl
 	asl
 	asl
 	clc
-	adc	>R_OFF
+	adc	<R_OFF
+	sta	<R_OFF
+	lda	<R_TMP
+	asl
+	asl
+	asl
+	asl
+	asl
+	asl
+	clc
+	adc	<R_OFF
 	rts
 
 Mul18
-	sta	>R_TMP
+	sta	<R_TMP
 	asl
-	sta	>R_OFF
-	lda	>R_TMP
+	sta	<R_OFF
+	lda	<R_TMP
 	asl
 	asl
 	asl
 	asl
 	clc
-	adc	>R_OFF
+	adc	<R_OFF
 	rts
 
 InitRowAddr
@@ -112,59 +116,59 @@ InitRowAddr
 
 ScreenXY
 * R_DEST = ROW_ADDR[Y] + X/2. Long,X: DBR may be $01 during blit.
-	lda	>R_Y
+	lda	<R_Y
 	and	#$00FF
 	asl
 	tax
 	lda	>ROW_ADDR,x
-	sta	>R_DEST
-	lda	>R_X
+	sta	<R_DEST
+	lda	<R_X
 	lsr
 	clc
-	adc	>R_DEST
-	sta	>R_DEST
+	adc	<R_DEST
+	sta	<R_DEST
 	rts
 
 BckXY
 * R_BDEST = ROW_BCK[Y] + (X-BCK_ORIGIN_X)/2. Strip is S_BCK-wide @ $01/A000.
-	lda	>R_Y
+	lda	<R_Y
 	and	#$00FF
 	asl
 	tax
 	lda	>ROW_BCK,x
-	sta	>R_BDEST
-	lda	>R_X
+	sta	<R_BDEST
+	lda	<R_X
 	sec
 	sbc	#BCK_ORIGIN_X
 	lsr
 	clc
-	adc	>R_BDEST
-	sta	>R_BDEST
+	adc	<R_BDEST
+	sta	<R_BDEST
 	rts
 
 GenOddSprites
 	php
 	rep	#$30
 	lda	#0
-	sta	>R_IDX
-]spr	lda	>R_IDX
+	sta	<R_IDX
+]spr	lda	<R_IDX
 	jsr	Mul84
-	sta	>R_OFF
+	sta	<R_OFF
 	lda	#12
-	sta	>R_ROW
+	sta	<R_ROW
 ]row	jsr	ShiftOneRow
-	lda	>R_OFF
+	lda	<R_OFF
 	clc
 	adc	#7
-	sta	>R_OFF
-	lda	>R_ROW
+	sta	<R_OFF
+	lda	<R_ROW
 	dec
-	sta	>R_ROW
+	sta	<R_ROW
 	bne	]row
-	lda	>R_IDX
+	lda	<R_IDX
 	inc
-	sta	>R_IDX
-	lda	>R_IDX
+	sta	<R_IDX
+	lda	<R_IDX
 	cmp	#64
 	bcc	]spr
 	plp
@@ -173,60 +177,60 @@ GenOddSprites
 ShiftOneRow
 	php
 	rep	#$30			; 16-bit A/X to fetch offset
-	lda	>R_OFF
+	lda	<R_OFF
 	tax
 	sep	#$20			; 8-bit A for pixel work; X stays 16-bit
 	lda	#0
-	sta	>R_CARRY
+	sta	<R_CARRY
 	ldy	#7
 ]p	lda	>AST_SPR_EVEN,x
 	pha
-	lda	>R_CARRY
+	lda	<R_CARRY
 	asl
 	asl
 	asl
 	asl
-	sta	>R_TMP
+	sta	<R_TMP
 	pla
 	pha
 	lsr
 	lsr
 	lsr
 	lsr
-	ora	>R_TMP
+	ora	<R_TMP
 	sta	>AST_SPR_ODD,x
 	pla
 	and	#$0F
-	sta	>R_CARRY
+	sta	<R_CARRY
 	inx
 	dey
 	bne	]p
 	rep	#$20
-	lda	>R_OFF
+	lda	<R_OFF
 	tax
 	sep	#$20
 	lda	#0
-	sta	>R_CARRY
+	sta	<R_CARRY
 	ldy	#7
 ]m	lda	>AST_MSK_EVEN,x
 	pha
-	lda	>R_CARRY
+	lda	<R_CARRY
 	asl
 	asl
 	asl
 	asl
-	sta	>R_TMP
+	sta	<R_TMP
 	pla
 	pha
 	lsr
 	lsr
 	lsr
 	lsr
-	ora	>R_TMP
+	ora	<R_TMP
 	sta	>AST_MSK_ODD,x
 	pla
 	and	#$0F
-	sta	>R_CARRY
+	sta	<R_CARRY
 	inx
 	dey
 	bne	]m
@@ -242,45 +246,45 @@ DrawTile
 	pha
 	plb
 	rep	#$30
-	lda	>R_TX
+	lda	<R_TX
 	asl
 	clc
-	adc	>R_TX
+	adc	<R_TX
 	asl
 	clc
 	adc	#PF_ORIGIN_X
-	sta	>R_X
-	lda	>R_TY
+	sta	<R_X
+	lda	<R_TY
 	asl
 	clc
-	adc	>R_TY
+	adc	<R_TY
 	asl
 	clc
 	adc	#PF_ORIGIN_Y
-	sta	>R_Y
+	sta	<R_Y
 	jsr	ScreenXY
 	jsr	BckXY
-	lda	>R_TILE
+	lda	<R_TILE
 	and	#$00FF
 	jsr	Mul18
 	tax
 	lda	#6
-	sta	>R_ROW
-	lda	>R_DEST
+	sta	<R_ROW
+	lda	<R_DEST
 	tay
 * 3 bytes/row: word @0 then overlapped word @1. X=tile src, Y=SHR, R_BDEST=BCK.
 ]tr	lda	>AST_TILES,x
 	sta	$2000,y
-	sta	>R_BTMP
+	sta	<R_BTMP
 	lda	>AST_TILES+1,x
 	sta	$2001,y
-	sta	>R_TMP
+	sta	<R_TMP
 	phx
-	lda	>R_BDEST
+	lda	<R_BDEST
 	tax
-	lda	>R_BTMP
+	lda	<R_BTMP
 	sta	BCK_BASE,x
-	lda	>R_TMP
+	lda	<R_TMP
 	sta	BCK_BASE+1,x
 	plx
 	txa
@@ -291,13 +295,13 @@ DrawTile
 	clc
 	adc	#S_SHR
 	tay
-	lda	>R_BDEST
+	lda	<R_BDEST
 	clc
 	adc	#S_BCK
-	sta	>R_BDEST
-	lda	>R_ROW
+	sta	<R_BDEST
+	lda	<R_ROW
 	dec
-	sta	>R_ROW
+	sta	<R_ROW
 	bne	]tr
 	plb
 	plp
@@ -313,61 +317,61 @@ DrawMaze
 	plb
 	rep	#$30
 	lda	#0
-	sta	>R_TY
+	sta	<R_TY
 ]my	lda	#0
-	sta	>R_TX
-]mx	lda	>R_TX
+	sta	<R_TX
+]mx	lda	<R_TX
 	asl
 	clc
-	adc	>R_TX
+	adc	<R_TX
 	asl
 	clc
 	adc	#PF_ORIGIN_X
-	sta	>R_X
-	lda	>R_TY
+	sta	<R_X
+	lda	<R_TY
 	asl
 	clc
-	adc	>R_TY
+	adc	<R_TY
 	asl
 	clc
 	adc	#PF_ORIGIN_Y
-	sta	>R_Y
+	sta	<R_Y
 	jsr	ScreenXY
 	jsr	BckXY
-	lda	>R_TY
+	lda	<R_TY
 	asl
 	asl
 	asl
 	asl
 	asl
-	sta	>R_TMP
-	lda	>R_TY
+	sta	<R_TMP
+	lda	<R_TY
 	asl
 	asl
-	sta	>R_OFF
-	lda	>R_TMP
+	sta	<R_OFF
+	lda	<R_TMP
 	sec
-	sbc	>R_OFF
+	sbc	<R_OFF
 	clc
-	adc	>R_TX
+	adc	<R_TX
 	jsr	Mul18
 	tax
 	lda	#6
-	sta	>R_ROW
-	lda	>R_DEST
+	sta	<R_ROW
+	lda	<R_DEST
 	tay
 ]mc	lda	>AST_MAZE_CELLS,x
 	sta	$2000,y
-	sta	>R_BTMP
+	sta	<R_BTMP
 	lda	>AST_MAZE_CELLS+1,x
 	sta	$2001,y
-	sta	>R_TMP
+	sta	<R_TMP
 	phx
-	lda	>R_BDEST
+	lda	<R_BDEST
 	tax
-	lda	>R_BTMP
+	lda	<R_BTMP
 	sta	BCK_BASE,x
-	lda	>R_TMP
+	lda	<R_TMP
 	sta	BCK_BASE+1,x
 	plx
 	txa
@@ -378,25 +382,25 @@ DrawMaze
 	clc
 	adc	#S_SHR
 	tay
-	lda	>R_BDEST
+	lda	<R_BDEST
 	clc
 	adc	#S_BCK
-	sta	>R_BDEST
-	lda	>R_ROW
+	sta	<R_BDEST
+	lda	<R_ROW
 	dec
-	sta	>R_ROW
+	sta	<R_ROW
 	bne	]mc
-	lda	>R_TX
+	lda	<R_TX
 	inc
-	sta	>R_TX
-	lda	>R_TX
+	sta	<R_TX
+	lda	<R_TX
 	cmp	#28
 	bcs	:ny
 	brl	]mx
-:ny	lda	>R_TY
+:ny	lda	<R_TY
 	inc
-	sta	>R_TY
-	lda	>R_TY
+	sta	<R_TY
+	lda	<R_TY
 	cmp	#31
 	bcs	:mdone
 	brl	]my
@@ -446,8 +450,8 @@ SortActorsByY
 	tax
 	lda	<DP_SORT,x
 	sta	<DP_KEYI			; key index
-	tay
-	lda	<DP_YKEY,y
+	tax				; dp,X — 65816 has no LDA dp,Y
+	lda	<DP_YKEY,x
 	sta	<DP_KEYY			; key Y
 	lda	<DP_I
 	sta	<DP_J			; j = i
@@ -456,8 +460,8 @@ SortActorsByY
 	dec
 	tax				; X = j-1
 	lda	<DP_SORT,x
-	tay
-	lda	<DP_YKEY,y			; Y of SORT[j-1]
+	tax				; dp,X — 65816 has no LDA dp,Y
+	lda	<DP_YKEY,x			; Y of SORT[j-1]
 	cmp	<DP_KEYY
 	bcc	:place			; SORT[j-1].Y < key → done
 	beq	:place			; equal → stable
@@ -532,9 +536,9 @@ RefreshAllSprites
 	phx
 	rep	#$30
 	and	#$00FF
-	sta	>R_ACT
+	sta	<R_ACT
 	jsr	EraseSprite
-	lda	>R_ACT
+	lda	<R_ACT
 	jsr	DrawSprite
 	sep	#$30
 	plx
@@ -549,8 +553,8 @@ CopySpritePos
 	php
 	rep	#$30
 	lda	#0
-	sta	>R_ACT
-]c	lda	>R_ACT
+	sta	<R_ACT
+]c	lda	<R_ACT
 	asl
 	asl
 	asl
@@ -562,9 +566,9 @@ CopySpritePos
 	sta	>BANK2+ACT_OX,x
 	lda	>BANK2+ACT_Y,x
 	sta	>BANK2+ACT_OY,x
-	lda	>R_ACT
+	lda	<R_ACT
 	inc
-	sta	>R_ACT
+	sta	<R_ACT
 	cmp	#NUM_ACTORS
 	bcc	]c
 	plp
@@ -576,7 +580,7 @@ EraseSprite
 * Merlin parses a+b*c left-to-right — use decimal row offsets, not S_BCK*n.
 	php
 	rep	#$30
-	sta	>R_ACT
+	sta	<R_ACT
 	sep	#$20
 	lda	#BRD_ERASE
 	jsr	SetBorder
@@ -585,14 +589,14 @@ EraseSprite
 	pha
 	plb
 	rep	#$30
-	lda	>R_ACT
+	lda	<R_ACT
 	asl
 	asl
 	asl
 	asl
 	clc
 	adc	#ACTORS16
-	sta	>R_BASE
+	sta	<R_BASE
 	tax
 	lda	>BANK2+ACT_FLAGS,x
 	and	#$0001
@@ -600,11 +604,10 @@ EraseSprite
 	plb
 	plp
 	rts
-:er	lda	>BANK2+ACT_BDEST,x
-	sta	>R_BDEST
-	lda	>BANK2+ACT_DEST,x
+* X still holds the actor base, so read both cached offsets straight into Y/X.
+:er	lda	>BANK2+ACT_DEST,x
 	tay				; Y = SHR offset
-	lda	>R_BDEST
+	lda	>BANK2+ACT_BDEST,x
 	tax				; X = BCK offset
 * Unrolled 12×7. Row r offsets: BCK r*88+{0,2,4,5} / SHR r*160+…
 * Decimal only — Merlin a+b*c is left-to-right (breaks S_BCK*n).
@@ -704,7 +707,7 @@ EraseSprite
 	sta	|SHR_PIXELS+1764,y
 	lda	BCK_BASE+973,x
 	sta	|SHR_PIXELS+1765,y
-	lda	>R_BASE
+	lda	<R_BASE
 	tax
 	sep	#$20
 	lda	>BANK2+ACT_FLAGS,x
@@ -719,7 +722,7 @@ DrawSprite
 * Compiled blit; cache ACT_DEST/ACT_BDEST for next EraseSprite.
 	php
 	rep	#$30
-	sta	>R_ACT
+	sta	<R_ACT
 	sep	#$20
 	lda	#BRD_DRAW
 	jsr	SetBorder
@@ -728,28 +731,28 @@ DrawSprite
 	pha
 	plb
 	rep	#$30
-	lda	>R_ACT
+	lda	<R_ACT
 	asl
 	asl
 	asl
 	asl
 	clc
 	adc	#ACTORS16
-	sta	>R_BASE
+	sta	<R_BASE
 	tax
 	lda	>BANK2+ACT_X,x
-	sta	>R_X
+	sta	<R_X
 	lda	>BANK2+ACT_Y,x
-	sta	>R_Y
+	sta	<R_Y
 	jsr	ScreenXY
 	jsr	BckXY
-	lda	>R_ACT
+	lda	<R_ACT
 	cmp	#FRUIT_ACTOR
 	beq	:fruitBlit
 	cmp	#PAC_ACTOR
 	beq	:pacBlit
 * Ghost: index = color_slot*16 + (ACT_SPR&7)*2 + (X&1)
-	lda	>R_BASE
+	lda	<R_BASE
 	tax
 	lda	>BANK2+ACT_COLOR,x
 	and	#$00FF
@@ -761,60 +764,60 @@ DrawSprite
 	asl
 	asl
 	asl				; *16
-	sta	>R_TMP
+	sta	<R_TMP
 	lda	>BANK2+ACT_SPR,x
 	and	#$0007
 	asl				; frame*2
-	sta	>R_OFF
-	lda	>R_X
+	sta	<R_OFF
+	lda	<R_X
 	and	#$0001
-	ora	>R_OFF
-	ora	>R_TMP
+	ora	<R_OFF
+	ora	<R_TMP
 	asl				; word index
 	tax
-	lda	>R_DEST
+	lda	<R_DEST
 	tay
 	jsr	GhostBlitGo
 	bra	:blitDone
 :fruitBlit
 * Fruit: index = (ACT_SPR&7)*2 + (X&1)
-	lda	>R_BASE
+	lda	<R_BASE
 	tax
 	lda	>BANK2+ACT_SPR,x
 	and	#$0007
 	asl				; type*2
-	sta	>R_OFF
-	lda	>R_X
+	sta	<R_OFF
+	lda	<R_X
 	and	#$0001
-	ora	>R_OFF
+	ora	<R_OFF
 	asl				; word index
 	tax
-	lda	>R_DEST
+	lda	<R_DEST
 	tay
 	jsr	FruitBlitGo
 	bra	:blitDone
 :pacBlit
 * Ms. Pac: index = (ACT_SPR & $0F)*2 + (X&1); ACT_SPR = dir*3+mouth
-	lda	>R_BASE
+	lda	<R_BASE
 	tax
 	lda	>BANK2+ACT_SPR,x
 	and	#$000F
 	asl				; slot*2
-	sta	>R_OFF
-	lda	>R_X
+	sta	<R_OFF
+	lda	<R_X
 	and	#$0001
-	ora	>R_OFF
+	ora	<R_OFF
 	asl				; word index
 	tax
-	lda	>R_DEST
+	lda	<R_DEST
 	tay
 	jsr	MsPacBlitGo
 :blitDone
-	lda	>R_BASE
+	lda	<R_BASE
 	tax
-	lda	>R_DEST
+	lda	<R_DEST
 	sta	>BANK2+ACT_DEST,x
-	lda	>R_BDEST
+	lda	<R_BDEST
 	sta	>BANK2+ACT_BDEST,x
 	sep	#$20
 	lda	>BANK2+ACT_FLAGS,x
@@ -829,42 +832,42 @@ ApplyDirty
 	rep	#$30
 	lda	>DIRTY_COUNT
 	beq	:adone
-	sta	>R_ROW
+	sta	<R_ROW
 	ldx	#0
 ]ad	lda	>DIRTY_LIST,x
 	and	#$00FF
-	sta	>R_TX
+	sta	<R_TX
 	lda	>DIRTY_LIST+1,x
 	and	#$00FF
-	sta	>R_TY
+	sta	<R_TY
 	phx
-	lda	>R_TY
+	lda	<R_TY
 	asl
 	asl
 	asl
 	asl
 	asl
-	sta	>R_TMP
-	lda	>R_TY
+	sta	<R_TMP
+	lda	<R_TY
 	asl
 	asl
-	sta	>R_OFF
-	lda	>R_TMP
+	sta	<R_OFF
+	lda	<R_TMP
 	sec
-	sbc	>R_OFF
+	sbc	<R_OFF
 	clc
-	adc	>R_TX
+	adc	<R_TX
 	tax
 	lda	>TILEMAP,x
 	and	#$00FF
-	sta	>R_TILE
+	sta	<R_TILE
 	jsr	DrawTile
 	plx
 	inx
 	inx
-	lda	>R_ROW
+	lda	<R_ROW
 	dec
-	sta	>R_ROW
+	sta	<R_ROW
 	bne	]ad
 	lda	#0
 	sta	>DIRTY_COUNT
@@ -881,8 +884,8 @@ DirtyEatDemo
 	rts
 :doEat
 	lda	>EAT_INDEX
-	sta	>R_TMP
-]find	lda	>R_TMP
+	sta	<R_TMP
+]find	lda	<R_TMP
 	cmp	#868
 	bcc	:chk
 	plp
@@ -892,42 +895,42 @@ DirtyEatDemo
 	and	#$00FF
 	cmp	#$0010
 	beq	:eat
-	lda	>R_TMP
+	lda	<R_TMP
 	inc
-	sta	>R_TMP
+	sta	<R_TMP
 	bra	]find
 :eat	sep	#$20
 	lda	#$40
 	sta	>TILEMAP,x
 	rep	#$20
-	lda	>R_TMP
+	lda	<R_TMP
 	sta	>EAT_INDEX
 	lda	>EAT_INDEX
 	inc
 	sta	>EAT_INDEX
-	lda	>R_TMP
-	sta	>R_OFF
+	lda	<R_TMP
+	sta	<R_OFF
 	lda	#0
-	sta	>R_TY
-]div	lda	>R_OFF
+	sta	<R_TY
+]div	lda	<R_OFF
 	cmp	#28
 	bcc	:got
 	sec
 	sbc	#28
-	sta	>R_OFF
-	lda	>R_TY
+	sta	<R_OFF
+	lda	<R_TY
 	inc
-	sta	>R_TY
+	sta	<R_TY
 	bra	]div
-:got	lda	>R_OFF
-	sta	>R_TX
+:got	lda	<R_OFF
+	sta	<R_TX
 	lda	>DIRTY_COUNT
 	asl
 	tax
 	sep	#$20
-	lda	>R_TX
+	lda	<R_TX
 	sta	>DIRTY_LIST,x
-	lda	>R_TY
+	lda	<R_TY
 	sta	>DIRTY_LIST+1,x
 	rep	#$20
 	lda	>DIRTY_COUNT

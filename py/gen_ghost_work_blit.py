@@ -46,10 +46,10 @@ def main() -> int:
             lines.append(f"\tlda\t>BANK2+{MASK_OFF + o},x")
             lines.append("\teor\t#$FF")
             lines.append(f"\tand\t${abs_addr:04X},y")
-            lines.append("\tsta\t>R_TMP")
+            lines.append("\tsta\t<R_TMP")
             lines.append(f"\tlda\t>BANK2+{o},x")
             lines.append(f"\tand\t>BANK2+{MASK_OFF + o},x")
-            lines.append("\tora\t>R_TMP")
+            lines.append("\tora\t<R_TMP")
             lines.append(f"\tsta\t${abs_addr:04X},y")
     # Restore Merlin assemble-time MX: sep #$20 above would otherwise leave
     # following PUT files assembling 8-bit immediates (ADC #n eats the RTS).

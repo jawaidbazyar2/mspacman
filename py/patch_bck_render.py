@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Re-apply $01/A000 BCK strip port to iigs/render_body.s.
+"""SUPERSEDED — do not re-run. One-shot $01/A000 BCK strip port, already applied.
+
+iigs/render_body.s has moved on since this ran and is now hand-maintained:
+EraseSprite restores from the cached ACT_DEST / ACT_BDEST rather than
+recomputing from ACT_OX / ACT_OY, and the R_* scratch lives in direct page
+(`<R_xxx`), not at $02/8A00. Re-running would revert both. Kept only as a
+record of how the BCK strip port was made.
 
 Merlin parses a+b*c left-to-right, so EraseSprite uses decimal row
 offsets (r*88 / r*160), not S_BCK*n / S_SHR*n.
-
-Usage:
-  python3 py/patch_bck_render.py
 """
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -400,4 +404,9 @@ BckXY
 
 
 if __name__ == "__main__":
+    if "--i-know-this-is-superseded" not in sys.argv:
+        raise SystemExit(
+            "py/patch_bck_render.py is superseded and would revert "
+            "iigs/render_body.s — see the module docstring."
+        )
     main()

@@ -9,16 +9,23 @@ bits 7/6 are X/Y flip. Color bank #09 prebaked into §2 SHR pens.
   index = (dir*3 + mouth)*2 + (X & 1)  → MsPacBlitTable
   ACT_SPR = dir*3 + mouth  (0..11)
 
+Adjacent opaque bytes are coalesced into 16-bit ops by py/blit_emit.py.
+
 Usage:
   python3 py/gen_compiled_mspac.py
   python3 py/gen_compiled_mspac.py --sprites mspacman-orig/5f -o iigs/compiled_mspac.s
+  python3 py/gen_compiled_mspac.py --no-word16    # 8-bit only, for A/B
 """
 
 from __future__ import annotations
 
 import argparse
 import importlib.util
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from blit_emit import BlitStats, check_equivalence, emit_blit  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SPRITE_ROM = ROOT / "mspacman-orig" / "5f"
@@ -26,10 +33,6 @@ DEFAULT_COLOR_ROM = ROOT / "mspacman-orig" / "82s123.7f"
 DEFAULT_PALETTE_ROM = ROOT / "mspacman-orig" / "82s126.4a"
 DEFAULT_OUT = ROOT / "iigs" / "compiled_mspac.s"
 
-ROWS = 12
-COLS = 7
-SHR_BASE = 0x2000
-ROW_BYTES = 160
 COLOR_BANK = 0x09
 
 # (dir, mouth, rom_index, h_flip, v_flip, label)
@@ -102,35 +105,6 @@ def flip_h(img: list[list[int]]) -> list[list[int]]:
     return [row[::-1] for row in img]
 
 
-def emit_blit(label: str, spr: bytes, msk: bytes) -> tuple[list[str], int, int]:
-    lines = [
-        label,
-        "\tphp",
-        "\tsep\t#$20",
-    ]
-    full = partial = 0
-    for row in range(ROWS):
-        for col in range(COLS):
-            i = row * COLS + col
-            m = msk[i]
-            if m == 0:
-                continue
-            addr = SHR_BASE + row * ROW_BYTES + col
-            s = spr[i] & m
-            if m == 0xFF:
-                lines.append(f"\tlda\t#${s:02X}")
-                lines.append(f"\tsta\t${addr:04X},y")
-                full += 1
-            else:
-                lines.append(f"\tlda\t${addr:04X},y")
-                lines.append(f"\tand\t#${m ^ 0xFF:02X}")
-                lines.append(f"\tora\t#${s:02X}")
-                lines.append(f"\tsta\t${addr:04X},y")
-                partial += 1
-    lines += ["\tplp", "\trts", ""]
-    return lines, full, partial
-
-
 def build_cell(gfx, rom: bytes, spr_code: int, h_flip: bool, v_flip: bool, shr_map):
     raw = gfx.decode_sprite(rom, spr_code)
     art = gfx.subsample_symmetric(gfx.upright_sprite(raw), gfx._SPR_SCALE_IDX)
@@ -154,6 +128,12 @@ def main() -> int:
     ap.add_argument("--color-rom", type=Path, default=DEFAULT_COLOR_ROM)
     ap.add_argument("--palette-rom", type=Path, default=DEFAULT_PALETTE_ROM)
     ap.add_argument("-o", "--out", type=Path, default=DEFAULT_OUT)
+    ap.add_argument(
+        "--no-word16",
+        dest="word16",
+        action="store_false",
+        help="emit 8-bit ops only (pre-optimization output, for A/B)",
+    )
     args = ap.parse_args()
 
     if not args.sprites.is_file():
@@ -191,7 +171,7 @@ def main() -> int:
 
     lines.append("")
     body: list[str] = []
-    total_full = total_part = 0
+    stats = BlitStats()
 
     for dir_, mouth, spr_code, h_flip, v_flip, name in FRAMES:
         even_s, even_m, odd_s, odd_m = build_cell(
@@ -199,10 +179,9 @@ def main() -> int:
         )
         for tag, spr, msk in (("E", even_s, even_m), ("O", odd_s, odd_m)):
             lab = f"MP{dir_}{mouth}_{tag}"
-            blit, full, part = emit_blit(lab, spr, msk)
-            body.extend(blit)
-            total_full += full
-            total_part += part
+            if args.word16:
+                check_equivalence(bytes(spr), msk)
+            body.extend(emit_blit(lab, bytes(spr), msk, stats, word16=args.word16))
             flips = ("", "H", "V", "HV")[int(h_flip) + 2 * int(v_flip)]
             print(
                 f"  {lab}: {name} spr=${spr_code:02X}"
@@ -215,10 +194,7 @@ def main() -> int:
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text("\n".join(lines) + "\n", encoding="ascii")
-    print(
-        f"wrote {args.out} ({len(labels)} blits, "
-        f"{total_full} solid + {total_part} partial byte ops)"
-    )
+    print(f"wrote {args.out} ({len(labels)} blits, {stats})")
     return 0
 
 
