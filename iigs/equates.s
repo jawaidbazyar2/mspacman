@@ -111,12 +111,14 @@ ROW_BCK        equ $028D00	; 256 words: Y → Y*S_BCK (BckXY)
 ACT_SIZE       equ 16
 ACT_X          equ 0		; new X (rails write; DrawSprite reads)
 ACT_Y          equ 2		; new Y
-ACT_OX         equ 4		; old X (last drawn; EraseSprite reads)
-ACT_OY         equ 6		; old Y
+ACT_OX         equ 4		; old X (CopySpritePos / Y-sort)
+ACT_OY         equ 6		; old Y (Y-sort before WaitVBL)
 ACT_SPR        equ 8
 ACT_FLAGS      equ 9
 ACT_WP         equ 10		; waypoint index into RailPath (byte)
 ACT_COLOR      equ 11		; SHR pen for body (replaces marker pen 6)
+ACT_DEST       equ 12		; SHR offset cached at DrawSprite
+ACT_BDEST      equ 14		; BCK offset cached at DrawSprite (EraseSprite)
 FLAG_DRAWN     equ $01
 
 * Ghost body pens (palette slots from gen_palette color-ROM fill)

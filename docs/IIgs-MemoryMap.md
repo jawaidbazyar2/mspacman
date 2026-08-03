@@ -100,13 +100,14 @@ Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 |-----|--------|------|------------|-----------|
 | +0 | `ACT_X` | word | rails / logic (**new**) | `DrawSprite` |
 | +2 | `ACT_Y` | word | rails / logic (**new**) | `DrawSprite` |
-| +4 | `ACT_OX` | word | `CopySpritePos` / init (**old**) | `EraseSprite` |
-| +6 | `ACT_OY` | word | `CopySpritePos` / init (**old**) | `EraseSprite` |
+| +4 | `ACT_OX` | word | `CopySpritePos` / init (**old**) | Y-sort (`ACT_OY` path) |
+| +6 | `ACT_OY` | word | `CopySpritePos` / init (**old**) | Y-sort before `WaitVBL` |
 | +8 | `ACT_SPR` | byte | rails / fruit / pac (ghost `$20–$27`, fruit `$00–$07`, Ms. Pac `dir*3+mouth`) | `DrawSprite` → ghost/fruit/MsPac blit table |
 | +9 | `ACT_FLAGS` | byte | render (`FLAG_DRAWN`) | render |
 | +10 | `ACT_WP` | byte | rails (waypoint index; ghosts + Ms. Pac) | rails only |
 | +11 | `ACT_COLOR` | byte | init (ghost body pen 5/7/9/11; unused for fruit/Ms. Pac) | `DrawSprite` → `GhostBlitTable` |
-| +12…15 | — | — | reserved | — |
+| +12 | `ACT_DEST` | word | `DrawSprite` (SHR offset) | `EraseSprite` |
+| +14 | `ACT_BDEST` | word | `DrawSprite` (BCK offset) | `EraseSprite` |
 
 ### Frame / dirty / demo control
 
@@ -172,7 +173,8 @@ Host writes these before `CALL 768`. Packed 4bpp; already upright (CW + row XOR 
 | Region | Publisher | Consumer |
 |--------|-----------|----------|
 | `ACT_X`/`ACT_Y` (new) | Rails / game logic | Draw |
-| `ACT_OX`/`ACT_OY` (old) | `CopySpritePos` after draw | Erase |
+| `ACT_OX`/`ACT_OY` (old) | `CopySpritePos` after draw | Y-sort |
+| `ACT_DEST`/`ACT_BDEST` | `DrawSprite` | `EraseSprite` |
 | `ACT_SPR` / `ACT_COLOR` | Rails / init | `DrawSprite` (compiled `GhostBlitGo` / `FruitBlitGo` / `MsPacBlitGo`) |
 | `ACT_WP` | Rails | Rails only |
 | `ACT_FLAGS` | Render | Render |

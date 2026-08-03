@@ -571,7 +571,7 @@ CopySpritePos
 	rts
 
 EraseSprite
-* A = actor index. Position from ACT_OX/OY (old).
+* A = actor index. Restore at last DrawSprite pose (ACT_DEST / ACT_BDEST).
 * Restore 14×12: abs,X load BCK (S_BCK) → abs,Y store SHR (S_SHR), DBR=$01.
 * Merlin parses a+b*c left-to-right — use decimal row offsets, not S_BCK*n.
 	php
@@ -600,16 +600,12 @@ EraseSprite
 	plb
 	plp
 	rts
-:er	lda	>BANK2+ACT_OX,x
-	sta	>R_X
-	lda	>BANK2+ACT_OY,x
-	sta	>R_Y
-	jsr	ScreenXY
-	jsr	BckXY
+:er	lda	>BANK2+ACT_BDEST,x
+	sta	>R_BDEST
+	lda	>BANK2+ACT_DEST,x
+	tay				; Y = SHR offset
 	lda	>R_BDEST
-	tax
-	lda	>R_DEST
-	tay
+	tax				; X = BCK offset
 * Unrolled 12×7. Row r offsets: BCK r*88+{0,2,4,5} / SHR r*160+…
 * Decimal only — Merlin a+b*c is left-to-right (breaks S_BCK*n).
 	lda	BCK_BASE+0,x
@@ -720,7 +716,7 @@ EraseSprite
 
 DrawSprite
 * A = actor index — must save before PHB bank switch clobbers it
-* Compiled ghost / fruit / Ms. Pac blit only (no save-under; erase uses BCK).
+* Compiled blit; cache ACT_DEST/ACT_BDEST for next EraseSprite.
 	php
 	rep	#$30
 	sta	>R_ACT
@@ -746,6 +742,7 @@ DrawSprite
 	lda	>BANK2+ACT_Y,x
 	sta	>R_Y
 	jsr	ScreenXY
+	jsr	BckXY
 	lda	>R_ACT
 	cmp	#FRUIT_ACTOR
 	beq	:fruitBlit
@@ -815,6 +812,10 @@ DrawSprite
 :blitDone
 	lda	>R_BASE
 	tax
+	lda	>R_DEST
+	sta	>BANK2+ACT_DEST,x
+	lda	>R_BDEST
+	sta	>BANK2+ACT_BDEST,x
 	sep	#$20
 	lda	>BANK2+ACT_FLAGS,x
 	ora	#$01
