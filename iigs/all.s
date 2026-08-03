@@ -35,7 +35,12 @@ Start
 	sta	>DEMO_FREEZE
 	jsr	InitActors
 	jsr	DrawMaze
-	jsr	DrawAllSprites		; new (== old at start); fills DP_SORT
+	jsr	InitHUD
+	jsr	DrawSideHUD		; gutters: 1UP / HIGH SCORE / lives / fruit
+	rep	#$30
+	lda	#ACT_OY
+	jsr	SortActorsByY		; DP_SORT for first draw (+ next erase)
+	jsr	DrawAllSprites		; new (== old at start)
 	jsr	CopySpritePos
 	lda	#0
 	sta	>FRAME_COUNT
@@ -46,7 +51,11 @@ Start
 	jsr	WaitVBL			; sync before first erase/draw
 
 MainLoop
-* refresh → old←new → move → sort(next) → WaitVBL
+* erase(old) → dirty → draw(new) → old←new → move → sort → WaitVBL
+* Dirty tiles (eaten dots) must land between erase and draw: erase restores the
+* BCK strip, so the pellet has to be gone from BCK before the next erase.
+* One Y-sort after rails (by ACT_OY) feeds next erase+draw — no re-sort before
+* draw (≤1px/frame; teleports are horizontal). Yellow sits before VBL slack.
 * Border color = phase profiler (see BRD_* in equates.s).
 	sep	#$20
 	lda	>KBD
@@ -60,7 +69,9 @@ MainLoop
 	and	#$00FF
 	bne	:frozen
 	rep	#$30
-	jsr	RefreshAllSprites	; erase/draw set BRD_ERASE / BRD_DRAW
+	jsr	EraseAllSprites		; erase/draw set BRD_ERASE / BRD_DRAW
+	jsr	ApplyDirty		; eaten dots → SHR + BCK
+	jsr	DrawAllSprites
 	sep	#$20
 	lda	#BRD_COPY
 	jsr	SetBorder
@@ -74,10 +85,12 @@ MainLoop
 	lda	>FRAME_COUNT
 	inc
 	sta	>FRAME_COUNT
+	jsr	EatDotsAtPac		; tile under Ms. Pac → TILEMAP + dirty list
+	jsr	DemoScoreTick		; +10 every SCORE_PERIOD frames
 	jsr	AdvanceFruit		; cycle fruit type every FRUIT_PERIOD
 	jsr	BlinkPowerPills		; palette pen 14 on/off (arcade #0A)
 	lda	#ACT_OY
-	jsr	SortActorsByY		; yellow; order for next refresh
+	jsr	SortActorsByY		; yellow; order for next erase+draw
 	jsr	WaitVBL			; border black while waiting
 	bra	MainLoop
 :frozen	sep	#$20
@@ -108,6 +121,7 @@ ExitDemo
 	put	compiled_mspac.s
 	mx	%00			; mspac blits end mid-sep; restore before harness
 	put	harness_body.s
+	put	hud_body.s
 	put	rails_data.s
 * Palette data last so it is not accidentally DP-addressed if |abs is missed
 	put	palette_data.s

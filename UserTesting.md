@@ -60,8 +60,10 @@ PYTHONPATH=$HOME/src/gssquared/clients/python/src \
 
 - Maze 1 in SHR 320×200 (pink/red walls, pellets).  
 - Four ghosts on a shared waypoint loop: **red / pink / cyan / orange**, spaced around the path.  
-- Smooth refresh (erase+draw by Y) → commit → rails (move is outside the blit hole).  
+- Erase-all → dirty tiles → draw-all by Y → commit → rails (move is outside the blit hole).  
 - Ghost draw uses **compiled** 65816 blits (`compiled_ghosts.s`); eyes/walk anim via `ACT_SPR` only.  
+- **Side HUD:** `1UP` + score over three Ms. Pac life icons (left), `HIGH SCORE` + `10000` over the level fruit (right). Score climbs by 10 every 300 frames (~5 s); beating the high score copies it across.  
+- Ms. Pac clears pellets as she goes, leaving a black trail behind her — they must not flicker back in on the next erase.  
 - **Border color = phase profiler** (width of each color ≈ time in that phase):
 
 | Border | Phase |
@@ -69,12 +71,19 @@ PYTHONPATH=$HOME/src/gssquared/clients/python/src \
 | Purple | `EraseSprite` (each actor erase) |
 | Green | `DrawSprite` (each actor draw) |
 | Light blue | `CopySpritePos` |
-| Orange | `AdvanceRails` |
-| Yellow | `SortActorsByY` (order for next frame; before VBL) |
+| Orange | `AdvanceRails` (+ eat/score/fruit/blink) |
+| Yellow | `SortActorsByY` (once; order for next erase+draw) |
 | Black | `WaitVBL` slack — **no black ⇒ work fills the frame** |
 | White | `DEMO_FREEZE` (host capture) |
 
-Order in time: purple/green toggle → light blue → orange → yellow → **black** → (repeat). Sort runs before `WaitVBL` so purple starts at blank.
+Order in time: purple ×6 → green ×6 → light blue → orange → yellow → **black** → (repeat).
+
+State check without eyeballing pixels (score, high score, lives, level, dots eaten):
+
+```bash
+PYTHONPATH=$HOME/src/gssquared/clients/python/src \
+  python3 py/gs2_probe_hud.py --run-seconds 14
+```
 
 ## Useful flags
 

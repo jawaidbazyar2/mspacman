@@ -68,7 +68,8 @@ instead of 6 / 4. Always spell these with an explicit `<`.
 | `$2C` | `R_BODY` | Body pen for remap |
 | `$2E` | `R_BTMP` | Blit temp |
 | `$30` | `R_BDEST` | BCK offset (`ROW_BCK[Y]+(X-72)/2`) |
-| `$32`–`$E9` | — | Free |
+| `$32` | `R_PEN` | HUD glyph ink pen (`BlitTileAbs`) |
+| `$34`–`$E9` | — | Free |
 
 High DP holds the Y-order key arrays (actor records are not moved):
 
@@ -148,7 +149,12 @@ Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | `$02/8900` | `FRAME_COUNT` | 2 | Frame counter |
 | `$02/8902` | `EAT_INDEX` | 2 | Dirty-eat demo cursor |
 | `$02/8904` | `DEMO_FREEZE` | 1 | Host≠0 → skip erase/draw/rails |
-| `$02/8905`–`$02/89FF` | — | — | Free |
+| `$02/8906` | `POWER_FLASH_CNT` | 1 | `BlinkPowerPills` period counter |
+| `$02/8908`–`$02/890A` | `SCORE_LO/MID/HI` | 3 | P1 score, BCD lo/mid/hi (arcade `#4E80`) |
+| `$02/890B`–`$02/890D` | `HISCORE_LO/MID/HI` | 3 | High score, BCD (arcade `#4E88`) |
+| `$02/890E` | `LIVES` | 1 | Lives shown in HUD (arcade `#4E15`) |
+| `$02/890F` | `LEVEL` | 1 | Level number, 0 = cherry (arcade `#4E13`) |
+| `$02/8910`–`$02/89FF` | — | — | Free |
 | `$02/8B00`–`$02/8CFF` | `ROW_ADDR` | 512 | `ScreenXY` LUT: `[y] = y*S_SHR` |
 | `$02/8D00`–`$02/8EFF` | `ROW_BCK` | 512 | `BckXY` LUT: `[y] = y*S_BCK` |
 

@@ -120,7 +120,8 @@ $(IIGS_BIN): $(IIGS_DIR)/link.s $(IIGS_DIR)/all.s $(IIGS_DIR)/equates.s \
 		$(IIGS_DIR)/shr_body.s $(IIGS_DIR)/render_body.s \
 		$(IIGS_DIR)/compiled_ghosts.s $(IIGS_DIR)/compiled_fruits.s \
 		$(IIGS_DIR)/compiled_mspac.s \
-		$(IIGS_DIR)/harness_body.s $(IIGS_DIR)/rails_data.s \
+		$(IIGS_DIR)/harness_body.s $(IIGS_DIR)/hud_body.s \
+		$(IIGS_DIR)/rails_data.s \
 		$(IIGS_DIR)/palette_data.s \
 		$(MERLIN32) | $(IIGS_BUILD)
 	cd $(IIGS_DIR) && $(MERLIN32) -V $(MERLIN_LIB) link.s || test -f harness.bin

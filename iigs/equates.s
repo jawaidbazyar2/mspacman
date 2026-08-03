@@ -22,7 +22,7 @@ BRD_ERASE      equ $03		; purple — EraseSprite entry
 BRD_DRAW       equ $0C		; green — DrawSprite entry
 BRD_COPY       equ $07		; light blue — CopySpritePos
 BRD_RAILS      equ $09		; orange — AdvanceRails
-BRD_SORT       equ $0D		; yellow — SortActorsByY (before WaitVBL)
+BRD_SORT       equ $0D		; yellow — SortActorsByY (after rails, before WaitVBL)
 BRD_VBL        equ $00		; black — WaitVBL slack (absent ⇒ no headroom / possible miss)
 BRD_FREEZE     equ $0F		; white — DEMO_FREEZE spin
 
@@ -83,6 +83,11 @@ PAC_RAIL_START equ 24		; Ms. Pac rail waypoint (mid-path visibility)
 NUM_TILES      equ 256
 TILE_BYTES_ROW equ 3
 TILE_BYTES     equ 18
+* Arcade tile codes (py/gen_maze1.py + listing "PACMAN TILE CODES")
+TILE_DOT       equ $10
+TILE_POWER     equ $14
+TILE_EMPTY     equ $40		; also the space glyph ($40-$5B = space + ASCII)
+TILE_DIGIT0    equ $00		; score digits $00-$09
 
 AST_TILES      equ $030000
 AST_SPR_EVEN   equ $031200
@@ -107,6 +112,19 @@ EAT_INDEX      equ $028902
 DEMO_FREEZE    equ $028904	; nonzero → MainLoop skips erase/rails/draw
 POWER_FLASH_CNT equ $028906	; byte; BlinkPowerPills period counter
 POWER_FLASH_PERIOD equ 10	; arcade #4DCF / #0A
+* HUD game state. Scores are 3 BCD bytes lo/mid/hi like arcade #4E80/#4E88:
+* value = hi*10000 + mid*100 + lo. Lives / level mirror #4E15 / #4E13.
+SCORE_LO       equ $028908
+SCORE_MID      equ $028909
+SCORE_HI       equ $02890A
+HISCORE_LO     equ $02890B
+HISCORE_MID    equ $02890C
+HISCORE_HI     equ $02890D
+LIVES          equ $02890E
+LEVEL          equ $02890F	; 0 = cherry (arcade level_number)
+* Low 16 of the score bytes, for >BANK2,x reads (same idiom as ACTORS16)
+SCORE16        equ $8908
+HISCORE16      equ $890B
 ROW_ADDR       equ $028B00	; 256 words: Y → Y*S_SHR (ScreenXY)
 ROW_BCK        equ $028D00	; 256 words: Y → Y*S_BCK (BckXY)
 
@@ -130,3 +148,28 @@ COL_INKY       equ 9		; cyan
 COL_CLYDE      equ 11		; orange
 COL_POWER      equ 14		; energizer fade (palette poke only)
 BODY_PEN       equ 6		; marker in sprite assets
+COL_DIGIT      equ 13		; yellow ink for HUD glyphs (tile art is pen 3)
+
+* Side HUD — the 76px gutters either side of the 168px playfield (§1 design).
+* Glyphs are 6×6 tiles blitted at absolute screen XY (SHR only: sprites never
+* reach the gutters, so the BCK strip needs no HUD copy). X must stay even.
+HUD_GLYPH_W    equ 6		; glyph advance = tile width
+HUD_SCORE_DIGITS equ 6		; 3 BCD bytes × 2 digits
+HUD_BLANK_LEAD equ 4		; leading zeros blanked (arcade j_2ace C=#04)
+HUD_1UP_X      equ 8
+HUD_1UP_Y      equ 4
+HUD_SCORE_X    equ 8
+HUD_SCORE_Y    equ 12
+HUD_LIVES_X    equ 8
+HUD_LIVES_Y    equ 40
+HUD_LIVES_DX   equ 14		; one sprite cell per life icon
+HUD_HS_LABEL_X equ 248
+HUD_HS_LABEL_Y equ 4
+HUD_HISCORE_X  equ 248
+HUD_HISCORE_Y  equ 12
+HUD_FRUIT_X    equ 252
+HUD_FRUIT_Y    equ 28
+MSPAC_LIFE_SPR equ 7		; dir W, mouth nearly shut ($2D+H) — HUD life icon
+MAX_FRUIT_TYPE equ 7		; arcade j_8793 clamps level fruit at banana
+START_LIVES    equ 3
+SCORE_PERIOD   equ 300		; demo: +10 points every 300 frames

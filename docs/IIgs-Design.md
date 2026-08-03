@@ -11,6 +11,7 @@ Design notes for porting arcade Ms. Pac-Man (`mspacmab`) to the Apple IIgs. This
 | §3.1 Frame loop & VBL | **Locked (v1)** |
 | §3.2 Graphics asset pipeline | **Locked (v1)** |
 | §3.3 Render harness (Merlin32) | **Scaffolding live** |
+| §3.4 Side HUD | **Live (v1)** — chrome, scores, lives, level fruit |
 | §4 Input | **Locked (v1 keyboard)** |
 | §5 Sound | TBD |
 | §6 CPU / memory model | **Harness map locked (v1)** |
@@ -158,7 +159,7 @@ Arcade graphics are **2bpp**: each pixel is palette-bank pen 0–3. At runtime t
 | Ghosts `$20–$27` | Sprite color `#01/#03/#05/#07` (body) + eyes | Eye white → pen 1; pupil → pen 15; body → pens **5/7/9/11** (`COL_*`); compiled blits bake body color |
 | Frightened `#11`/`#12` | Blue / flash banks | Prebake or swap body pens to the matching PROM RGBs already in the table |
 | Moving fruit `$00–$07` | Ms. Pac table `#879D` (sprite + color bank) | Even/odd compiled blits with **all four bank pens resolved to SHR indices** (no runtime recolor) |
-| HUD fruit strip | Tile bases `#90+` + colors at `#3B08` (max **7** icons; tiles, not actors) | Precolored HUD bitmaps / tile blits from the same RGB→pen map |
+| HUD level fruit | Arcade uses tile bases `#90+` + colors at `#3B08` (max **7** icons) | v1 draws the current level's fruit with the same compiled actor blit (§3.4); the 7-icon strip would need precolored HUD tiles |
 | Ms. Pac | Yellow bank `#09` (and related) | Prebake yellow / red / blue accents onto pens **13** / **5** / **15** etc. |
 
 Harness today still uses a partial pack (`gen_palette.py` maze `#1D` in 0–3 + color-ROM 0–11 in 4–15, omitting green/teal). That is demo scaffolding. The **target** is: one fixed RGB→pen map covering all 12 chromatic colors; generators emit correct indices; runtime almost never remaps pixels.
@@ -240,7 +241,7 @@ Do **not** model the four power pills as soft sprites on the IIgs. Keep the soft
 | Maze | 28×31 × 8×8 | 28×31 × **6×6** → 168×186 playfield |
 | Actors | 6 × 16×16 HW | 6 × **12×12** soft sprites |
 | Dots / power pills | Tile + color RAM | Dirty **tile** updates |
-| HUD | Top/bottom tile rows | Side gutters (§1) |
+| HUD | Top/bottom tile rows | Side gutters (§1, §3.4) |
 
 ### Soft-sprite rules (v1)
 
@@ -293,7 +294,7 @@ SHR **320** mode stores **two pixels per byte** (4 bits each). That constrains h
 ### Blit implementation sequence
 
 1. **Ghosts:** build-time **compiled** masked blits (`py/gen_compiled_ghosts.py`) for walk frames `$20–$27` × 4 body colors × even/odd; erase restores from `$01` BCK strip.
-2. **Fruit (demo):** `py/gen_compiled_fruits.py` — 8 types × even/odd, colors prebaked from `#879D`. Harness actor 4 sits at fixed tile (14,17); `AdvanceFruit` cycles `ACT_SPR` every 360 frames. HUD fruit strip still TBD (precolored tiles, not actors).
+2. **Fruit (demo):** `py/gen_compiled_fruits.py` — 8 types × even/odd, colors prebaked from `#879D`. Harness actor 4 sits at fixed tile (14,17); `AdvanceFruit` cycles `ACT_SPR` every 360 frames. The same blits draw the HUD level fruit (§3.4); the arcade's 7-icon strip stays TBD.
 3. **Ms. Pac (walk):** `py/gen_compiled_mspac.py` — 4 dirs × 3 mouths × even/odd (24 blits), bank `#09` prebaked; west/north apply H / HV flips. Harness actor 5 on rails; `ACT_SPR = dir*3 + mouth` from arcade `#869C` phase tables. Death frames later.
 
 ```mermaid
@@ -323,13 +324,15 @@ flowchart TB
 
 ### Per-frame loop
 
-1. `RefreshAllSprites`: for each actor top→bottom by `ACT_OY`, erase(old) then draw(new) — BCK→SHR restore, then masked blit. Closes upper holes before the beam.
-2. Apply dirty playfield tiles when present (update SHR + BCK; order vs refresh TBD when dots land).
-3. `CopySpritePos`: old ← new.
-4. Run logic / rails / sound (writes next **new** XY; rails also update `ACT_SPR`).
-5. `WaitVBL` (poll input around this edge), then loop.
+1. `EraseAllSprites`: BCK→SHR restore of every actor's old rect, top→bottom from `DP_SORT`.
+2. `ApplyDirty`: eaten dots and other queued tiles → SHR **and** BCK. This must sit between erase and draw: erase replays whatever BCK holds, so a pellet has to leave BCK before the next erase can put it back.
+3. `DrawAllSprites`: masked blit at the new pose, **same** `DP_SORT` (no re-sort — actors move ≤1px/frame; teleports are horizontal).
+4. `CopySpritePos`: old ← new.
+5. Run logic / rails / sound (writes next **new** XY; rails also update `ACT_SPR`).
+6. `SortActorsByY` by `ACT_OY` — yellow before VBL; feeds next frame's erase+draw.
+7. `WaitVBL` (poll input around this edge), then loop.
 
-Level start draws maze once, draws sprites at initial new (== old), commits, then enters the loop.
+Level start draws maze once, draws the side HUD, draws sprites at initial new (== old), commits, then enters the loop.
 
 ### Why this shape
 
@@ -339,7 +342,8 @@ Level start draws maze once, draws sprites at initial new (== old), commits, the
 | Erase → move → draw (move in the hole) | Rejected — long invisible gap → flicker. |
 | Erase(old) → draw(new) → commit → logic → VBL | **Chosen.** Tight blit pair; logic publishes next frame’s new regs after sprites are visible. |
 | Trail the beam (per-sprite scanline waits) | Not used in v1 — deferred redraws caused worse flicker than tear. |
-| Y-sort erase/draw (no beam wait) | **Used** — `RefreshAllSprites` erases then draws each actor top→bottom by `ACT_OY`. |
+| Y-sort erase/draw (no beam wait) | **Used** — one `SortActorsByY` (`ACT_OY`) after rails; erase and draw share `DP_SORT`. |
+| Per-actor fused erase+draw | Dropped — dirty tiles need a seam between the two passes, so erase-all and draw-all are separate. |
 
 ### Cycle-budget sketch
 
@@ -372,7 +376,7 @@ Write SHR through bank `$01` shadow at full CPU speed. Avoid long poke loops int
 
 ### Non-goals (still)
 
-- HUD fruit strip not wired yet.
+- Arcade's 7-icon level-fruit strip (`#3B08`) — the HUD shows the current level's fruit only.
 - No beam-trailing plan beyond “measure first, then consider.”
 - No full game logic / Z80 translation yet.
 
@@ -453,6 +457,26 @@ Harness maze tiles must match `make gfx` upright orientation (CW + row XOR 3). G
 
 ---
 
+## 3.4 Side HUD (v1)
+
+The 76 px gutters either side of the playfield carry the chrome the arcade puts in its top/bottom rows ([`iigs/hud_body.s`](../iigs/hud_body.s)). HUD pixels go to **SHR only** — actors never leave the playfield, so the BCK strip carries no HUD copy and the HUD is never erased.
+
+| Gutter | Contents | Origin |
+|--------|----------|--------|
+| Left | `1UP`, P1 score, life icons | `(8,4)` / `(8,12)` / `(8,40)` |
+| Right | `HIGH SCORE`, high score, level fruit | `(248,4)` / `(248,12)` / `(252,28)` |
+
+- **Text** reuses arcade glyph tiles: score digits `$00–$09`, ASCII `$40–$5B` (`$40` = space). The art is single-ink, so `BlitTileAbs` recolors any nonzero nibble to `R_PEN` (`COL_DIGIT`, pen 13) while blitting the 6×6 cell — one opaque write, so redraws need no clear. Advance is 6 px/glyph.
+- **Scores** are 3 BCD bytes lo/mid/hi like arcade `#4E80` / `#4E88`; `ScoreAdd10` uses 65816 decimal mode where the Z80 chains `add`/`daa` (`j_2a65`). `DrawScoreBCD` blanks up to 4 leading zeros so a fresh score reads `00` (`j_2abe` / `j_2ace`), and `CheckHighScore` copies P1 over the high score on an MSB→LSB win (`j_2a91`).
+- **Life icons** are the compiled Ms. Pac blit (dir W, mouth nearly shut), not tiles; the **level fruit** is the compiled fruit blit clamped at banana like `j_8793`. Both are masked blits over black.
+- **Harness demo only:** score ticks +10 every 300 frames, lives are fixed at 3, and level stays 0 — real game state replaces `InitHUD` later.
+
+Dot eating rides the same seam: `EatDotsAtPac` maps Ms. Pac's `ACT_X`/`ACT_Y` back to a tile, clears `$10`/`$14` from `TILEMAP`, and queues the cell so `ApplyDirty` rewrites it empty into **both** SHR and BCK before the next erase (§3.1).
+
+Host check: [`py/gs2_probe_hud.py`](../py/gs2_probe_hud.py) reports frames, score / high score, lives, level and dots eaten (`--seed-score` reaches the 10000 rollover without waiting 1000 ticks).
+
+---
+
 ## 4. Input
 
 ### Decision (v1)
@@ -492,6 +516,6 @@ Summary:
 | `$01/2000` | SHR (`S_SHR`); **`$01/A000`** BCK strip (`S_BCK`) |
 | `$E1/2000` | Displayed SHR (host capture) |
 
-Playfield origin: **(76, 7)** for the 168×186 maze in 320×200. Side HUD unused in the harness.
+Playfield origin: **(76, 7)** for the 168×186 maze in 320×200; the leftover gutters hold the side HUD (§3.4).
 
 How much game logic is reimplemented vs translated remains open; soft-render replaces arcade tilemap + sprite hardware.

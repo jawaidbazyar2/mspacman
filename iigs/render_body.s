@@ -23,6 +23,7 @@ R_SAVE         equ $2A
 R_BODY         equ $2C		; ACT_COLOR nibble for RemapBodyByte
 R_BTMP         equ $2E
 R_BDEST        equ $30		; BCK strip offset (BckXY)
+R_PEN          equ $32		; HUD glyph ink pen (BlitTileAbs / RemapInkByte)
 * High DP (DP=$0000): Y-sort keys — actor records are never moved
 DP_KEYI        equ $EA		; insertion: actor index being placed
 DP_KEYY        equ $EB		; insertion: its Y
@@ -485,11 +486,9 @@ SortActorsByY
 	rts
 
 EraseAllSprites
-* Erase at ACT_OX/OY (old), top→bottom by ACT_OY. (init / tools)
+* Erase at ACT_OX/OY (old), top→bottom from DP_SORT.
+* Caller fills DP_SORT once after rails (SortActorsByY ACT_OY) before WaitVBL.
 	php
-	rep	#$30
-	lda	#ACT_OY
-	jsr	SortActorsByY
 	sep	#$30
 	ldx	#0
 ]e	lda	<DP_SORT,x
@@ -506,11 +505,8 @@ EraseAllSprites
 	rts
 
 DrawAllSprites
-* Draw at ACT_X/Y (new), top→bottom by ACT_Y. (level start)
+* Draw at ACT_X/Y (new), same DP_SORT as erase (no re-sort: ≤1px/frame).
 	php
-	rep	#$30
-	lda	#ACT_Y
-	jsr	SortActorsByY
 	sep	#$30
 	ldx	#0
 ]d	lda	<DP_SORT,x
@@ -523,28 +519,6 @@ DrawAllSprites
 	inx
 	cpx	#NUM_ACTORS
 	bcc	]d
-	plp
-	rts
-
-RefreshAllSprites
-* Per actor top→bottom using DP_SORT (filled before WaitVBL).
-* Erase(old) then draw(new); closes upper holes before the beam.
-	php
-	sep	#$30
-	ldx	#0
-]r	lda	<DP_SORT,x
-	phx
-	rep	#$30
-	and	#$00FF
-	sta	<R_ACT
-	jsr	EraseSprite
-	lda	<R_ACT
-	jsr	DrawSprite
-	sep	#$30
-	plx
-	inx
-	cpx	#NUM_ACTORS
-	bcc	]r
 	plp
 	rts
 
@@ -828,11 +802,13 @@ DrawSprite
 	rts
 
 ApplyDirty
+* Redraw queued tiles into SHR + BCK. Keep the count in R_IDX: DrawTile owns
+* R_ROW (and R_TX/R_TY/R_TMP/R_OFF/R_DEST/R_BDEST/R_BTMP) as scratch.
 	php
 	rep	#$30
 	lda	>DIRTY_COUNT
 	beq	:adone
-	sta	<R_ROW
+	sta	<R_IDX
 	ldx	#0
 ]ad	lda	>DIRTY_LIST,x
 	and	#$00FF
@@ -865,9 +841,9 @@ ApplyDirty
 	plx
 	inx
 	inx
-	lda	<R_ROW
+	lda	<R_IDX
 	dec
-	sta	<R_ROW
+	sta	<R_IDX
 	bne	]ad
 	lda	#0
 	sta	>DIRTY_COUNT
