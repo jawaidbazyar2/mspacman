@@ -334,6 +334,29 @@ flowchart TB
 
 Level start draws maze once, draws the side HUD, draws sprites at initial new (== old), commits, then enters the loop.
 
+### Arcade VBLANK IRQ vs main-loop JSR
+
+On arcade (`mspacmab` / locked `mspac.asm`), hardware VBLANK fires an interrupt (bootleg **IM 1** → `RST 38` at `$0038` → `$1F9B` → `$008D`). That ISR publishes sprites/sound, then runs the per-frame core: timers, timed tasks (`RST #30`), and game-mode dispatch (`$03C8`, including gameplay at `$06BE`). Heavy video work is queued via `RST #28` and drained on the main thread (`$238D`), not inside the IRQ.
+
+The behavioral contract is **one logic tick per VBLANK**, not “logic must live in an ISR.” On IIgs we keep a regular `MainLoop` and `jsr` that same one-frame update after commit / before `WaitVBL` (step 5 above). `WaitVBL` is the clock; no VBL interrupt handler is required. Arcade’s exact IRQ order (sound → sprite ports → logic) need not be mirrored — draw-before-logic is the soft-sprite choice above. Deferred maze/HUD work maps to level-start draws and in-loop dirty tiles, not a second task CPU.
+
+### Arcade modes (attract / play / intermission)
+
+Mode switching is a **nested state machine** in locked `mspac.asm`, not separate programs. Each VBLANK, `$03C8` dispatches on `game_mode` (`#4E00`):
+
+| `#4E00` | Mode | Role |
+|--------|------|------|
+| 0 | Power-on | Clear / dips / scores → enter demo |
+| 1 | Attract | Marquee + maze demo until a credit |
+| 2 | Credit | “PUSH START” / spend credit → start game |
+| 3 | Playing | Core play via `level_state` (`#4E04`) |
+
+Sub-counters advance the steps inside attract (`game_mode_sub1` `#4E02`) and the coin screen (`game_mode_sub2` `#4E03`). Timed tasks (`RST #30`) and deferred tasks (`RST #28`) bump those counters.
+
+**Intermissions are not a top-level mode.** They are mid-level steps of `level_state` while still in `#4E00 = 3`. After a cleared board (flash sequence → `#0A2C`), a level-index table at `$0A44` picks Act 1 / 2 / 3 or skips; Ms. Pac scripts set `intermission_flag` (`#4F00`), then `level_state` advances into next-board setup and back to maze play (`#03`). Attract’s marquee reuses some of that motion path and also touches `#4F00`.
+
+IIgs port implication: keep the same nesting — one outer “screen family” (attract / coin / play) and an inner play-state for ready / maze / death / flash / cutscene / next level — rather than inventing a flat enum that treats intermission as a peer of attract.
+
 ### Why this shape
 
 | Approach | Verdict |
