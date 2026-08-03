@@ -199,7 +199,7 @@ Pens **3** and **5** may hold the same red word; keeping both simplifies “maze
 
 ### Harness note
 
-`gen_palette.py` emits the §2 target map (green/teal/`COL_POWER` included). Fruit compiled blits prebake bank colors into those pens. Power-pill tiles still use pen **1** until fade remap lands.
+`gen_palette.py` emits the §2 target map (green/teal/`COL_POWER` included). Fruit compiled blits prebake bank colors into those pens. Power-pill tiles use pen **14**; `BlinkPowerPills` toggles that palette slot every 10 frames.
 
 ### Power-pill fade
 
@@ -372,7 +372,7 @@ Write SHR through bank `$01` shadow at full CPU speed. Avoid long poke loops int
 
 ### Non-goals (still)
 
-- Power-pill fade remap (pen 14) and HUD fruit strip not wired yet.
+- HUD fruit strip not wired yet.
 - No beam-trailing plan beyond “measure first, then consider.”
 - No full game logic / Z80 translation yet.
 

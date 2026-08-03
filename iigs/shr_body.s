@@ -61,6 +61,28 @@ LoadPalette
 
 * PalTable lives in palette_data.s (put from all.s) — maze PROM #1D → pens 0–3
 
+BlinkPowerPills
+* Arcade #0C0D / FLASHEN: every POWER_FLASH_PERIOD frames, toggle pen 14
+* between pale (PalTable) and black. Pixels stay COL_POWER in SHR+BCK.
+	php
+	sep	#$20
+	lda	>POWER_FLASH_CNT
+	inc
+	sta	>POWER_FLASH_CNT
+	cmp	#POWER_FLASH_PERIOD
+	bne	:done
+	lda	#0
+	sta	>POWER_FLASH_CNT
+	rep	#$20
+	lda	>SHR_PALETTE+28		; pen 14 word
+	beq	:on
+	lda	#0
+	bra	:store
+:on	lda	|PalTable+28		; full-bright pale
+:store	sta	>SHR_PALETTE+28
+:done	plp
+	rts
+
 SetBorder
 * A = color 0–15. $E0/C034 (IOLC inhibited — not $00/C034).
 	php

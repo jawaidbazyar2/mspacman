@@ -39,6 +39,9 @@ Start
 	jsr	CopySpritePos
 	lda	#0
 	sta	>FRAME_COUNT
+	sep	#$20
+	sta	>POWER_FLASH_CNT
+	rep	#$30
 * Keep SEI — no IRQ handlers installed; cli → random BRK/monitor
 	jsr	WaitVBL			; sync before first erase/draw
 
@@ -72,6 +75,7 @@ MainLoop
 	inc
 	sta	>FRAME_COUNT
 	jsr	AdvanceFruit		; cycle fruit type every FRUIT_PERIOD
+	jsr	BlinkPowerPills		; palette pen 14 on/off (arcade #0A)
 	lda	#ACT_OY
 	jsr	SortActorsByY		; yellow; order for next refresh
 	jsr	WaitVBL			; border black while waiting

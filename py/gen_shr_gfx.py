@@ -185,7 +185,7 @@ def make_centered_pellet(size: int = 8) -> list[list[int]]:
 
 
 def make_power_pill(size: int = 8) -> list[list[int]]:
-    """Solid octagon/disc pen-1 (ROM+scale pinches 0x14 into an H/bowtie)."""
+    """Solid octagon/disc pen-14 COL_POWER (ROM+scale pinches 0x14 into an H/bowtie)."""
     out = [[0] * size for _ in range(size)]
     # Radius-ish fill; works for 8×8 and survives symmetric 8→6 subsample.
     mid = (size - 1) / 2.0
@@ -193,7 +193,7 @@ def make_power_pill(size: int = 8) -> list[list[int]]:
     for y in range(size):
         for x in range(size):
             if (x - mid) ** 2 + (y - mid) ** 2 <= rad * rad:
-                out[y][x] = 1
+                out[y][x] = 14
     return out
 
 

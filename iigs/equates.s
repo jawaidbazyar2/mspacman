@@ -105,6 +105,8 @@ DIRTY_LIST     equ $028802
 FRAME_COUNT    equ $028900
 EAT_INDEX      equ $028902
 DEMO_FREEZE    equ $028904	; nonzero → MainLoop skips erase/rails/draw
+POWER_FLASH_CNT equ $028906	; byte; BlinkPowerPills period counter
+POWER_FLASH_PERIOD equ 10	; arcade #4DCF / #0A
 ROW_ADDR       equ $028B00	; 256 words: Y → Y*S_SHR (ScreenXY)
 ROW_BCK        equ $028D00	; 256 words: Y → Y*S_BCK (BckXY)
 
@@ -126,4 +128,5 @@ COL_BLINKY     equ 5		; red
 COL_PINKY      equ 7		; pink
 COL_INKY       equ 9		; cyan
 COL_CLYDE      equ 11		; orange
+COL_POWER      equ 14		; energizer fade (palette poke only)
 BODY_PEN       equ 6		; marker in sprite assets
