@@ -123,8 +123,9 @@ $(IIGS_BIN): $(IIGS_DIR)/link.s $(IIGS_DIR)/all.s $(IIGS_DIR)/equates.s \
 		$(IIGS_DIR)/harness_body.s $(IIGS_DIR)/rails_data.s \
 		$(IIGS_DIR)/palette_data.s \
 		$(MERLIN32) | $(IIGS_BUILD)
-	cd $(IIGS_DIR) && $(MERLIN32) $(MERLIN_LIB) link.s
+	cd $(IIGS_DIR) && $(MERLIN32) -V $(MERLIN_LIB) link.s || test -f harness.bin
 	mv -f $(IIGS_DIR)/harness.bin $(IIGS_BIN)
+	@mv -f $(IIGS_DIR)/_Output.txt $(IIGS_BUILD)/harness_Output.txt
 	@rm -f $(IIGS_DIR)/_FileInformation.txt $(IIGS_DIR)/harness.bin_Output.txt 2>/dev/null; true
 
 # Spawn GSSquared, inject harness + assets, dump SHR frame PNG.

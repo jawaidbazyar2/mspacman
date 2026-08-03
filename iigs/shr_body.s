@@ -12,10 +12,12 @@ InitSHR
 	sep	#$30
 	lda	#$C1
 	sta	>NEWVIDEO
-	lda	>SHADOW
-	and	#$F7			; bit3=0 → SHR shadowing on
-	sta	>SHADOW
 	sta	>TXTCLR
+* Inhibit every shadow except SHR (bit3=0). Includes IOLC (bit6) so
+* $01/A000–FFFF is RAM for BCK — must set this BEFORE clearing BCK or
+* stores into $01/Cxxx hit I/O and wedge VBL. Soft-switches use $E0/$E1.
+	lda	#$F7
+	sta	>SHADOW
 	rep	#$30
 	lda	#$0000
 	ldx	#SHR_PIXEL_BYTES-2
@@ -23,6 +25,14 @@ InitSHR
 	dex
 	dex
 	bpl	]clr
+* Zero PF backing strip ($01/A000, stride S_BCK) before DrawMaze.
+* Use CPX end (not BPL) — count is >$8000 so BPL would abort early.
+	ldx	#0
+]bck	sta	>BCK_PIXELS,x
+	inx
+	inx
+	cpx	#BCK_CLEAR_BYTES
+	bcc	]bck
 * SCB: 320 mode, fill off, palette 0 for every scanline ($00)
 	sep	#$30
 	lda	#$00
@@ -52,7 +62,7 @@ LoadPalette
 * PalTable lives in palette_data.s (put from all.s) — maze PROM #1D → pens 0–3
 
 SetBorder
-* A = color 0–15. Writes $00/C034 low nibble only (high ← 0; fine for demo).
+* A = color 0–15. $E0/C034 (IOLC inhibited — not $00/C034).
 	php
 	sep	#$20
 	and	#$0F
@@ -61,9 +71,7 @@ SetBorder
 	rts
 
 WaitVBL
-* IIgs $C019: bit7=1 during blank (TN #40). Border black for slack time.
-* Wait until OUT of VBL, then until INTO VBL (next blank leading edge).
-* Do NOT time out past :w1 — that used to skip :w2 and drop frame sync.
+* $E1/C019 bit7=1 during blank (TN #40). Required when IOLC inhibited.
 	php
 	sep	#$20
 	lda	#BRD_VBL

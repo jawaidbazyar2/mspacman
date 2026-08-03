@@ -246,8 +246,8 @@ Do **not** model the four power pills as soft sprites on the IIgs. Keep the soft
 
 - Soft-blit actors over the 168×186 playfield only (HUD is separate).
 - **Logical size 12×12; blit cell 14×12.** Visible art is 12×12 (arcade 16×16 at 0.75). Store and blit as a **14×12** cell with **masking** so the two extra horizontal pixels stay transparent. At 4bpp, 14 px = **exactly 7 bytes/row** — a fixed width for every sprite frame (even and odd).
-- **Backing-store erase:** bank `$04` holds a full SHR pixel mirror of the playfield (no sprites). On erase, copy the 14×12 rect from `$04` → `$01`. Draw is masked blit only (no per-actor save-under).
-- **Dirty tiles update both banks:** `DrawTile` writes `$01` and `$04`. Erase sprites first, apply dirty, then draw — next erase shows the new tile from `$04`.
+- **Backing-store erase:** PF strip at `$01/A000` (stride **`S_BCK`**, no sprites). On erase, abs-copy the 14×12 rect from BCK → SHR (`S_SHR`). `SHADOW=$F7` (SHR shadow only) so `$A000+` is usable RAM. Draw is masked blit only (no per-actor save-under).
+- **Dirty tiles update SHR + BCK:** `DrawTile` dual-cursor (`S_SHR` / `S_BCK`). Erase sprites first, apply dirty, then draw.
 - **Draw order (v1):** fruit, then Ms. Pac, then ghosts (back → front). When matching arcade eat-ghost / power-pill priority matters visually, adjust ghost↔pac order to match the VBLANK priority swaps in `mspac.asm`; fruit stays under the actors.
 
 ### Game coordinates & motion (locked)
@@ -292,7 +292,7 @@ SHR **320** mode stores **two pixels per byte** (4 bits each). That constrains h
 
 ### Blit implementation sequence
 
-1. **Ghosts:** build-time **compiled** masked blits (`py/gen_compiled_ghosts.py`) for walk frames `$20–$27` × 4 body colors × even/odd; erase restores from bank `$04` mirror.
+1. **Ghosts:** build-time **compiled** masked blits (`py/gen_compiled_ghosts.py`) for walk frames `$20–$27` × 4 body colors × even/odd; erase restores from `$01` BCK strip.
 2. **Fruit (demo):** `py/gen_compiled_fruits.py` — 8 types × even/odd, colors prebaked from `#879D`. Harness actor 4 sits at fixed tile (14,17); `AdvanceFruit` cycles `ACT_SPR` every 360 frames. HUD fruit strip still TBD (precolored tiles, not actors).
 3. **Ms. Pac (walk):** `py/gen_compiled_mspac.py` — 4 dirs × 3 mouths × even/odd (24 blits), bank `#09` prebaked; west/north apply H / HV flips. Harness actor 5 on rails; `ACT_SPR = dir*3 + mouth` from arcade `#869C` phase tables. Death frames later.
 
@@ -323,8 +323,8 @@ flowchart TB
 
 ### Per-frame loop
 
-1. `RefreshAllSprites`: for each actor top→bottom by `ACT_OY`, erase(old) then draw(new) — `$04`→`$01` restore, then masked blit. Closes upper holes before the beam.
-2. Apply dirty playfield tiles when present (update `$01` and `$04`; order vs refresh TBD when dots land).
+1. `RefreshAllSprites`: for each actor top→bottom by `ACT_OY`, erase(old) then draw(new) — BCK→SHR restore, then masked blit. Closes upper holes before the beam.
+2. Apply dirty playfield tiles when present (update SHR + BCK; order vs refresh TBD when dots land).
 3. `CopySpritePos`: old ← new.
 4. Run logic / rails / sound (writes next **new** XY; rails also update `ACT_SPR`).
 5. `WaitVBL` (poll input around this edge), then loop.
@@ -432,7 +432,7 @@ Helper: [`py/gen_maze1.py`](../py/gen_maze1.py).
 
 ### Decision
 
-First on-target milestone: a **65816 soft-render module** (tiles + masked soft sprites + `$04` backing-store erase) driven by a GSSquared inject/run test — not a full game.
+First on-target milestone: a **65816 soft-render module** (tiles + masked soft sprites + `$01` BCK-strip erase) driven by a GSSquared inject/run test — not a full game.
 
 | Piece | Path |
 |-------|------|
@@ -449,7 +449,7 @@ make iigs-test   # spawn GSSquared, inject, CALL 768, dump build/iigs/frame.png
 
 Harness maze tiles must match `make gfx` upright orientation (CW + row XOR 3). Ground-truth previews: `build/gfx/ppm/maze1_8x8_upright.png` / `maze1_6x6_upright.png`.
 
-**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`py/gen_ghost_rails.py` → `iigs/rails_data.s`). Rails write **new** `ACT_X`/`ACT_Y` and `ACT_SPR` (arcade facing `$20–$27`: `dir×2 + ((FRAME_COUNT>>3)&1) + $20`). Draw uses **compiled** masked blits (`py/gen_compiled_ghosts.py` → `GhostBlitTable`, color×frame×parity); no per-frame `PrepOneGhost` / `SPR_WORK*`. A fifth actor (fruit) sits at fixed tile (14,17) with prebaked `FruitBlitTable` blits; `AdvanceFruit` cycles type `$00–$07` every 360 frames. Erase restores from bank `$04` at **old** `ACT_OX`/`ACT_OY`; draw is masked blit only at new. Ghost bodies are baked from `ACT_COLOR` pens 5/7/9/11. Loop: erase→draw→commit→rails→fruit→VBL until a key at `$C000`/`$C010`, or host sets `DEMO_FREEZE` (`$02/8904`) before SHR capture. **Border** (`$C034`) changes per phase (red/green/blue/orange/black) for visual timing — see `BRD_*` in `equates.s` / [`UserTesting.md`](../UserTesting.md).
+**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`py/gen_ghost_rails.py` → `iigs/rails_data.s`). Rails write **new** `ACT_X`/`ACT_Y` and `ACT_SPR` (arcade facing `$20–$27`: `dir×2 + ((FRAME_COUNT>>3)&1) + $20`). Draw uses **compiled** masked blits (`py/gen_compiled_ghosts.py` → `GhostBlitTable`, color×frame×parity); no per-frame `PrepOneGhost` / `SPR_WORK*`. A fifth actor (fruit) sits at fixed tile (14,17) with prebaked `FruitBlitTable` blits; `AdvanceFruit` cycles type `$00–$07` every 360 frames. Erase restores from `$01` BCK at **old** `ACT_OX`/`ACT_OY`; draw is masked blit only at new. Ghost bodies are baked from `ACT_COLOR` pens 5/7/9/11. Loop: erase→draw→commit→rails→fruit→VBL until a key at `$C000`/`$C010`, or host sets `DEMO_FREEZE` (`$02/8904`) before SHR capture. **Border** (`$C034`) changes per phase (red/green/blue/orange/black) for visual timing — see `BRD_*` in `equates.s` / [`UserTesting.md`](../UserTesting.md).
 
 ---
 
@@ -487,11 +487,9 @@ Summary:
 
 | Bank / range | Contents |
 |--------------|----------|
-| `$02/0000` | Code + actors + dirty + scratch |
-| `$04/2000` | BG pixel mirror (erase source) |
-| `$02/7000` | Logical tilemap 28×31 |
+| `$02/0000` | Code + tilemap@`$8000` + actors + dirty + scratch |
 | `$03/0000` | Tiles, even/odd sprites+masks, maze, stitched cells |
-| `$01/2000` | SHR shadow (**shadowing ON**) |
+| `$01/2000` | SHR (`S_SHR`); **`$01/A000`** BCK strip (`S_BCK`) |
 | `$E1/2000` | Displayed SHR (host capture) |
 
 Playfield origin: **(76, 7)** for the 168×186 maze in 320×200. Side HUD unused in the harness.

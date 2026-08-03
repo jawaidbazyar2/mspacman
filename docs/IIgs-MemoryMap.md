@@ -13,18 +13,16 @@ While running: **DB = `$02`** (code bank), **DP = `$0000`**, **stack** = `$01FF`
 | Bank | Role |
 |------|------|
 | `$00` | Soft-switches, page-3 trampoline, stack |
-| `$01` | SHR shadow (pixels, SCB, palette) — **shadowing ON** |
+| `$01` | SHR shadow (`$2000–$9FFF`) + PF **BCK** strip (`$A000+`) — SHR shadow only |
 | `$02` | Harness code + game/render RAM |
 | `$03` | Injected graphics / maze assets (read-only at runtime) |
-| `$04` | Full SHR **pixel** mirror (maze/tiles only; no sprites) — erase source |
-| `$E1` | Displayed SHR (tracks `$01` when shadowing on; host PNG capture) |
+| `$E1` | Displayed SHR (tracks `$01` SHR region; host PNG capture) |
 
 ```
 $00  soft-switches, CALL 768 stub
-$01  SHR shadow ──────────────────────────► display via $E1
+$01  SHR $2000–9FFF ──shadow──► $E1   |  BCK strip $A000+ (S_BCK stride)
 $02  code | … | tilemap | actors | dirty | scratch
 $03  tiles | sprites/masks even+odd | maze | stitched cells
-$04  BG pixel mirror (same offsets as $01/2000)
 ```
 
 ---
@@ -34,12 +32,13 @@ $04  BG pixel mirror (same offsets as $01/2000)
 | Address | Symbol | Size | Notes |
 |---------|--------|------|-------|
 | `$00/0300` | (trampoline) | 6 | `CLC` / `XCE` / `JML $020000` — Applesoft `CALL 768` |
-| `$00/C000` | `KBD` | — | Key data + pending (bit 7) |
-| `$00/C010` | `KBDSTRB` | — | Clear keyboard strobe |
-| `$00/C019` | `RDVBLBAR` | — | VBL sense (IIgs: bit7 set in VBL) |
-| `$00/C029` | `NEWVIDEO` | — | SHR enable (`$C1` in harness) |
-| `$00/C035` | `SHADOW` | — | Bit3 clear → SHR shadowing on |
-| `$00/C050` | `TXTCLR` | — | Graphics mode |
+| `$E0/C000` | `KBD` | — | Key data + pending (bit 7) |
+| `$E0/C010` | `KBDSTRB` | — | Clear keyboard strobe |
+| `$E1/C019` | `RDVBLBAR` | — | VBL sense (bit7 set in VBL) |
+| `$E0/C029` | `NEWVIDEO` | — | SHR enable (`$C1` in harness) |
+| `$E0/C035` | `SHADOW` | — | `$F7`: inhibit all shadowing except SHR (bit3=0) |
+| `$E0/C034` | `BORDCOLOR` | — | Border colour nibble |
+| `$E0/C050` | `TXTCLR` | — | Graphics mode |
 
 Stack pointer initialized to `$01FF` at `Start`.
 
@@ -57,17 +56,18 @@ High DP holds the Y-order key arrays (actor records are not moved):
 
 ---
 
-## Bank `$01` — SHR (shadow write target)
+## Bank `$01` — SHR + playfield backing strip
 
 | Address | Symbol | Size | Notes |
 |---------|--------|------|-------|
-| `$01/2000`–`$01/9CFF` | `SHR_PIXELS` | 32000 | 320×200 4bpp packed (160 bytes/row) |
+| `$01/2000`–`$01/9CFF` | `SHR_PIXELS` | 32000 | 320×200 4bpp; stride **`S_SHR` = 160** |
 | `$01/9D00`–`$01/9DFF` | `SHR_SCB` | 256 | Scanline control (palette 0, 320 mode) |
 | `$01/9E00`–`$01/9E1F` | `SHR_PALETTE` | 32 | Palette 0 (16× SHR `$0RGB` words) |
+| `$01/A000`–… | `BCK_PIXELS` / `BCK_BASE` | `BCK_CLEAR_BYTES` | Maze/tiles only; stride **`S_BCK` = 88** (176 px from X=72); zeroed in `InitSHR` |
 
-Playfield blit origin: **(76, 7)**; size **168×186** (28×31 × 6×6). Side gutters unused in the harness.
+Playfield blit origin: **(76, 7)**; size **168×186** (28×31 × 6×6). BCK origin X = `SPR_BASE_X` (72) so 14×12 erase fits. `BckXY`: `ROW_BCK[Y] + (X-72)/2`.
 
-With shadowing on, do **not** poke `$E1` from the 65816 hot path; host capture may still read `$01` or `$E1`.
+`SHADOW=$F7` before BCK clear (IOLC off → `$01/A000+` is RAM). Soft-switches via `$E0`/`$E1`, not `$00`. Do **not** poke `$E1` SHR pixels on the hot path.
 
 ---
 
@@ -90,7 +90,7 @@ Merlin `org $0000` → loaded at `$02/0000`.
 | `$02/8000`–`$02/8363` | `TILEMAP` | 868 | 28×31 tile codes (copy of `AST_MAZE`) |
 | `$02/8364`–`$02/83FF` | — | — | Unused pad to actors |
 | `$02/8400`–`$02/845F` | `ACTORS` | 96 | 6 actors × 16 bytes (4 ghosts + fruit + Ms. Pac) |
-| `$02/8460`–`$02/87FF` | — | — | Free (was save-under; erase uses bank `$04`) |
+| `$02/8460`–`$02/87FF` | — | — | Free (was save-under; erase uses `$01` BCK) |
 
 ### Actor record (`ACT_SIZE` = 16)
 
@@ -118,7 +118,8 @@ Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | `$02/8902` | `EAT_INDEX` | 2 | Dirty-eat demo cursor |
 | `$02/8904` | `DEMO_FREEZE` | 1 | Host≠0 → skip erase/draw/rails |
 | `$02/8905`–`$02/89FF` | — | — | Free |
-| `$02/8B00`–`$02/8CFF` | `ROW_ADDR` | 512 | `ScreenXY` LUT: word `[y] = y*160` (`InitRowAddr`) |
+| `$02/8B00`–`$02/8CFF` | `ROW_ADDR` | 512 | `ScreenXY` LUT: `[y] = y*S_SHR` |
+| `$02/8D00`–`$02/8EFF` | `ROW_BCK` | 512 | `BckXY` LUT: `[y] = y*S_BCK` |
 
 ### Render / harness scratch
 
@@ -137,23 +138,14 @@ Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 | `$02/8A14` | `R_TMP` | General temp |
 | `$02/8A16` | `R_ACT` | Actor index |
 | `$02/8A18` | `R_BASE` | Actor base (`ACTORS16+…`) |
-| `$02/8A1A` | `R_SAVE` | Scratch (unused by erase) |
+| `$02/8A1A` | `R_SAVE` | Scratch |
 | `$02/8A1C` | `R_BODY` | Body pen for remap |
 | `$02/8A1E` | `R_BTMP` | Blit temp |
-| `$02/8A20`–`$02/8AFF` | — | Free (Y-sort keys live in high DP) |
+| `$02/8A20` | `R_BDEST` | BCK offset (`ROW_BCK[Y]+(X-72)/2`) |
+| `$02/8A22`–`$02/8AFF` | — | Free (Y-sort keys live in high DP) |
 
 `BANK2` = `$020000` (long base for `,x` with 16-bit offset).  
 `ACTORS16` = `$8400`.
-
----
-
-## Bank `$04` — background pixel mirror
-
-| Address | Symbol | Size | Notes |
-|---------|--------|------|-------|
-| `$04/2000`–`$04/9F3F` | `BG_PIXELS` | 32000 | Same layout as `$01/2000`. Maze/`DrawTile` maintain it; sprites never write here. Erase copies 14×12 rects from here → `$01`. |
-
-Built at runtime (`DrawMaze` → `$04`, then copy to `$01`). Host does not inject `$04`.
 
 ---
 
@@ -184,10 +176,10 @@ Host writes these before `CALL 768`. Packed 4bpp; already upright (CW + row XOR 
 | `ACT_SPR` / `ACT_COLOR` | Rails / init | `DrawSprite` (compiled `GhostBlitGo` / `FruitBlitGo` / `MsPacBlitGo`) |
 | `ACT_WP` | Rails | Rails only |
 | `ACT_FLAGS` | Render | Render |
-| `TILEMAP` / dirty list | Game logic | Tile redraw (`DrawTile` → `$01` and `$04`) |
-| `BG_PIXELS` (`$04`) | `DrawMaze` / `DrawTile` | `EraseSprite` (restore rect → `$01`) |
+| `TILEMAP` / dirty list | Game logic | Tile redraw (`DrawTile` → SHR + BCK) |
+| BCK strip (`$01/A000`) | `DrawMaze` / `DrawTile` | `EraseSprite` (abs restore → SHR) |
 | `$03/*` assets | Host inject | Render (read) |
-| SHR `$01` | Render | Display |
+| SHR `$01/2000` | Render | Display |
 
 ---
 
@@ -195,7 +187,7 @@ Host writes these before `CALL 768`. Packed 4bpp; already upright (CW + row XOR 
 
 1. **Code must stay below `$02/8000`** (working RAM starts there).
 2. Six actors: 6×16 = 96 → actors through `$845F`.
-3. Dirty playfield changes must update **both** `$01` and `$04`.
+3. Dirty playfield changes must update **both** SHR and the BCK strip.
 4. Odd sprite/mask forms are **host-injected** (not generated on target in the current harness).
 
 When this map changes, update [`iigs/equates.s`](../iigs/equates.s) first, then this file.

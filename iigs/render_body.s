@@ -18,6 +18,7 @@ R_BASE         equ $028A18
 R_SAVE         equ $028A1A
 R_BODY         equ $028A1C	; ACT_COLOR nibble for RemapBodyByte
 R_BTMP         equ $028A1E
+R_BDEST        equ $028A20	; BCK strip offset (BckXY)
 * High DP (DP=$0000): Y-sort keys — actor records are never moved
 DP_KEYI        equ $EA		; insertion: actor index being placed
 DP_KEYY        equ $EB		; insertion: its Y
@@ -85,18 +86,27 @@ Mul18
 	rts
 
 InitRowAddr
-* ROW_ADDR[y] = y*160 for y=0..255 (word table @ $02/8B00).
+* ROW_ADDR[y]=y*S_SHR, ROW_BCK[y]=y*S_BCK (y=0..255).
 	php
 	rep	#$30
 	ldx	#0
 	lda	#0
 ]i	sta	>ROW_ADDR,x
 	clc
-	adc	#160
+	adc	#S_SHR
 	inx
 	inx
 	cpx	#512
 	bcc	]i
+	ldx	#0
+	lda	#0
+]j	sta	>ROW_BCK,x
+	clc
+	adc	#S_BCK
+	inx
+	inx
+	cpx	#512
+	bcc	]j
 	plp
 	rts
 
@@ -113,6 +123,23 @@ ScreenXY
 	clc
 	adc	>R_DEST
 	sta	>R_DEST
+	rts
+
+BckXY
+* R_BDEST = ROW_BCK[Y] + (X-BCK_ORIGIN_X)/2. Strip is S_BCK-wide @ $01/A000.
+	lda	>R_Y
+	and	#$00FF
+	asl
+	tax
+	lda	>ROW_BCK,x
+	sta	>R_BDEST
+	lda	>R_X
+	sec
+	sbc	#BCK_ORIGIN_X
+	lsr
+	clc
+	adc	>R_BDEST
+	sta	>R_BDEST
 	rts
 
 GenOddSprites
@@ -206,22 +233,8 @@ ShiftOneRow
 	plp
 	rts
 
-CopyBgToShr
-* Word-copy $04/2000 → $01/2000 (32000 bytes). Level-start only.
-	php
-	rep	#$30
-	ldx	#0
-]c	lda	>BG_PIXELS,x
-	sta	>SHR_PIXELS,x
-	inx
-	inx
-	cpx	#SHR_PIXEL_BYTES
-	bcc	]c
-	plp
-	rts
-
 DrawTile
-* Write tile to SHR ($01) and BG mirror ($04).
+* Write tile to SHR ($01) and BCK strip ($01/A000), strides S_SHR / S_BCK.
 	php
 	phb
 	sep	#$20
@@ -246,6 +259,7 @@ DrawTile
 	adc	#PF_ORIGIN_Y
 	sta	>R_Y
 	jsr	ScreenXY
+	jsr	BckXY
 	lda	>R_TILE
 	and	#$00FF
 	jsr	Mul18
@@ -254,8 +268,7 @@ DrawTile
 	sta	>R_ROW
 	lda	>R_DEST
 	tay
-* 3 bytes/row: word @0 then overlapped word @1 (covers 0–2, no 4th byte)
-* Long,Y is not a 65816 mode — dual-write BG via long,X (X = dest).
+* 3 bytes/row: word @0 then overlapped word @1. X=tile src, Y=SHR, R_BDEST=BCK.
 ]tr	lda	>AST_TILES,x
 	sta	$2000,y
 	sta	>R_BTMP
@@ -263,11 +276,12 @@ DrawTile
 	sta	$2001,y
 	sta	>R_TMP
 	phx
-	tyx
+	lda	>R_BDEST
+	tax
 	lda	>R_BTMP
-	sta	>BG_PIXELS,x
+	sta	BCK_BASE,x
 	lda	>R_TMP
-	sta	>BG_PIXELS+1,x
+	sta	BCK_BASE+1,x
 	plx
 	txa
 	clc
@@ -275,8 +289,12 @@ DrawTile
 	tax
 	tya
 	clc
-	adc	#SHR_ROW_BYTES
+	adc	#S_SHR
 	tay
+	lda	>R_BDEST
+	clc
+	adc	#S_BCK
+	sta	>R_BDEST
 	lda	>R_ROW
 	dec
 	sta	>R_ROW
@@ -286,12 +304,11 @@ DrawTile
 	rts
 
 DrawMaze
-* Blit pre-stitched per-cell 6x6 into BG mirror ($04), then copy to SHR ($01).
-* Cells are already upright (CW + row^3); no rotate/flip here.
+* Pre-stitched 6×6 cells → SHR + BCK (DBR=$01). No bank-$04 mirror.
 	php
 	phb
 	sep	#$20
-	lda	#BANK_BG
+	lda	#BANK_SHR
 	pha
 	plb
 	rep	#$30
@@ -316,6 +333,7 @@ DrawMaze
 	adc	#PF_ORIGIN_Y
 	sta	>R_Y
 	jsr	ScreenXY
+	jsr	BckXY
 	lda	>R_TY
 	asl
 	asl
@@ -338,19 +356,32 @@ DrawMaze
 	sta	>R_ROW
 	lda	>R_DEST
 	tay
-* 3 bytes/row: word @0 + overlapped word @1 (no spill past cell)
 ]mc	lda	>AST_MAZE_CELLS,x
 	sta	$2000,y
+	sta	>R_BTMP
 	lda	>AST_MAZE_CELLS+1,x
 	sta	$2001,y
+	sta	>R_TMP
+	phx
+	lda	>R_BDEST
+	tax
+	lda	>R_BTMP
+	sta	BCK_BASE,x
+	lda	>R_TMP
+	sta	BCK_BASE+1,x
+	plx
 	txa
 	clc
 	adc	#3
 	tax
 	tya
 	clc
-	adc	#SHR_ROW_BYTES
+	adc	#S_SHR
 	tay
+	lda	>R_BDEST
+	clc
+	adc	#S_BCK
+	sta	>R_BDEST
 	lda	>R_ROW
 	dec
 	sta	>R_ROW
@@ -370,7 +401,6 @@ DrawMaze
 	bcs	:mdone
 	brl	]my
 :mdone	plb
-	jsr	CopyBgToShr
 	plp
 	rts
 
@@ -542,8 +572,8 @@ CopySpritePos
 
 EraseSprite
 * A = actor index. Position from ACT_OX/OY (old).
-* Restore 14×12: long load from BG ($04) + abs,y store with DBR=$01.
-* X = Y = dest (no absolute-long,Y mode).
+* Restore 14×12: abs,X load BCK (S_BCK) → abs,Y store SHR (S_SHR), DBR=$01.
+* Merlin parses a+b*c left-to-right — use decimal row offsets, not S_BCK*n.
 	php
 	rep	#$30
 	sta	>R_ACT
@@ -575,106 +605,108 @@ EraseSprite
 	lda	>BANK2+ACT_OY,x
 	sta	>R_Y
 	jsr	ScreenXY
-	lda	>R_DEST
+	jsr	BckXY
+	lda	>R_BDEST
 	tax
+	lda	>R_DEST
 	tay
-* Unrolled 12×7: BG → SHR. Words @0,2,4 + @5 per row (no 8th byte).
-* |SHR_PIXELS forces abs (low 16 of $012000 → $2000) with DBR=$01.
-	lda	>BG_PIXELS,x
-	sta	|SHR_PIXELS,y
-	lda	>BG_PIXELS+2,x
+* Unrolled 12×7. Row r offsets: BCK r*88+{0,2,4,5} / SHR r*160+…
+* Decimal only — Merlin a+b*c is left-to-right (breaks S_BCK*n).
+	lda	BCK_BASE+0,x
+	sta	|SHR_PIXELS+0,y
+	lda	BCK_BASE+2,x
 	sta	|SHR_PIXELS+2,y
-	lda	>BG_PIXELS+4,x
+	lda	BCK_BASE+4,x
 	sta	|SHR_PIXELS+4,y
-	lda	>BG_PIXELS+5,x
+	lda	BCK_BASE+5,x
 	sta	|SHR_PIXELS+5,y
-	lda	>BG_PIXELS+160,x
+	lda	BCK_BASE+88,x
 	sta	|SHR_PIXELS+160,y
-	lda	>BG_PIXELS+162,x
+	lda	BCK_BASE+90,x
 	sta	|SHR_PIXELS+162,y
-	lda	>BG_PIXELS+164,x
+	lda	BCK_BASE+92,x
 	sta	|SHR_PIXELS+164,y
-	lda	>BG_PIXELS+165,x
+	lda	BCK_BASE+93,x
 	sta	|SHR_PIXELS+165,y
-	lda	>BG_PIXELS+320,x
+	lda	BCK_BASE+176,x
 	sta	|SHR_PIXELS+320,y
-	lda	>BG_PIXELS+322,x
+	lda	BCK_BASE+178,x
 	sta	|SHR_PIXELS+322,y
-	lda	>BG_PIXELS+324,x
+	lda	BCK_BASE+180,x
 	sta	|SHR_PIXELS+324,y
-	lda	>BG_PIXELS+325,x
+	lda	BCK_BASE+181,x
 	sta	|SHR_PIXELS+325,y
-	lda	>BG_PIXELS+480,x
+	lda	BCK_BASE+264,x
 	sta	|SHR_PIXELS+480,y
-	lda	>BG_PIXELS+482,x
+	lda	BCK_BASE+266,x
 	sta	|SHR_PIXELS+482,y
-	lda	>BG_PIXELS+484,x
+	lda	BCK_BASE+268,x
 	sta	|SHR_PIXELS+484,y
-	lda	>BG_PIXELS+485,x
+	lda	BCK_BASE+269,x
 	sta	|SHR_PIXELS+485,y
-	lda	>BG_PIXELS+640,x
+	lda	BCK_BASE+352,x
 	sta	|SHR_PIXELS+640,y
-	lda	>BG_PIXELS+642,x
+	lda	BCK_BASE+354,x
 	sta	|SHR_PIXELS+642,y
-	lda	>BG_PIXELS+644,x
+	lda	BCK_BASE+356,x
 	sta	|SHR_PIXELS+644,y
-	lda	>BG_PIXELS+645,x
+	lda	BCK_BASE+357,x
 	sta	|SHR_PIXELS+645,y
-	lda	>BG_PIXELS+800,x
+	lda	BCK_BASE+440,x
 	sta	|SHR_PIXELS+800,y
-	lda	>BG_PIXELS+802,x
+	lda	BCK_BASE+442,x
 	sta	|SHR_PIXELS+802,y
-	lda	>BG_PIXELS+804,x
+	lda	BCK_BASE+444,x
 	sta	|SHR_PIXELS+804,y
-	lda	>BG_PIXELS+805,x
+	lda	BCK_BASE+445,x
 	sta	|SHR_PIXELS+805,y
-	lda	>BG_PIXELS+960,x
+	lda	BCK_BASE+528,x
 	sta	|SHR_PIXELS+960,y
-	lda	>BG_PIXELS+962,x
+	lda	BCK_BASE+530,x
 	sta	|SHR_PIXELS+962,y
-	lda	>BG_PIXELS+964,x
+	lda	BCK_BASE+532,x
 	sta	|SHR_PIXELS+964,y
-	lda	>BG_PIXELS+965,x
+	lda	BCK_BASE+533,x
 	sta	|SHR_PIXELS+965,y
-	lda	>BG_PIXELS+1120,x
+	lda	BCK_BASE+616,x
 	sta	|SHR_PIXELS+1120,y
-	lda	>BG_PIXELS+1122,x
+	lda	BCK_BASE+618,x
 	sta	|SHR_PIXELS+1122,y
-	lda	>BG_PIXELS+1124,x
+	lda	BCK_BASE+620,x
 	sta	|SHR_PIXELS+1124,y
-	lda	>BG_PIXELS+1125,x
+	lda	BCK_BASE+621,x
 	sta	|SHR_PIXELS+1125,y
-	lda	>BG_PIXELS+1280,x
+	lda	BCK_BASE+704,x
 	sta	|SHR_PIXELS+1280,y
-	lda	>BG_PIXELS+1282,x
+	lda	BCK_BASE+706,x
 	sta	|SHR_PIXELS+1282,y
-	lda	>BG_PIXELS+1284,x
+	lda	BCK_BASE+708,x
 	sta	|SHR_PIXELS+1284,y
-	lda	>BG_PIXELS+1285,x
+	lda	BCK_BASE+709,x
 	sta	|SHR_PIXELS+1285,y
-	lda	>BG_PIXELS+1440,x
+	lda	BCK_BASE+792,x
 	sta	|SHR_PIXELS+1440,y
-	lda	>BG_PIXELS+1442,x
+	lda	BCK_BASE+794,x
 	sta	|SHR_PIXELS+1442,y
-	lda	>BG_PIXELS+1444,x
+	lda	BCK_BASE+796,x
 	sta	|SHR_PIXELS+1444,y
-	lda	>BG_PIXELS+1445,x
+	lda	BCK_BASE+797,x
 	sta	|SHR_PIXELS+1445,y
-	lda	>BG_PIXELS+1600,x
+	lda	BCK_BASE+880,x
 	sta	|SHR_PIXELS+1600,y
-	lda	>BG_PIXELS+1602,x
+	lda	BCK_BASE+882,x
 	sta	|SHR_PIXELS+1602,y
-	lda	>BG_PIXELS+1604,x
+	lda	BCK_BASE+884,x
 	sta	|SHR_PIXELS+1604,y
-	lda	>BG_PIXELS+1605,x
+	lda	BCK_BASE+885,x
 	sta	|SHR_PIXELS+1605,y
-	lda	>BG_PIXELS+1760,x
+	lda	BCK_BASE+968,x
 	sta	|SHR_PIXELS+1760,y
-	lda	>BG_PIXELS+1762,x
+	lda	BCK_BASE+970,x
 	sta	|SHR_PIXELS+1762,y
-	lda	>BG_PIXELS+1764,x
+	lda	BCK_BASE+972,x
 	sta	|SHR_PIXELS+1764,y
-	lda	>BG_PIXELS+1765,x
+	lda	BCK_BASE+973,x
 	sta	|SHR_PIXELS+1765,y
 	lda	>R_BASE
 	tax
@@ -688,7 +720,7 @@ EraseSprite
 
 DrawSprite
 * A = actor index — must save before PHB bank switch clobbers it
-* Compiled ghost / fruit / Ms. Pac blit only (no save-under; erase uses $04).
+* Compiled ghost / fruit / Ms. Pac blit only (no save-under; erase uses BCK).
 	php
 	rep	#$30
 	sta	>R_ACT

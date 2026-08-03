@@ -1,6 +1,8 @@
 *
 * Single translation unit for Merlin32 (equates + shr + render + harness)
 *
+* Listing: Merlin32 ignores LST. make iigs passes -V → build/iigs/harness_Output.txt
+*
 
 	xc
 	xc
@@ -46,7 +48,9 @@ MainLoop
 	sep	#$20
 	lda	>KBD
 	bpl	:nokey
-	sta	>KBDSTRB			; clear strobe
+	cmp	#$FF			; ignore open-bus
+	beq	:nokey
+	sta	>KBDSTRB
 	jmp	ExitDemo
 :nokey	rep	#$30
 	lda	>DEMO_FREEZE
