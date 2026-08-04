@@ -324,8 +324,9 @@ GhostMoveOrange
 	rts
 
 * Tile-center AI decisions (keep GhostMove* branches short for Merlin)
-* Target: scatter corner if frightened OR ghost_orient_index bit0=0 (even);
-* else chase (pink: 4 tiles ahead). Bit0 matches j_2730 / j_278e gate.
+* Target: scatter corner if frightened OR ghost_orient_index bit0=0;
+* else chase (pink: 4 ahead). Bit0 matches j_2730 / j_278e.
+* After ~7s Ms. Pac j_0e36 forces index=1 so chase stays on (see GhostOrientTick).
 
 * Reverse (== j_1efe): PREV_DIR⊕2 → DIR/TILE_DY, skip AI this center.
 * Arcade runs reverse after AI insert and overwrites tile_dy2.

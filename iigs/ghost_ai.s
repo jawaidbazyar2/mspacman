@@ -90,17 +90,27 @@ Dist2TmpToDst
 	rts
 
 SquareX
-* X = value → R_X = X*X (16-bit). Clobbers A.
+* X = value → R_X = X*X (16-bit). Clobbers A / R_TMP / R_OFF.
+* Multiplier bits must start at bit15: ASL on $00V never feeds C (always 0),
+* so Dist2 was always 0 and Pathfind picked the first open dir (not toward dest).
 	php
 	rep	#$30
 	txa
 	and	#$00FF
-	sta	<R_TMP
-	sta	<R_OFF
+	sta	<R_TMP			; multiplicand
+	asl	a
+	asl	a
+	asl	a
+	asl	a
+	asl	a
+	asl	a
+	asl	a
+	asl	a			; V → high byte ($V00)
+	sta	<R_OFF			; multiplier (MSB first)
 	lda	#0
 	ldx	#8
-]s	asl	a
-	asl	<R_OFF
+]s	asl	a			; product <<= 1
+	asl	<R_OFF			; C ← next multiplier bit
 	bcc	:n
 	clc
 	adc	<R_TMP

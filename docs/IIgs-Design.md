@@ -173,16 +173,16 @@ Decoded with MAME `pacman` weights from `82s123.7f`. Color-ROM indices in bracke
 | **0** | `$0000` | `(0,0,0)` | 0/4/8/10 | Black, empty path, sprite transparency |
 | **1** | `$0DDF` | `(222,222,255)` | 15 | Dots, eye white, fruit highlight, many maze pen1s |
 | **2** | `$0FBA` | `(255,184,174)` | 14 | Maze `#1D` wall fill; some chrome / frightened accents |
-| **3** | `$0F00` | `(255,0,0)` | 1 | Maze `#1D` wall ink; **shared with Blinky / cherry red** (alias ok — same RGB as pen 5) |
+| **3** | `$0F00` | `(255,0,0)` | 1 | Maze `#1D` wall ink; **fruit red** (cherry / strawberry / apple) — same RGB as pen 5, not fright-poked |
 | **4** | `$00F0` | `(0,255,0)` | 12 | **Green** — strawberry leaf, peach leaf, pear, frightened-bank accents |
-| **5** | `$0F00` | `(255,0,0)` | 1 | `COL_BLINKY`; cherry / strawberry / apple body |
+| **5** | `$0F00` | `(255,0,0)` | 1 | `COL_BLINKY` only (fright palette poke → blue/white) |
 | **6** | `$0D95` | `(222,151,81)` | 2 | Brown — fruit stems, maze `#14` accents; ghost `BODY_PEN` marker when needed |
 | **7** | `$0FBF` | `(255,184,255)` | 3 | `COL_PINKY`; maze `#18` pink |
 | **8** | `$04BA` | `(71,184,174)` | 13 | **Teal** — pear HUD bank `#17` |
 | **9** | `$00FF` | `(0,255,255)` | 5 | `COL_INKY`; maze `#18` cyan |
 | **10** | `$04BF` | `(71,184,255)` | 6 | Light blue — banana / maze `#16` |
-| **11** | `$0FB5` | `(255,184,81)` | 7 | `COL_CLYDE`; peach / pretzel orange; maze `#07` |
-| **12** | — | — | — | **Spare** |
+| **11** | `$0FB5` | `(255,184,81)` | 7 | `COL_CLYDE` only (fright palette poke) |
+| **12** | `$0FB5` | `(255,184,81)` | 7 | **Fruit orange** (peach / pretzel) — Clyde RGB alias; not fright-poked |
 | **13** | `$0FF0` | `(255,255,0)` | 9 | Ms. Pac body; banana; maze `#16`/`#18` yellow |
 | **14** | `$0DDF` → fade | `(222,222,255)` base | 15 | **`COL_POWER`** — power-pill fade (same RGB as pen 1 at full bright) |
 | **15** | `$022F` | `(33,33,255)` | 11 | Ghost pupils; pretzel blue; maze `#07` deep blue |
@@ -193,10 +193,10 @@ Decoded with MAME `pacman` weights from `82s123.7f`. Color-ROM indices in bracke
 | Dots | 0, **1** |
 | Power pills | 0, **14** |
 | Ghosts | 0, 1, 15, body **5/7/9/11** |
-| Fruit (actor + HUD) | baked mix of 1, 4–6, 8, 10–11, 13, 15 (and red via 5) |
+| Fruit (actor + HUD) | baked mix of 1, **3**, 4, 6, 8, 10, **12**, 13, 15 (never ghost body pens) |
 | Ms. Pac | 0, 13 (yellow), plus 5 / 15 accents as bank `#09` requires |
 
-Pens **3** and **5** may hold the same red word; keeping both simplifies “maze ink” vs `COL_BLINKY` naming. Pen **12** is the leftover spare after green/teal/`COL_POWER` claim the former duplicate-black holes.
+Pens **3**/**5** (red) and **11**/**12** (orange) share RGB so fruit stays stable while fright pokes only ghost body pens **5/7/9/11**.
 
 ### Harness note
 

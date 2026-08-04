@@ -7,6 +7,7 @@ Thin status map for the **game** build (`make iigs-game` → `build/iigs/game.bi
 | VBL logic after publish | `game_tick.s` `LogicTick` / `FrameTick` | live |
 | `j_06be` level_state | `level_fsm.s` `LevelFsm` | maze-only (play/death/clear) |
 | `j_08eb` | `play_tick.s` `PlayTick` | live |
+| `j_0e36` scatter→chase | `play_tick.s` `GhostOrientTick` | live (Ms. Pac forces idx=1) |
 | `j_1017` ×2 | `play_tick.s` `ActorTick` | live |
 | `j_13dd` | `leave_house.s` `GhostHouse` | live (idle release) |
 | `j_0c42` | `leave_house.s` `LeaveHouse` | live |

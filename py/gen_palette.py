@@ -7,10 +7,12 @@ Writes:
 
 Target pen map (docs/IIgs-Design.md §2):
   0 black, 1 pale, 2 peach, 3 maze red, 4 green, 5 Blinky red, 6 brown,
-  7 Pinky, 8 teal, 9 Inky, 10 light blue, 11 Clyde, 12 spare, 13 yellow,
+  7 Pinky, 8 teal, 9 Inky, 10 light blue, 11 Clyde,
+  12 fruit orange (= Clyde RGB; fright pokes leave this alone), 13 yellow,
   14 COL_POWER (pale), 15 pupil blue.
 
 Slots 0–3 still track maze palette #1D for level-1 walls/dots.
+Fruit red uses pen 3 (same RGB as Blinky pen 5) so energizer recolor is safe.
 
 Usage:
   python3 py/gen_palette.py
@@ -29,22 +31,22 @@ DEFAULT_OUT = ROOT / "build" / "gfx"
 DEFAULT_ASM = ROOT / "iigs" / "palette_data.s"
 MAZE_PAL = 0x1D
 
-# Color-ROM index per SHR pen (see §2). Pen 12 unused (black spare).
-# Pens 0–3 overwritten by maze bank when building.
+# Color-ROM index per SHR pen (see §2).
+# Pens 0–3 overwritten by maze bank when building (pen 3 stays maze/fruit red).
 TARGET_COLOR_ROM = (
     0,   # 0 black
     15,  # 1 pale
     14,  # 2 peach
-    1,   # 3 maze red
+    1,   # 3 maze / fruit red (alias of Blinky RGB)
     12,  # 4 green
-    1,   # 5 Blinky red
+    1,   # 5 Blinky red (fright-poked)
     2,   # 6 brown
     3,   # 7 Pinky
     13,  # 8 teal
     5,   # 9 Inky
     6,   # 10 light blue
-    7,   # 11 Clyde
-    0,   # 12 spare
+    7,   # 11 Clyde (fright-poked)
+    7,   # 12 fruit orange (alias of Clyde RGB; not fright-poked)
     9,   # 13 yellow
     15,  # 14 COL_POWER (= pale)
     11,  # 15 pupil blue

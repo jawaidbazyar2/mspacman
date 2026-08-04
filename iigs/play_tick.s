@@ -20,6 +20,22 @@ PlayTick
 	plp
 	rts
 
+* Top-left 4 SHR pixels @ $01/2000: $FFFF (pen $F) = chase, $0000 = scatter.
+* GHOST_ORIENT_IDX bit0 (Ms. Pac: 0 until first reverse, then stays 1).
+* Called once per frame from LogicTick.
+ChaseModeInd
+	php
+	rep	#$30
+	lda	>GHOST_ORIENT_IDX
+	and	#$0001
+	beq	:scat
+	lda	#$FFFF
+	bra	:wr
+:scat	lda	#$0000
+:wr	sta	>SHR_PIXELS		; $01/2000 — four 320-mode nibbles
+	plp
+	rts
+
 ActorTick
 * == j_1017
 	php
@@ -76,8 +92,11 @@ FrightTimerDec
 :done	plp
 	rts
 
-* Periodic ghost reverses + advance scatter/chase index. == j_0e36
-* Without this, no-reverse pathfind parks every ghost in a corner loop.
+* Periodic ghost reverses + scatter→chase. == j_0e36 (Ms. Pac patch)
+* Pac-Man SRL A then INC walks the wave table (scatter/chase/scatter…).
+* Ms. Pac replaces SRL with XOR A / NOP so index becomes 1 forever after the
+* first reverse — chase sticks on, ghosts do not re-park in scatter corners
+* ("PATCH TO MAKE RED MONSTER GO AFTER OTTO TO AVOID PARKING" @0E5C).
 GhostOrientTick
 	php
 	sep	#$20
@@ -99,10 +118,8 @@ GhostOrientTick
 	cmp	<R_TMP
 	bne	:done
 	sep	#$20
-	lda	>GHOST_ORIENT_IDX
-	inc
+	lda	#1			; == xor a / inc a @0E5C — force chase
 	sta	>GHOST_ORIENT_IDX
-	lda	#1
 	sta	>RED_REVERSE
 	sta	>PINK_REVERSE
 	sta	>BLUE_REVERSE

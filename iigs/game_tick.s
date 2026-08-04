@@ -12,5 +12,8 @@ LogicTick
 	sta	>FRAME_COUNT
 	jsr	LevelFsm
 	jsr	ActorPublish
+* ChaseModeInd also runs from PlayTick; refresh here so death/clear
+* frames still show the last orient bit every VBL.
+	jsr	ChaseModeInd
 	plp
 	rts

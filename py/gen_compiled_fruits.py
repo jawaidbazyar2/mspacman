@@ -47,16 +47,19 @@ FRUITS = (
     (7, 0x09, "Junior"),  # table lists #00; PROM bank 0 is blank
 )
 
-# Color-ROM index → preferred SHR pen (§2; red→5, pale→1 not COL_POWER)
+# Color-ROM index → preferred SHR pen (§2).
+# Red→3 (maze-red alias), orange→12 (spare alias of Clyde): same RGBs as
+# pens 5/11 at rest, but fright palette pokes only poke ghost body pens
+# 5/7/9/11 — fruit must not share those nibbles or cherries turn blue.
 _ROM_TO_SHR = {
     0: 0,
-    1: 5,
+    1: 3,   # red (cherry/strawberry/apple) — not COL_BLINKY
     2: 6,
     3: 7,
     4: 0,
     5: 9,
     6: 10,
-    7: 11,
+    7: 12,  # orange (peach/pretzel) — not COL_CLYDE
     8: 0,
     9: 13,
     10: 0,
