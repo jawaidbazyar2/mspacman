@@ -121,7 +121,8 @@ Merlin `org $0000` → loaded at `$02/0000`.
 | `$02/8000`–`$02/8363` | `TILEMAP` | 868 | 28×31 tile codes (copy of `AST_MAZE`) |
 | `$02/8364`–`$02/83FF` | — | — | Unused pad to actors |
 | `$02/8400`–`$02/845F` | `ACTORS` | 96 | 6 actors × 16 bytes (4 ghosts + fruit + Ms. Pac) |
-| `$02/8460`–`$02/87FF` | — | — | Free (was save-under; erase uses `$01` BCK) |
+| `$02/8460`–`$02/859F` | `RAM4D` | 320 | **Game build:** arcade `#4D00`–`#4E3F` mirror (actor physics, speeds, modes, dots). Demo unused. |
+| `$02/85A0`–`$02/87FF` | — | — | Free |
 
 ### Actor record (`ACT_SIZE` = 16)
 
@@ -200,10 +201,23 @@ Host writes these before `CALL 768`. Packed 4bpp; already upright (CW + row XOR 
 
 ---
 
+## Game-build arcade RAM (`RAM4D` @ `$028460` == `#4D00`)
+
+Field equates in [`iigs/equates.s`](../iigs/equates.s) (`PAC_X`, `RED_DIR`, `DOTS_EATEN`, `LEVEL_STATE`, …). Offsets match [`src/ram.inc`](../src/ram.inc). Soft `STICK_IN0` / fruit timers sit just after the `#4E` block (`$028590+`).
+
+`ActorPublish` converts arcade pixel (Y,X) → upright SHR `ACT_X`/`ACT_Y` (tile map from `j_0065` / `gen_maze1` upright extract, then ×6/8 + `SPR_BASE_*`).
+
+## Dual builds
+
+| Artifact | Link unit | `FrameTick` | Uses `RAM4D` |
+|----------|-----------|-------------|--------------|
+| `harness.bin` | `link_demo.s` | `DemoTick` | no |
+| `game.bin` | `link_game.s` | `LogicTick` | yes |
+
 ## Gaps / constraints
 
 1. **Code must stay below `$02/8000`** (working RAM starts there).
-2. Six actors: 6×16 = 96 → actors through `$845F`.
+2. Six actors: 6×16 = 96 → actors through `$845F`; game RAM starts at `$8460`.
 3. Dirty playfield changes must update **both** SHR and the BCK strip.
 4. Odd sprite/mask forms are **host-injected** (not generated on target in the current harness).
 

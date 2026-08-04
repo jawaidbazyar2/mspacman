@@ -1,7 +1,7 @@
 *
-* Merlin32 link — flat binary at $0000 (loaded to bank $02)
+* Compatibility link → demo harness.bin (same as link_demo.s).
 *
 	dsk	harness.bin
 	org	$0000
 	typ	$06
-	asm	all.s
+	asm	all_demo.s

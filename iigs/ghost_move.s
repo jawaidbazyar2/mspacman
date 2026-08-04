@@ -1,0 +1,513 @@
+*
+* Ghost motion — == j_1b36 / j_1c4b / j_1d22 / j_1df9 (four similar bodies).
+*
+	mx	%00
+
+GhostsMoveAll
+	php
+	jsr	GhostMoveRed
+	jsr	GhostMovePink
+	jsr	GhostMoveBlue
+	jsr	GhostMoveOrange
+	plp
+	rts
+
+GhostSpeedStep
+* 32-bit ROL on SPD_RED_NORM; C = move (same fix as RotSpeedNorm)
+	sep	#$20
+	lda	>SPD_RED_NORM
+	asl	a
+	sta	>SPD_RED_NORM
+	lda	>SPD_RED_NORM+1
+	rol	a
+	sta	>SPD_RED_NORM+1
+	lda	>SPD_RED_NORM+2
+	rol	a
+	sta	>SPD_RED_NORM+2
+	lda	>SPD_RED_NORM+3
+	rol	a
+	sta	>SPD_RED_NORM+3
+	bcc	:out
+	lda	>SPD_RED_NORM
+	ora	#$01
+	sta	>SPD_RED_NORM
+	sec
+:out	rts
+
+GhostStepXY
+* In: Y addr in R_TMP (low16 of RED_Y etc), dy at tile_dy addr in R_OFF
+* Uses R_ACT as ghost index unused — expects:
+*   R_BASE = long? Simpler: pass via fixed labels per caller.
+	rts
+
+* ---------------------------------------------------------------
+GhostMoveRed
+* == j_1b36
+	php
+	sep	#$20
+	lda	>RED_STATE
+	beq	:go
+	plp
+	rts
+:go	jsr	GhostSpeedStep
+	bcs	:do
+	plp
+	rts
+:do	sep	#$20			; GhostSpeedStep leaves 16-bit A
+* == j_1bd8: decide on the motion axis only (not both X&Y).
+* Vertical movers spawn at X&7==0; requiring both forever skipped AI.
+	lda	>RED_TILE_DY
+	beq	:cx
+	lda	>RED_Y
+	and	#$07
+	cmp	#$04
+	bne	:step
+	bra	:dec
+:cx	lda	>RED_X
+	and	#$07
+	cmp	#$04
+	bne	:step
+:dec	jsr	RedDecide
+:step	sep	#$20
+	lda	>RED_TILE_DY
+	beq	:xr
+	bmi	:ru
+* no vertical wrap (unlike tunnel X) — Y $FF→$00 teleports top↔bottom
+	lda	>RED_Y
+	inc
+	beq	:fix
+	sta	>RED_Y
+	bra	:fix
+:ru	lda	>RED_Y
+	beq	:fix
+	dec
+	sta	>RED_Y
+	bra	:fix
+:xr	lda	>RED_TILE_DY+1
+	beq	:fix
+	bmi	:rl
+	lda	>RED_X
+	inc
+	sta	>RED_X
+	bra	:fix
+:rl	lda	>RED_X
+	dec
+	sta	>RED_X
+:fix	lda	>RED_Y
+	lsr
+	lsr
+	lsr
+	clc
+	adc	#$20
+	sta	>RED_TILE_Y
+	lda	>RED_X
+	lsr
+	lsr
+	lsr
+	clc
+	adc	#$1E
+	sta	>RED_TILE_X
+	plp
+	rts
+
+GhostMovePink
+* == j_1c4b
+	php
+	sep	#$20
+	lda	>DOTS_EATEN
+	cmp	#15
+	bcs	:rel
+	plp
+	rts
+:rel	lda	>PINK_STATE
+	beq	:go
+	plp
+	rts
+:go	jsr	GhostSpeedStep
+	bcs	:do
+	plp
+	rts
+:do	sep	#$20
+	lda	>PINK_TILE_DY
+	beq	:cx
+	lda	>PINK_Y
+	and	#$07
+	cmp	#$04
+	bne	:step
+	bra	:dec
+:cx	lda	>PINK_X
+	and	#$07
+	cmp	#$04
+	bne	:step
+:dec	jsr	PinkDecide
+:step	sep	#$20
+	lda	>PINK_TILE_DY
+	beq	:xp
+	bmi	:pu
+	lda	>PINK_Y
+	inc
+	beq	:fix
+	sta	>PINK_Y
+	bra	:fix
+:pu	lda	>PINK_Y
+	beq	:fix
+	dec
+	sta	>PINK_Y
+	bra	:fix
+:xp	lda	>PINK_TILE_DY+1
+	beq	:fix
+	bmi	:pl
+	lda	>PINK_X
+	inc
+	sta	>PINK_X
+	bra	:fix
+:pl	lda	>PINK_X
+	dec
+	sta	>PINK_X
+:fix	lda	>PINK_Y
+	lsr
+	lsr
+	lsr
+	clc
+	adc	#$20
+	sta	>PINK_TILE_Y
+	lda	>PINK_X
+	lsr
+	lsr
+	lsr
+	clc
+	adc	#$1E
+	sta	>PINK_TILE_X
+	plp
+	rts
+
+GhostMoveBlue
+* == j_1d22
+	php
+	sep	#$20
+	lda	>DOTS_EATEN
+	cmp	#30
+	bcs	:rel
+	plp
+	rts
+:rel	lda	>BLUE_STATE
+	beq	:go
+	plp
+	rts
+:go	jsr	GhostSpeedStep
+	bcs	:do
+	plp
+	rts
+:do	sep	#$20
+	lda	>BLUE_TILE_DY
+	beq	:cx
+	lda	>BLUE_Y
+	and	#$07
+	cmp	#$04
+	bne	:step
+	bra	:dec
+:cx	lda	>BLUE_X
+	and	#$07
+	cmp	#$04
+	bne	:step
+:dec	jsr	BlueDecide
+:step	sep	#$20
+	lda	>BLUE_TILE_DY
+	beq	:xb
+	bmi	:bu
+	lda	>BLUE_Y
+	inc
+	beq	:fix
+	sta	>BLUE_Y
+	bra	:fix
+:bu	lda	>BLUE_Y
+	beq	:fix
+	dec
+	sta	>BLUE_Y
+	bra	:fix
+:xb	lda	>BLUE_TILE_DY+1
+	beq	:fix
+	bmi	:bl
+	lda	>BLUE_X
+	inc
+	sta	>BLUE_X
+	bra	:fix
+:bl	lda	>BLUE_X
+	dec
+	sta	>BLUE_X
+:fix	lda	>BLUE_Y
+	lsr
+	lsr
+	lsr
+	clc
+	adc	#$20
+	sta	>BLUE_TILE_Y
+	lda	>BLUE_X
+	lsr
+	lsr
+	lsr
+	clc
+	adc	#$1E
+	sta	>BLUE_TILE_X
+	plp
+	rts
+
+GhostMoveOrange
+* == j_1df9
+	php
+	sep	#$20
+	lda	>DOTS_EATEN
+	cmp	#60
+	bcs	:rel
+	plp
+	rts
+:rel	lda	>ORANGE_STATE
+	beq	:go
+	plp
+	rts
+:go	jsr	GhostSpeedStep
+	bcs	:do
+	plp
+	rts
+:do	sep	#$20
+	lda	>ORANGE_TILE_DY
+	beq	:cx
+	lda	>ORANGE_Y
+	and	#$07
+	cmp	#$04
+	bne	:step
+	bra	:dec
+:cx	lda	>ORANGE_X
+	and	#$07
+	cmp	#$04
+	bne	:step
+:dec	jsr	OrangeDecide
+:step	sep	#$20
+	lda	>ORANGE_TILE_DY
+	beq	:xo
+	bmi	:ou
+	lda	>ORANGE_Y
+	inc
+	beq	:fix
+	sta	>ORANGE_Y
+	bra	:fix
+:ou	lda	>ORANGE_Y
+	beq	:fix
+	dec
+	sta	>ORANGE_Y
+	bra	:fix
+:xo	lda	>ORANGE_TILE_DY+1
+	beq	:fix
+	bmi	:ol
+	lda	>ORANGE_X
+	inc
+	sta	>ORANGE_X
+	bra	:fix
+:ol	lda	>ORANGE_X
+	dec
+	sta	>ORANGE_X
+:fix	lda	>ORANGE_Y
+	lsr
+	lsr
+	lsr
+	clc
+	adc	#$20
+	sta	>ORANGE_TILE_Y
+	lda	>ORANGE_X
+	lsr
+	lsr
+	lsr
+	clc
+	adc	#$1E
+	sta	>ORANGE_TILE_X
+	plp
+	rts
+
+* Tile-center AI decisions (keep GhostMove* branches short for Merlin)
+* Target: scatter corner if frightened OR ghost_orient_index bit0=0 (even);
+* else chase (pink: 4 tiles ahead). Bit0 matches j_2730 / j_278e gate.
+
+RedDecide
+	php
+	sep	#$20
+	lda	>RED_REVERSE
+	beq	:nr
+	lda	#0
+	sta	>RED_REVERSE
+	lda	>RED_DIR
+	eor	#$02
+	sta	>RED_DIR
+:nr	lda	>RED_TILE_Y
+	sta	>PATH_CUR_Y
+	lda	>RED_TILE_X
+	sta	>PATH_CUR_X
+	lda	>RED_FRIGHT
+	bne	:scat
+	lda	>GHOST_ORIENT_IDX
+	and	#$01
+	bne	:chase
+:scat	lda	ScatterRed
+	sta	>PATH_DST_Y
+	lda	ScatterRed+1
+	sta	>PATH_DST_X
+	bra	:aim
+:chase	lda	>PAC_TILE_Y
+	sta	>PATH_DST_Y
+	lda	>PAC_TILE_X
+	sta	>PATH_DST_X
+:aim	lda	>RED_DIR
+	jsr	Pathfind2966
+	sep	#$30
+	sta	>RED_DIR
+	asl
+	tax
+	lda	DirDelta,x
+	sta	>RED_TILE_DY
+	lda	DirDelta+1,x
+	sta	>RED_TILE_DY+1
+	plp
+	rts
+
+PinkDecide
+	php
+	sep	#$20
+	lda	>PINK_REVERSE
+	beq	:nr
+	lda	#0
+	sta	>PINK_REVERSE
+	lda	>PINK_DIR
+	eor	#$02
+	sta	>PINK_DIR
+:nr	lda	>PINK_TILE_Y
+	sta	>PATH_CUR_Y
+	lda	>PINK_TILE_X
+	sta	>PATH_CUR_X
+	lda	>PINK_FRIGHT
+	bne	:scat
+	lda	>GHOST_ORIENT_IDX
+	and	#$01
+	bne	:chase
+:scat	lda	ScatterPink
+	sta	>PATH_DST_Y
+	lda	ScatterPink+1
+	sta	>PATH_DST_X
+	bra	:aim
+:chase	sep	#$30
+	lda	>PAC_DIR
+	asl
+	tax
+	lda	>PAC_TILE_Y
+	clc
+	adc	DirDelta,x
+	clc
+	adc	DirDelta,x
+	clc
+	adc	DirDelta,x
+	clc
+	adc	DirDelta,x
+	sta	>PATH_DST_Y
+	lda	>PAC_TILE_X
+	clc
+	adc	DirDelta+1,x
+	clc
+	adc	DirDelta+1,x
+	clc
+	adc	DirDelta+1,x
+	clc
+	adc	DirDelta+1,x
+	sta	>PATH_DST_X
+:aim	sep	#$20
+	lda	>PINK_DIR
+	jsr	Pathfind2966
+	sep	#$30
+	sta	>PINK_DIR
+	asl
+	tax
+	lda	DirDelta,x
+	sta	>PINK_TILE_DY
+	lda	DirDelta+1,x
+	sta	>PINK_TILE_DY+1
+	plp
+	rts
+
+BlueDecide
+	php
+	sep	#$20
+	lda	>BLUE_REVERSE
+	beq	:nr
+	lda	#0
+	sta	>BLUE_REVERSE
+	lda	>BLUE_DIR
+	eor	#$02
+	sta	>BLUE_DIR
+:nr	lda	>BLUE_TILE_Y
+	sta	>PATH_CUR_Y
+	lda	>BLUE_TILE_X
+	sta	>PATH_CUR_X
+	lda	>BLUE_FRIGHT
+	bne	:scat
+	lda	>GHOST_ORIENT_IDX
+	and	#$01
+	bne	:chase
+:scat	lda	ScatterBlue
+	sta	>PATH_DST_Y
+	lda	ScatterBlue+1
+	sta	>PATH_DST_X
+	bra	:aim
+:chase	lda	>PAC_TILE_Y
+	sta	>PATH_DST_Y
+	lda	>PAC_TILE_X
+	sta	>PATH_DST_X
+:aim	lda	>BLUE_DIR
+	jsr	Pathfind2966
+	sep	#$30
+	sta	>BLUE_DIR
+	asl
+	tax
+	lda	DirDelta,x
+	sta	>BLUE_TILE_DY
+	lda	DirDelta+1,x
+	sta	>BLUE_TILE_DY+1
+	plp
+	rts
+
+OrangeDecide
+	php
+	sep	#$20
+	lda	>ORANGE_REVERSE
+	beq	:nr
+	lda	#0
+	sta	>ORANGE_REVERSE
+	lda	>ORANGE_DIR
+	eor	#$02
+	sta	>ORANGE_DIR
+:nr	lda	>ORANGE_TILE_Y
+	sta	>PATH_CUR_Y
+	lda	>ORANGE_TILE_X
+	sta	>PATH_CUR_X
+	lda	>ORANGE_FRIGHT
+	bne	:scat
+	lda	>GHOST_ORIENT_IDX
+	and	#$01
+	bne	:chase
+:scat	lda	ScatterOrange
+	sta	>PATH_DST_Y
+	lda	ScatterOrange+1
+	sta	>PATH_DST_X
+	bra	:aim
+:chase	lda	>PAC_TILE_Y
+	sta	>PATH_DST_Y
+	lda	>PAC_TILE_X
+	sta	>PATH_DST_X
+:aim	lda	>ORANGE_DIR
+	jsr	Pathfind2966
+	sep	#$30
+	sta	>ORANGE_DIR
+	asl
+	tax
+	lda	DirDelta,x
+	sta	>ORANGE_TILE_DY
+	lda	DirDelta+1,x
+	sta	>ORANGE_TILE_DY+1
+	plp
+	rts

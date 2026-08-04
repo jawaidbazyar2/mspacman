@@ -29,11 +29,13 @@ MERLIN_LIB ?= $(HOME)/src/Merlin32_v1.1/Library
 IIGS_DIR  := iigs
 IIGS_BUILD := $(BUILD_DIR)/iigs
 IIGS_BIN  := $(IIGS_BUILD)/harness.bin
+IIGS_GAME_BIN := $(IIGS_BUILD)/game.bin
 
 GSSQUARED ?= $(HOME)/src/gssquared/build/GSSquared
 GS2_PY    := $(HOME)/src/gssquared/clients/python/src
 
-.PHONY: all clean verify sjasmplus-check gfx gfx-ppm palette maze tiles-preview iigs iigs-test iigs-demo
+.PHONY: all clean verify sjasmplus-check gfx gfx-ppm palette maze tiles-preview \
+	iigs iigs-test iigs-demo iigs-game iigs-game-test iigs-game-demo
 
 all: $(BIN)
 
@@ -93,9 +95,15 @@ tiles-preview: maze
 		$(if $(COMPARE),--compare $(COMPARE),) \
 		--out $(GFX_DIR)/ppm
 
-# Assemble IIgs render harness with Merlin32 → build/iigs/harness.bin
-iigs: palette rails gfx $(IIGS_DIR)/compiled_ghosts.s $(IIGS_DIR)/compiled_fruits.s \
-		$(IIGS_DIR)/compiled_mspac.s $(IIGS_BIN)
+# Shared compiled blit deps
+IIGS_COMPILED := $(IIGS_DIR)/compiled_ghosts.s $(IIGS_DIR)/compiled_fruits.s \
+		$(IIGS_DIR)/compiled_mspac.s
+
+# Assemble IIgs rail demo → build/iigs/harness.bin
+iigs: palette rails gfx $(IIGS_COMPILED) $(IIGS_BIN)
+
+# Assemble IIgs game-logic build → build/iigs/game.bin
+iigs-game: palette gfx maze $(IIGS_COMPILED) $(IIGS_GAME_BIN)
 
 $(IIGS_DIR)/compiled_ghosts.s: py/gen_compiled_ghosts.py \
 		$(GFX_DIR)/sprites14x12.bin $(GFX_DIR)/sprites14x12.mask.bin \
@@ -116,18 +124,42 @@ $(IIGS_DIR)/ghost_work_blit.s: py/gen_ghost_work_blit.py
 $(IIGS_BUILD):
 	mkdir -p $(IIGS_BUILD)
 
-$(IIGS_BIN): $(IIGS_DIR)/link.s $(IIGS_DIR)/all.s $(IIGS_DIR)/equates.s \
+IIGS_DEMO_SRCS := $(IIGS_DIR)/link_demo.s $(IIGS_DIR)/all_demo.s $(IIGS_DIR)/equates.s \
+		$(IIGS_DIR)/frame_body.s $(IIGS_DIR)/demo_tick.s \
 		$(IIGS_DIR)/shr_body.s $(IIGS_DIR)/render_body.s \
-		$(IIGS_DIR)/compiled_ghosts.s $(IIGS_DIR)/compiled_fruits.s \
-		$(IIGS_DIR)/compiled_mspac.s \
-		$(IIGS_DIR)/harness_body.s $(IIGS_DIR)/hud_body.s \
-		$(IIGS_DIR)/rails_data.s \
-		$(IIGS_DIR)/palette_data.s \
-		$(MERLIN32) | $(IIGS_BUILD)
-	cd $(IIGS_DIR) && $(MERLIN32) -V $(MERLIN_LIB) link.s || test -f harness.bin
+		$(IIGS_COMPILED) \
+		$(IIGS_DIR)/rails_body.s $(IIGS_DIR)/hud_body.s \
+		$(IIGS_DIR)/rails_data.s $(IIGS_DIR)/palette_data.s
+
+IIGS_GAME_SRCS := $(IIGS_DIR)/link_game.s $(IIGS_DIR)/all_game.s $(IIGS_DIR)/equates.s \
+		$(IIGS_DIR)/frame_body.s $(IIGS_DIR)/game_tick.s \
+		$(IIGS_DIR)/input_adapt.s $(IIGS_DIR)/logic_data.s \
+		$(IIGS_DIR)/maze_state.s $(IIGS_DIR)/ghost_ai.s \
+		$(IIGS_DIR)/mspac_move.s $(IIGS_DIR)/ghost_move.s \
+		$(IIGS_DIR)/collide.s $(IIGS_DIR)/fruit.s \
+		$(IIGS_DIR)/play_tick.s $(IIGS_DIR)/level_fsm.s \
+		$(IIGS_DIR)/actor_publish.s $(IIGS_DIR)/game_init.s \
+		$(IIGS_DIR)/shr_body.s $(IIGS_DIR)/render_body.s \
+		$(IIGS_COMPILED) \
+		$(IIGS_DIR)/hud_body.s $(IIGS_DIR)/palette_data.s
+
+$(IIGS_BIN): $(IIGS_DEMO_SRCS) $(MERLIN32) | $(IIGS_BUILD)
+	rm -f $(IIGS_DIR)/harness.bin
+	cd $(IIGS_DIR) && $(MERLIN32) -V $(MERLIN_LIB) link_demo.s; \
+		test -f harness.bin
 	mv -f $(IIGS_DIR)/harness.bin $(IIGS_BIN)
-	@mv -f $(IIGS_DIR)/_Output.txt $(IIGS_BUILD)/harness_Output.txt
-	@rm -f $(IIGS_DIR)/_FileInformation.txt $(IIGS_DIR)/harness.bin_Output.txt 2>/dev/null; true
+	@mv -f $(IIGS_DIR)/_Output.txt $(IIGS_BUILD)/harness_Output.txt 2>/dev/null; true
+	@rm -f $(IIGS_DIR)/_FileInformation.txt $(IIGS_DIR)/harness.bin_Output.txt \
+		$(IIGS_DIR)/error_output.txt 2>/dev/null; true
+
+$(IIGS_GAME_BIN): $(IIGS_GAME_SRCS) $(MERLIN32) | $(IIGS_BUILD)
+	rm -f $(IIGS_DIR)/game.bin
+	cd $(IIGS_DIR) && $(MERLIN32) -V $(MERLIN_LIB) link_game.s; \
+		test -f game.bin
+	mv -f $(IIGS_DIR)/game.bin $(IIGS_GAME_BIN)
+	@mv -f $(IIGS_DIR)/_Output.txt $(IIGS_BUILD)/game_Output.txt 2>/dev/null; true
+	@rm -f $(IIGS_DIR)/_FileInformation.txt $(IIGS_DIR)/game.bin_Output.txt \
+		$(IIGS_DIR)/error_output.txt 2>/dev/null; true
 
 # Spawn GSSquared, inject harness + assets, dump SHR frame PNG.
 iigs-test: gfx maze iigs
@@ -138,11 +170,22 @@ iigs-test: gfx maze iigs
 		--out $(IIGS_BUILD)/frame.png \
 		--run-seconds 2.0
 
+iigs-game-test: gfx maze iigs-game
+	PYTHONPATH=$(GS2_PY) python3 py/gs2_render_test.py \
+		--gs2 $(GSSQUARED) \
+		--bin $(IIGS_GAME_BIN) \
+		--gfx $(GFX_DIR) \
+		--out $(IIGS_BUILD)/game_frame.png \
+		--run-seconds 2.0
+
 # Interactive demo: one process builds (if needed), spawns GS2, waits for Enter.
 iigs-demo:
 	GS2_PY=$(GS2_PY) GSSQUARED=$(GSSQUARED) python3 py/gs2_run_demo.py
 
+iigs-game-demo:
+	GS2_PY=$(GS2_PY) GSSQUARED=$(GSSQUARED) python3 py/gs2_run_demo.py --bin $(IIGS_GAME_BIN) --make-target iigs-game
+
 clean:
 	rm -rf $(BUILD_DIR)
-	rm -f $(IIGS_DIR)/harness.bin $(IIGS_DIR)/_FileInformation.txt \
+	rm -f $(IIGS_DIR)/harness.bin $(IIGS_DIR)/game.bin $(IIGS_DIR)/_FileInformation.txt \
 		$(IIGS_DIR)/*_Output.txt 2>/dev/null; true

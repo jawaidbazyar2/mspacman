@@ -42,17 +42,17 @@ except ImportError as exc:  # pragma: no cover
     ) from exc
 
 
-def ensure_build(build: bool) -> None:
+def ensure_build(build: bool, make_target: str, bin_path: Path) -> None:
     gfx_ok = (rt.DEFAULT_GFX / "tiles6.bin").is_file() and (
         rt.DEFAULT_GFX / "maze1_cells.bin"
     ).is_file()
-    bin_ok = rt.DEFAULT_BIN.is_file()
+    bin_ok = bin_path.is_file()
     if not build and bin_ok and gfx_ok:
         return
     targets = []
     if not gfx_ok or build:
         targets.extend(["gfx", "maze"])
-    targets.append("iigs")
+    targets.append(make_target)
     print(f"building: make {' '.join(targets)}")
     subprocess.check_call(["make", *targets], cwd=ROOT)
 
@@ -85,14 +85,25 @@ def main() -> int:
         action="store_true",
         help="do not run make; require existing harness + gfx",
     )
+    ap.add_argument(
+        "--bin",
+        type=Path,
+        default=rt.DEFAULT_BIN,
+        help="65816 binary to inject (default: harness.bin demo)",
+    )
+    ap.add_argument(
+        "--make-target",
+        default="iigs",
+        help="make target when building (iigs or iigs-game)",
+    )
     ap.add_argument("--boot-wait", type=float, default=5.0)
     ap.add_argument("--post-reset-wait", type=float, default=2.0)
     args = ap.parse_args()
 
-    ensure_build(build=not args.no_build)
+    ensure_build(build=not args.no_build, make_target=args.make_target, bin_path=args.bin)
 
     for need in (
-        rt.DEFAULT_BIN,
+        args.bin,
         rt.DEFAULT_GFX / "tiles6.bin",
         rt.DEFAULT_GFX / "sprites14x12.bin",
         rt.DEFAULT_GFX / "sprites14x12.mask.bin",
@@ -130,7 +141,7 @@ def main() -> int:
             except TimeoutError:
                 print("warning: no EVT_STOPPED after pre-inject pause")
 
-            rt.inject_assets(client, rt.DEFAULT_BIN, rt.DEFAULT_GFX)
+            rt.inject_assets(client, args.bin, rt.DEFAULT_GFX)
             rt.install_page3_trampoline(client)
             # Ensure freeze off for live demo
             client.write_mem(MEM_MAIN, rt.DEMO_FREEZE_ADDR, bytes([0]))

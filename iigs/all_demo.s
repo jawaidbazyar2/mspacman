@@ -1,6 +1,6 @@
 *
-* Compatibility alias for all_demo.s (rail demo build).
-* make iigs uses link_demo.s → all_demo.s.
+* Demo build translation unit (rail tour).
+* make iigs → build/iigs/harness.bin
 *
 	xc
 	xc

@@ -714,7 +714,14 @@ DrawSprite
 	adc	#ACTORS16
 	sta	<R_BASE
 	tax
-	lda	>BANK2+ACT_X,x
+	lda	>BANK2+ACT_FLAGS,x
+	and	#$00FF
+	and	#FLAG_NODRAW
+	beq	:doDraw
+	plb
+	plp
+	rts
+:doDraw	lda	>BANK2+ACT_X,x
 	sta	<R_X
 	lda	>BANK2+ACT_Y,x
 	sta	<R_Y

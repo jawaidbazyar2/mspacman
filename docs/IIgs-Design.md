@@ -10,11 +10,11 @@ Design notes for porting arcade Ms. Pac-Man (`mspacmab`) to the Apple IIgs. This
 | §3 coords / motion | **Locked** (arcade sim → SHR blit) |
 | §3.1 Frame loop & VBL | **Locked (v1)** |
 | §3.2 Graphics asset pipeline | **Locked (v1)** |
-| §3.3 Render harness (Merlin32) | **Scaffolding live** |
+| §3.3 Render harness (Merlin32) | **Dual builds live** (demo + game) |
 | §3.4 Side HUD | **Live (v1)** — chrome, scores, lives, level fruit |
 | §4 Input | **Locked (v1 keyboard)** |
 | §5 Sound | TBD |
-| §6 CPU / memory model | **Harness map locked (v1)** |
+| §6 CPU / memory model | **Locked** — semantic 65816 + structural Z80 anchors |
 
 Related: [Rom.Files.md](../Rom.Files.md) (arcade hardware / ROM map), [AGENTS.md](../AGENTS.md) (repo conventions).
 
@@ -401,7 +401,7 @@ Write SHR through bank `$01` shadow at full CPU speed. Avoid long poke loops int
 
 - Arcade's 7-icon level-fruit strip (`#3B08`) — the HUD shows the current level's fruit only.
 - No beam-trailing plan beyond “measure first, then consider.”
-- No full game logic / Z80 translation yet.
+- Attract / coin / intermission VMs (game build is maze-play first; see §6).
 
 ---
 
@@ -459,24 +459,37 @@ Helper: [`py/gen_maze1.py`](../py/gen_maze1.py).
 
 ### Decision
 
-First on-target milestone: a **65816 soft-render module** (tiles + masked soft sprites + `$01` BCK-strip erase) driven by a GSSquared inject/run test — not a full game.
+Two Merlin32 builds share the soft-render shell (`frame_body.s`: erase → dirty → draw → commit → **`FrameTick`** → sort → VBL). Mode-specific work is only the tick + init:
+
+| Build | Make | Output | `FrameTick` | Notes |
+|-------|------|--------|-------------|-------|
+| **Demo** | `make iigs` | `build/iigs/harness.bin` | `DemoTick` (rails) | Unchanged rail-tour workflow |
+| **Game** | `make iigs-game` | `build/iigs/game.bin` | `LogicTick` | Ported arcade play (level 1) |
 
 | Piece | Path |
 |-------|------|
-| Merlin32 sources | [`iigs/`](../iigs/) (`all.s` + `*_body.s`, link → `build/iigs/harness.bin`) |
-| Host driver | [`py/gs2_render_test.py`](../py/gs2_render_test.py) |
-| SHR → PNG | [`py/shr_dump_png.py`](../py/shr_dump_png.py) |
+| Shared shell | [`iigs/frame_body.s`](../iigs/frame_body.s), render/HUD/SHR, compiled blits |
+| Demo | [`iigs/all_demo.s`](../iigs/all_demo.s) / [`link_demo.s`](../iigs/link_demo.s), `demo_tick.s`, `rails_body.s` |
+| Game | [`iigs/all_game.s`](../iigs/all_game.s) / [`link_game.s`](../iigs/link_game.s), `game_tick.s`, logic modules |
+| Host driver | [`py/gs2_render_test.py`](../py/gs2_render_test.py), [`py/gs2_run_demo.py`](../py/gs2_run_demo.py) |
+| Port checklist | [`IIgs-LogicPort.md`](IIgs-LogicPort.md) |
 
 ```bash
-make iigs        # Merlin32 assemble
-make iigs-test   # spawn GSSquared, inject, CALL 768, dump build/iigs/frame.png
+make iigs             # demo → harness.bin
+make iigs-test        # GS2 + harness.bin → frame.png
+make iigs-demo        # interactive rail demo
+make iigs-game        # game → game.bin
+make iigs-game-test   # GS2 + game.bin → game_frame.png
+make iigs-game-demo   # interactive game build
 ```
 
 **Boot into Applesoft:** wait ~5s after spawn → **Control-Reset** (Ctrl+F12; not Control-OA-Reset) → BASIC `%` prompt → poke trampoline at `$00/0300` → type `CALL 768`.
 
-Harness maze tiles must match `make gfx` upright orientation (CW + row XOR 3). Ground-truth previews: `build/gfx/ppm/maze1_8x8_upright.png` / `maze1_6x6_upright.png`.
+Harness maze tiles must match `make gfx` upright orientation (CW + row XOR 3).
 
-**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`py/gen_ghost_rails.py` → `iigs/rails_data.s`). Rails write **new** `ACT_X`/`ACT_Y` and `ACT_SPR` (arcade facing `$20–$27`: `dir×2 + ((FRAME_COUNT>>3)&1) + $20`). Draw uses **compiled** masked blits (`py/gen_compiled_ghosts.py` → `GhostBlitTable`, color×frame×parity); no per-frame `PrepOneGhost` / `SPR_WORK*`. A fifth actor (fruit) sits at fixed tile (14,17) with prebaked `FruitBlitTable` blits; `AdvanceFruit` cycles type `$00–$07` every 360 frames. Erase restores from `$01` BCK at **old** `ACT_OX`/`ACT_OY`; draw is masked blit only at new. Ghost bodies are baked from `ACT_COLOR` pens 5/7/9/11. Loop: erase→draw→commit→rails→fruit→VBL until a key at `$C000`/`$C010`, or host sets `DEMO_FREEZE` (`$02/8904`) before SHR capture. **Border** (`$C034`) changes per phase (red/green/blue/orange/black) for visual timing — see `BRD_*` in `equates.s` / [`UserTesting.md`](../UserTesting.md).
+**Rail demo:** four ghosts tour a shared pellet-tile waypoint loop (`rails_data.s`). Loop: erase→draw→commit→`DemoTick`→VBL until any key, or host sets `DEMO_FREEZE`. **Border** phase colors: `BRD_*` in `equates.s`.
+
+**Game build:** keyboard stick (A/Z/←/→), Esc/Q quit; arcade `#4D`/`#4E` mirror; publish → `ACT_*` each tick (§6).
 
 ---
 
@@ -513,7 +526,8 @@ Simulate the arcade **4-way stick** with keyboard **any-key-down** (level-sensit
 | Left | **←** (left arrow) |
 | Right | **→** (right arrow) |
 
-- Multiple held keys: last meaningful direction wins for intent, or prefer the axis that matches arcade “intended direction” buffering if that logic is ported — do not require diagonals (arcade stick is 4-way only).
+- Multiple held keys: last meaningful direction wins for intent — do not require diagonals (arcade stick is 4-way only).
+- Game build (`input_adapt.s`): IIgs keyboard is strobe-based, so directions are **latched** on key events into soft `STICK_IN0` (active-low like arcade `IN0`). Esc/Q quits. Demo build still exits on any key.
 - Start / coin (credit) / pause remain TBD; joystick hardware can be added later without changing this keyboard map.
 
 ---
@@ -526,19 +540,31 @@ TBD. Arcade Namco WSG → IIgs Ensoniq DOC (or simpler square/noise approximatio
 
 ## 6. CPU / memory model
 
-Full Z80↔65816 strategy TBD.
+### Locked port approach
 
-**Detailed harness map:** [`IIgs-MemoryMap.md`](IIgs-MemoryMap.md) (banks `$00`–`$03`/`$E1`, actor fields, asset ranges, scratch, ownership).
+**Semantic 65816 + structural Z80 anchors** (game build only):
 
-Summary:
+- Idiomatic Merlin32 (16-bit regs, DP, long banks).
+- Same routine responsibilities / call order as locked [`src/mspac.asm`](../src/mspac.asm) (`j_08eb`, `j_1017`×2, `j_1806`, `j_2966`, …).
+- Every module carries listing anchors (`; == j_xxxx`).
+- `#4D`/`#4E` field meanings (and offsets in the `$02/8460` mirror) preserved for MAME dumps.
+- No Z80 emulator; no full `RST #28`/`#30` task CPU — AI runs inline at the same control points the Z80 enqueued tasks.
+- Soft-render replaces VRAM / sprite ports; keyboard replaces `IN0`.
+
+**First playable scope:** single-maze (level 1). Attract / credit / intermissions stubbed (`game_mode = 3`).
+
+Living checklist: [`IIgs-LogicPort.md`](IIgs-LogicPort.md).
+
+### Memory (both builds)
+
+**Detailed map:** [`IIgs-MemoryMap.md`](IIgs-MemoryMap.md).
 
 | Bank / range | Contents |
 |--------------|----------|
-| `$02/0000` | Code + tilemap@`$8000` + actors + dirty + scratch |
+| `$02/0000` | Code (&lt; `$8000`) + tilemap@`$8000` + actors + dirty + HUD |
+| `$02/8460` | **Game only:** arcade `#4D00`–`#4E3F` mirror (`RAM4D`) |
 | `$03/0000` | Tiles, even/odd sprites+masks, maze, stitched cells |
 | `$01/2000` | SHR (`S_SHR`); **`$01/A000`** BCK strip (`S_BCK`) |
 | `$E1/2000` | Displayed SHR (host capture) |
 
-Playfield origin: **(76, 7)** for the 168×186 maze in 320×200; the leftover gutters hold the side HUD (§3.4).
-
-How much game logic is reimplemented vs translated remains open; soft-render replaces arcade tilemap + sprite hardware.
+Playfield origin: **(76, 7)**. Demo writes screen-space `ACT_*` from rails; game simulates arcade pixels and **publishes** via `ActorPublish` (6/8 map).
