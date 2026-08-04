@@ -733,6 +733,7 @@ DrawSprite
 	cmp	#PAC_ACTOR
 	beq	:pacBlit
 * Ghost: index = color_slot*16 + (ACT_SPR&7)*2 + (X&1)
+* slot: 5/7/9/11 → 0..3 (fright recolors via palette poke, not extra slots)
 	lda	<R_BASE
 	tax
 	lda	>BANK2+ACT_COLOR,x

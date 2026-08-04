@@ -109,16 +109,43 @@ EatAtPacTile
 	jsr	ArcadeTileIndex
 	rep	#$30			; word cmps (Merlin MX across JSR)
 	cmp	#$FFFF
-	beq	:done
-	cmp	#TILEMAP_CELLS
-	bcs	:done
-	tax
+	bne	:in
+	plp
+	rts
+:in	cmp	#TILEMAP_CELLS
+	bcc	:ok
+	plp
+	rts
+:ok	tax
 	lda	>TILEMAP,x
 	and	#$00FF
 	cmp	#TILE_DOT
 	beq	:dot
 	cmp	#TILE_POWER
-	bne	:done
+	beq	:pow
+	plp
+	rts
+:pow	jsr	EatPowerAtX		; X = tilemap index
+	plp
+	rts
+:dot	sep	#$20
+	lda	#TILE_EMPTY
+	sta	>TILEMAP,x
+	lda	>DOTS_EATEN
+	inc
+	sta	>DOTS_EATEN
+	jsr	HouseDotInc
+	rep	#$30
+	jsr	DirtyFromIndex
+	jsr	ScoreAdd10
+	jsr	DrawScore
+	jsr	CheckHighScore
+	plp
+	rts
+
+* X = tilemap index of energizer. == j_1a70 side effects
+EatPowerAtX
+	php
 	sep	#$20
 	lda	#TILE_EMPTY
 	sta	>TILEMAP,x
@@ -128,29 +155,30 @@ EatAtPacTile
 	sta	>PINK_FRIGHT
 	sta	>BLUE_FRIGHT
 	sta	>ORANGE_FRIGHT
-	lda	>FRIGHT_TIME
+	sta	>RED_REVERSE
+	sta	>PINK_REVERSE
+	sta	>BLUE_REVERSE
+	sta	>ORANGE_REVERSE
+	lda	#0
+	sta	>FRIGHT_FLASH_CNT
+	sta	>FRIGHT_FLASH_PHASE
+	rep	#$30
+	lda	>FRIGHT_TIME		; #4DBD → #4DCB
 	sta	>FRIGHT_TIMER
+	phx
+	jsr	FrightPaletteUpdate
+	sep	#$20
 	lda	>DOTS_EATEN
 	inc
 	sta	>DOTS_EATEN
+	jsr	HouseDotInc
 	rep	#$30
+	plx
 	jsr	DirtyFromIndex
 	jsr	ScoreAdd50
 	jsr	DrawScore
 	jsr	CheckHighScore
-	bra	:done
-:dot	sep	#$20
-	lda	#TILE_EMPTY
-	sta	>TILEMAP,x
-	lda	>DOTS_EATEN
-	inc
-	sta	>DOTS_EATEN
-	rep	#$30
-	jsr	DirtyFromIndex
-	jsr	ScoreAdd10
-	jsr	DrawScore
-	jsr	CheckHighScore
-:done	plp
+	plp
 	rts
 
 DirtyFromIndex

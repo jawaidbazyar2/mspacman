@@ -42,12 +42,15 @@ GhostStepXY
 
 * ---------------------------------------------------------------
 GhostMoveRed
-* == j_1b36
+* == j_1b36 — maze AI only when SUBSTATE≠0 (outside) and alive
 	php
 	sep	#$20
+	lda	>RED_SUBSTATE
+	beq	:skip
 	lda	>RED_STATE
-	beq	:go
-	plp
+	bne	:skip
+	bra	:go
+:skip	plp
 	rts
 :go	jsr	GhostSpeedStep
 	bcs	:do
@@ -111,17 +114,16 @@ GhostMoveRed
 	rts
 
 GhostMovePink
-* == j_1c4b
+* == j_1c4b — maze AI only when SUBSTATE==1
 	php
 	sep	#$20
-	lda	>DOTS_EATEN
-	cmp	#15
-	bcs	:rel
-	plp
-	rts
-:rel	lda	>PINK_STATE
-	beq	:go
-	plp
+	lda	>PINK_SUBSTATE
+	cmp	#1
+	bne	:skip
+	lda	>PINK_STATE
+	bne	:skip
+	bra	:go
+:skip	plp
 	rts
 :go	jsr	GhostSpeedStep
 	bcs	:do
@@ -182,17 +184,16 @@ GhostMovePink
 	rts
 
 GhostMoveBlue
-* == j_1d22
+* == j_1d22 — maze AI only when SUBSTATE==1
 	php
 	sep	#$20
-	lda	>DOTS_EATEN
-	cmp	#30
-	bcs	:rel
-	plp
-	rts
-:rel	lda	>BLUE_STATE
-	beq	:go
-	plp
+	lda	>BLUE_SUBSTATE
+	cmp	#1
+	bne	:skip
+	lda	>BLUE_STATE
+	bne	:skip
+	bra	:go
+:skip	plp
 	rts
 :go	jsr	GhostSpeedStep
 	bcs	:do
@@ -253,17 +254,16 @@ GhostMoveBlue
 	rts
 
 GhostMoveOrange
-* == j_1df9
+* == j_1df9 — maze AI only when SUBSTATE==1
 	php
 	sep	#$20
-	lda	>DOTS_EATEN
-	cmp	#60
-	bcs	:rel
-	plp
-	rts
-:rel	lda	>ORANGE_STATE
-	beq	:go
-	plp
+	lda	>ORANGE_SUBSTATE
+	cmp	#1
+	bne	:skip
+	lda	>ORANGE_STATE
+	bne	:skip
+	bra	:go
+:skip	plp
 	rts
 :go	jsr	GhostSpeedStep
 	bcs	:do
@@ -327,17 +327,30 @@ GhostMoveOrange
 * Target: scatter corner if frightened OR ghost_orient_index bit0=0 (even);
 * else chase (pink: 4 tiles ahead). Bit0 matches j_2730 / j_278e gate.
 
+* Reverse (== j_1efe): PREV_DIR⊕2 → DIR/TILE_DY, skip AI this center.
+* Arcade runs reverse after AI insert and overwrites tile_dy2.
+
 RedDecide
 	php
 	sep	#$20
 	lda	>RED_REVERSE
-	beq	:nr
+	beq	:ai
 	lda	#0
 	sta	>RED_REVERSE
-	lda	>RED_DIR
+	lda	>RED_PREV_DIR
 	eor	#$02
 	sta	>RED_DIR
-:nr	lda	>RED_TILE_Y
+	sta	>RED_PREV_DIR
+	sep	#$30
+	asl
+	tax
+	lda	DirDelta,x
+	sta	>RED_TILE_DY
+	lda	DirDelta+1,x
+	sta	>RED_TILE_DY+1
+	plp
+	rts
+:ai	lda	>RED_TILE_Y
 	sta	>PATH_CUR_Y
 	lda	>RED_TILE_X
 	sta	>PATH_CUR_X
@@ -359,6 +372,7 @@ RedDecide
 	jsr	Pathfind2966
 	sep	#$30
 	sta	>RED_DIR
+	sta	>RED_PREV_DIR
 	asl
 	tax
 	lda	DirDelta,x
@@ -372,13 +386,23 @@ PinkDecide
 	php
 	sep	#$20
 	lda	>PINK_REVERSE
-	beq	:nr
+	beq	:ai
 	lda	#0
 	sta	>PINK_REVERSE
-	lda	>PINK_DIR
+	lda	>PINK_PREV_DIR
 	eor	#$02
 	sta	>PINK_DIR
-:nr	lda	>PINK_TILE_Y
+	sta	>PINK_PREV_DIR
+	sep	#$30
+	asl
+	tax
+	lda	DirDelta,x
+	sta	>PINK_TILE_DY
+	lda	DirDelta+1,x
+	sta	>PINK_TILE_DY+1
+	plp
+	rts
+:ai	lda	>PINK_TILE_Y
 	sta	>PATH_CUR_Y
 	lda	>PINK_TILE_X
 	sta	>PATH_CUR_X
@@ -421,6 +445,7 @@ PinkDecide
 	jsr	Pathfind2966
 	sep	#$30
 	sta	>PINK_DIR
+	sta	>PINK_PREV_DIR
 	asl
 	tax
 	lda	DirDelta,x
@@ -434,13 +459,23 @@ BlueDecide
 	php
 	sep	#$20
 	lda	>BLUE_REVERSE
-	beq	:nr
+	beq	:ai
 	lda	#0
 	sta	>BLUE_REVERSE
-	lda	>BLUE_DIR
+	lda	>BLUE_PREV_DIR
 	eor	#$02
 	sta	>BLUE_DIR
-:nr	lda	>BLUE_TILE_Y
+	sta	>BLUE_PREV_DIR
+	sep	#$30
+	asl
+	tax
+	lda	DirDelta,x
+	sta	>BLUE_TILE_DY
+	lda	DirDelta+1,x
+	sta	>BLUE_TILE_DY+1
+	plp
+	rts
+:ai	lda	>BLUE_TILE_Y
 	sta	>PATH_CUR_Y
 	lda	>BLUE_TILE_X
 	sta	>PATH_CUR_X
@@ -462,6 +497,7 @@ BlueDecide
 	jsr	Pathfind2966
 	sep	#$30
 	sta	>BLUE_DIR
+	sta	>BLUE_PREV_DIR
 	asl
 	tax
 	lda	DirDelta,x
@@ -475,13 +511,23 @@ OrangeDecide
 	php
 	sep	#$20
 	lda	>ORANGE_REVERSE
-	beq	:nr
+	beq	:ai
 	lda	#0
 	sta	>ORANGE_REVERSE
-	lda	>ORANGE_DIR
+	lda	>ORANGE_PREV_DIR
 	eor	#$02
 	sta	>ORANGE_DIR
-:nr	lda	>ORANGE_TILE_Y
+	sta	>ORANGE_PREV_DIR
+	sep	#$30
+	asl
+	tax
+	lda	DirDelta,x
+	sta	>ORANGE_TILE_DY
+	lda	DirDelta+1,x
+	sta	>ORANGE_TILE_DY+1
+	plp
+	rts
+:ai	lda	>ORANGE_TILE_Y
 	sta	>PATH_CUR_Y
 	lda	>ORANGE_TILE_X
 	sta	>PATH_CUR_X
@@ -503,6 +549,7 @@ OrangeDecide
 	jsr	Pathfind2966
 	sep	#$30
 	sta	>ORANGE_DIR
+	sta	>ORANGE_PREV_DIR
 	asl
 	tax
 	lda	DirDelta,x

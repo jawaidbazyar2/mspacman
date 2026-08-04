@@ -45,10 +45,11 @@ InitActors
 	inx
 	cpx	#Level1SpeedLen
 	bcc	]sp
-* Fright duration ~ #02D0 frames → use low byte $D0 for v1 timer
-	sep	#$20
-	lda	#$D0
+* Fright duration word == #4DBD from difficulty table (level1 $02D0)
+	rep	#$30
+	lda	#FrightTimeLevel1
 	sta	>FRIGHT_TIME
+	sep	#$20
 	jsr	InitArcadeActors
 	jsr	ActorPublish
 * Seed ACT_OX/OY
@@ -143,11 +144,15 @@ InitArcadeActors
 	sta	>PAC_WANT_DIR
 	lda	#DIR_LEFT		; #0102 → red=2, pink=1
 	sta	>RED_DIR
+	sta	>RED_PREV_DIR
 	lda	#DIR_DOWN
 	sta	>PINK_DIR
+	sta	>PINK_PREV_DIR
 	lda	#DIR_UP			; #0303
 	sta	>BLUE_DIR
+	sta	>BLUE_PREV_DIR
 	sta	>ORANGE_DIR
+	sta	>ORANGE_PREV_DIR
 	lda	#0
 	sta	>RED_STATE
 	lda	#0
@@ -166,10 +171,35 @@ InitArcadeActors
 	sta	>ORANGE_FRIGHT
 	lda	#0
 	sta	>POWER_PILL_ACT
+* Red starts outside; pink/blue/orange bounce in house until released
 	lda	#1
 	sta	>RED_SUBSTATE
+	lda	#0
 	sta	>PINK_SUBSTATE
 	sta	>BLUE_SUBSTATE
 	sta	>ORANGE_SUBSTATE
+	lda	#$55
+	sta	>GHOST_HOME_MOVE
+	rep	#$30
+	lda	#LeaveHomeUnitsLevel1
+	sta	>LEAVE_HOME_UNITS
+	lda	#0
+	sta	>LEAVE_HOME_IDLE
+	sep	#$20
+	lda	#LeaveLimitPink
+	sta	>PINK_EXIT_LIMIT
+	lda	#LeaveLimitBlue
+	sta	>BLUE_EXIT_LIMIT
+	lda	#LeaveLimitOrange
+	sta	>ORANGE_EXIT_LIMIT
+	lda	#0
+	sta	>PINK_EXIT_CNT
+	sta	>BLUE_EXIT_CNT
+	sta	>ORANGE_EXIT_CNT
+* Preserve DIED_THIS_LEVEL across death respawn (InitActors RAM clear zeros it)
+	lda	#0
+	sta	>PILLS_AFTER_DEATH
+	lda	>DOTS_EATEN
+	sta	>PILLS_SINCE_PAC_MOVE
 	plp
 	rts

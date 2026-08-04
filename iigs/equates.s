@@ -144,7 +144,7 @@ FLAG_DRAWN     equ $01
 FLAG_NODRAW    equ $02		; skip DrawSprite (inactive fruit, tunnel null zone)
 
 * Ghost body pens (palette slots from gen_palette color-ROM fill)
-COL_BLINKY     equ 5		; red
+COL_BLINKY     equ 5		; red (fright: palette poke → blue/white)
 COL_PINKY      equ 7		; pink
 COL_INKY       equ 9		; cyan
 COL_CLYDE      equ 11		; orange
@@ -225,6 +225,11 @@ SPD_PAC_NORM   equ $0284A6	; == #4D46 (4 bytes rotating)
 SPD_PAC_ENERG  equ $0284AA	; == #4D4A
 SPD_RED_NORM   equ $0284B6	; == #4D56
 PAC_MOVE_DELAY equ $0284FD	; == #4D9D
+PILLS_SINCE_PAC_MOVE equ $0284FE	; == #4D9E
+PILLS_AFTER_DEATH equ $0284FF	; == #4D9F
+GHOST_HOME_MOVE equ $0284F4	; == #4D94 (RLCA half-rate house motion)
+LEAVE_HOME_UNITS equ $0284F5	; == #4D95 word idle threshold
+LEAVE_HOME_IDLE equ $0284F7	; == #4D97 word idle counter
 POWER_PILL_ACT equ $028506	; == #4DA6
 RED_FRIGHT     equ $028507	; == #4DA7
 PINK_FRIGHT    equ $028508
@@ -234,17 +239,26 @@ RED_STATE      equ $02850B	; == #4DAB (0=alive,1=eyes,…)
 PINK_STATE     equ $02850C
 BLUE_STATE     equ $02850D
 ORANGE_STATE   equ $02850E
-RED_SUBSTATE   equ $028500	; == #4DA0 (0=home,1=chase,…)
+RED_SUBSTATE   equ $028500	; == #4DA0 (0=home,1=out,2=door up,3=to door)
 PINK_SUBSTATE  equ $028501
 BLUE_SUBSTATE  equ $028502
 ORANGE_SUBSTATE equ $028503
+PINK_EXIT_LIMIT equ $028518	; == #4DB8
+BLUE_EXIT_LIMIT equ $028519	; == #4DB9
+ORANGE_EXIT_LIMIT equ $02851A	; == #4DBA
 DOTS_EATEN     equ $02856E	; == #4E0E
+PINK_EXIT_CNT  equ $02856F	; == #4E0F
+BLUE_EXIT_CNT  equ $028570	; == #4E10
+ORANGE_EXIT_CNT equ $028571	; == #4E11
+DIED_THIS_LEVEL equ $028572	; == #4E12
 GAME_MODE      equ $028560	; == #4E00
 LEVEL_STATE    equ $028564	; == #4E04
 LEVEL_NUMBER   equ $028573	; == #4E13
 LIVES_REAL     equ $028575	; == #4E15
-FRIGHT_TIMER   equ $02852B	; == #4DCB (byte; we use word at FRIGHT_TIME)
-FRIGHT_TIME    equ $02851D	; == #4DBD word initial fright duration
+FRIGHT_FLASH_CNT equ $028528	; == #4DC8 (j_0ac3 period, reload #$0E)
+FRIGHT_FLASH_PHASE equ $028529	; soft: 0=blue, 1=white when timer < $0100
+FRIGHT_TIMER   equ $02852B	; == #4DCB word countdown
+FRIGHT_TIME    equ $02851D	; == #4DBD word initial duration (level1 $02D0)
 RED_REVERSE    equ $028511	; == #4DB1
 PINK_REVERSE   equ $028512	; == #4DB2
 BLUE_REVERSE   equ $028513	; == #4DB3

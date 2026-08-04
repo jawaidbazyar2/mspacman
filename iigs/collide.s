@@ -48,6 +48,10 @@ CollideHostile
 	sta	>LEVEL_STATE
 	lda	#90
 	sta	>DEATH_TIMER
+	lda	#1
+	sta	>DIED_THIS_LEVEL
+	lda	#0
+	sta	>PILLS_AFTER_DEATH
 :out	plp
 	rts
 
@@ -91,7 +95,8 @@ CollideFright
 	lda	#1
 	sta	>ORANGE_STATE
 	jsr	ScoreGhost
-:out	plp
+:out	jsr	FrightPaletteUpdate	; eaten ghost reverts; others stay blue
+	plp
 	rts
 
 NearRed

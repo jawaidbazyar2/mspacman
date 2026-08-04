@@ -19,6 +19,7 @@
 	put	ghost_move.s
 	put	collide.s
 	put	fruit.s			; uses AbsLt4 from collide
+	put	leave_house.s
 	put	play_tick.s
 	put	level_fsm.s
 	put	actor_publish.s

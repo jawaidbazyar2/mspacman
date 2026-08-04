@@ -34,3 +34,12 @@ ScatterOrange	db	$40,$3B		; bottom left
 * Fruit release thresholds (Ms. Pac)
 FruitDots1	equ	64
 FruitDots2	equ	176
+
+* Ghost house exit pill limits — difficulty row `#00,#1E,#3C` (== `@0846`)
+LeaveLimitPink		equ	0
+LeaveLimitBlue		equ	30
+LeaveLimitOrange	equ	60
+* Idle frames before forced release (== `@0873` $00F0)
+LeaveHomeUnitsLevel1	equ	240
+* Fright duration — difficulty `@0796` byte4=2 → table `@0865` = $02D0
+FrightTimeLevel1	equ	$02D0

@@ -8,6 +8,9 @@ table indexed by:
   index = color_slot*16 + (ACT_SPR & 7)*2 + (X & 1)
   color_slot = (ACT_COLOR - 5) / 2   ; 5,7,9,11 → 0..3
 
+Fright blue/flash is a runtime palette poke on pens 5/7/9/11 (keeps code
+under $02/8000 — do not add compiled fright color slots).
+
 Transparent mask bytes are omitted; adjacent opaque bytes are coalesced into
 16-bit ops by py/blit_emit.py.
 

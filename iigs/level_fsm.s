@@ -9,25 +9,22 @@ LevelFsm
 	sep	#$20
 	lda	>LEVEL_STATE
 	cmp	#3
-	beq	:play
+	bne	:notplay
+	jsr	PlayTick
+	plp
+	rts
+:notplay
 	cmp	#4
-	beq	:death
-	cmp	#12
-	beq	:clear
-	bra	:done
-:play	jsr	PlayTick
-	bra	:done
-:death
+	bne	:notdeath
 	lda	>DEATH_TIMER
 	beq	:dorel
-	lda	>DEATH_TIMER
 	dec
 	sta	>DEATH_TIMER
-	bra	:done
+	plp
+	rts
 :dorel
 	lda	>LIVES
 	beq	:gameover
-	lda	>LIVES
 	dec
 	sta	>LIVES
 	sta	>LIVES_REAL
@@ -35,18 +32,22 @@ LevelFsm
 	jsr	ResetActorsOnly
 	lda	#3
 	sta	>LEVEL_STATE
-	bra	:done
+	plp
+	rts
 :gameover
 	lda	#0
 	sta	>LEVEL_STATE		; freeze
-	bra	:done
-:clear
+	plp
+	rts
+:notdeath
+	cmp	#12
+	bne	:out
 	lda	>CLEAR_TIMER
 	beq	:reload
-	lda	>CLEAR_TIMER
 	dec
 	sta	>CLEAR_TIMER
-	bra	:done
+	plp
+	rts
 :reload
 	jsr	ReloadBoard
 	lda	>LEVEL
@@ -57,13 +58,13 @@ LevelFsm
 	jsr	ResetActorsOnly
 	lda	#0
 	sta	>DOTS_EATEN
-	lda	#0
 	sta	>FRUIT_SPAWNED
-	lda	#0
 	sta	>FRUIT_ACTIVE
+	sta	>DIED_THIS_LEVEL
+	sta	>PILLS_AFTER_DEATH
 	lda	#3
 	sta	>LEVEL_STATE
-:done	plp
+:out	plp
 	rts
 
 ResetActorsOnly

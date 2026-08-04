@@ -24,6 +24,9 @@ MsPacMove
 :normSpd	jsr	RotSpeedNorm
 	bcc	:done
 :domove	sep	#$20			; RotSpeed* leaves 16-bit A
+* == j_1843: snapshot dots so GhostHouse idle resets only after eats
+	lda	>DOTS_EATEN
+	sta	>PILLS_SINCE_PAC_MOVE
 	jsr	ReadWantedDir
 	jsr	TryTurnOrAdvance
 	jsr	MaybeEat
