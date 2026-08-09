@@ -43,7 +43,7 @@ $04  BCK strip @ $2000 (S_BCK)
 | Assets (data) | `PUTBIN` tiles/sprites/maze (same bytes as static bank `$03`) |
 | Work (data) | Tilemap, actors, arcade `#4D`/`#4E` mirror, dirty list, row tables — `seg_work.s` |
 
-SHR remains bank `$01` with normal shadowing (no odd-bank / shadow-all). Work RAM is an OMF data segment (not fixed `$028xxx`).
+SHR remains bank `$01` with normal shadowing (no odd-bank / shadow-all). Work RAM is an OMF data segment (not fixed `$02Axxx`).
 
 **65816 / Merlin caveat:** `LDX` / `LDY` have no 24-bit absolute form. `ldx >EXT_LABEL` assembles as 16-bit `LDX abs` against **DB**, so GS/OS work-segment symbols must be read with `lda >LABEL` / `tax` (see `actor_publish.s`).
 ---
@@ -65,7 +65,7 @@ Stack pointer initialized to `$01FF` at `Start`.
 
 ### Direct page (`DP = $0000`)
 
-Low DP holds the render / harness scratch. It used to live at `$02/8A00` and be
+Low DP holds the render / harness scratch. It used to live at `$02/AA00` and be
 reached with long addressing; direct page is always bank `$00`, so it stays
 reachable across the `DB = $01` switch in the blits at 4 cycles / 2 bytes
 instead of 6 / 4. Always spell these with an explicit `<`.
@@ -136,23 +136,23 @@ Merlin `org $0000` → loaded at `$02/0000`.
 
 | Address | Size | Notes |
 |---------|------|-------|
-| `$02/0000`–… | `harness.bin` | Code + compiled ghost/fruit/Ms. Pac blits (keep below `$8000`) |
-| …–`$02/7FFF` | — | **Free** after code (working RAM starts at `$8000`) |
+| `$02/0000`–… | `harness.bin` / `game.bin` | Code + compiled ghost/fruit/Ms. Pac blits (keep below `$A000`) |
+| …–`$02/9FFF` | — | **Free** after code (working RAM starts at `$A000`) |
 
 ### Logical tilemap and actors
 
 | Address | Symbol | Size | Notes |
 |---------|--------|------|-------|
 | `$02/6000`–`$02/653F` | (free) | 1344 | Was `SPR_WORK*`; ghosts use compiled blits now |
-| `$02/8000`–`$02/8363` | `TILEMAP` | 868 | 28×31 tile codes (copy of `AST_MAZE`) |
-| `$02/8364`–`$02/83FF` | — | — | Unused pad to actors |
-| `$02/8400`–`$02/845F` | `ACTORS` | 96 | 6 actors × 16 bytes (4 ghosts + fruit + Ms. Pac) |
-| `$02/8460`–`$02/859F` | `RAM4D` | 320 | **Game build:** arcade `#4D00`–`#4E3F` mirror (actor physics, speeds, modes, dots). Demo unused. |
-| `$02/85A0`–`$02/87FF` | — | — | Free |
+| `$02/A000`–`$02/A363` | `TILEMAP` | 868 | 28×31 tile codes (copy of `AST_MAZE`) |
+| `$02/A364`–`$02/A3FF` | — | — | Unused pad to actors |
+| `$02/A400`–`$02/A45F` | `ACTORS` | 96 | 6 actors × 16 bytes (4 ghosts + fruit + Ms. Pac) |
+| `$02/A460`–`$02/A59F` | `RAM4D` | 320 | **Game build:** arcade `#4D00`–`#4E3F` mirror (actor physics, speeds, modes, dots). Demo unused. |
+| `$02/A5A0`–`$02/A7FF` | — | — | Free |
 
 ### Actor record (`ACT_SIZE` = 16)
 
-Base = `$028400 + index×16`. Indexed in asm as `X = index×16` with `>ACTORS+field,x`.
+Base = `$02A400 + index×16`. Indexed in asm as `X = index×16` with `>ACTORS+field,x`.
 
 | Off | Symbol | Type | Who writes | Who reads |
 |-----|--------|------|------------|-----------|
@@ -171,23 +171,23 @@ Base = `$028400 + index×16`. Indexed in asm as `X = index×16` with `>ACTORS+fi
 
 | Address | Symbol | Size | Notes |
 |---------|--------|------|-------|
-| `$02/8800` | `DIRTY_COUNT` | 2 | Number of dirty tile entries |
-| `$02/8802`–… | `DIRTY_LIST` | pairs | `(tx,ty)` bytes; room before `$8900` |
-| `$02/8900` | `FRAME_COUNT` | 2 | Frame counter |
-| `$02/8902` | `EAT_INDEX` | 2 | Dirty-eat demo cursor |
-| `$02/8904` | `DEMO_FREEZE` | 1 | Host≠0 → skip erase/draw/rails |
-| `$02/8906` | `POWER_FLASH_CNT` | 1 | `BlinkPowerPills` period counter |
-| `$02/8908`–`$02/890A` | `SCORE_LO/MID/HI` | 3 | P1 score, BCD lo/mid/hi (arcade `#4E80`) |
-| `$02/890B`–`$02/890D` | `HISCORE_LO/MID/HI` | 3 | High score, BCD (arcade `#4E88`) |
-| `$02/890E` | `LIVES` | 1 | Lives shown in HUD (arcade `#4E15`) |
-| `$02/890F` | `LEVEL` | 1 | Level number, 0 = cherry (arcade `#4E13`) |
-| `$02/8910`–`$02/89FF` | — | — | Free |
-| `$02/8B00`–`$02/8CFF` | `ROW_ADDR` | 512 | `ScreenXY` LUT: `[y] = y*S_SHR` |
-| `$02/8D00`–`$02/8EFF` | `ROW_BCK` | 512 | `BckXY` LUT: `[y] = y*S_BCK` |
+| `$02/A800` | `DIRTY_COUNT` | 2 | Number of dirty tile entries |
+| `$02/A802`–… | `DIRTY_LIST` | pairs | `(tx,ty)` bytes; room before `$8900` |
+| `$02/A900` | `FRAME_COUNT` | 2 | Frame counter |
+| `$02/A902` | `EAT_INDEX` | 2 | Dirty-eat demo cursor |
+| `$02/A904` | `DEMO_FREEZE` | 1 | Host≠0 → skip erase/draw/rails |
+| `$02/A906` | `POWER_FLASH_CNT` | 1 | `BlinkPowerPills` period counter |
+| `$02/A908`–`$02/A90A` | `SCORE_LO/MID/HI` | 3 | P1 score, BCD lo/mid/hi (arcade `#4E80`) |
+| `$02/A90B`–`$02/A90D` | `HISCORE_LO/MID/HI` | 3 | High score, BCD (arcade `#4E88`) |
+| `$02/A90E` | `LIVES` | 1 | Lives shown in HUD (arcade `#4E15`) |
+| `$02/A90F` | `LEVEL` | 1 | Level number, 0 = cherry (arcade `#4E13`) |
+| `$02/A910`–`$02/A9FF` | — | — | Free |
+| `$02/AB00`–`$02/ACFF` | `ROW_ADDR` | 512 | `ScreenXY` LUT: `[y] = y*S_SHR` |
+| `$02/AD00`–`$02/AEFF` | `ROW_BCK` | 512 | `BckXY` LUT: `[y] = y*S_BCK` |
 
-| `$02/8A00`–`$02/8AFF` | — | — | Free (was `R_*`; scratch moved to low DP) |
+| `$02/AA00`–`$02/AAFF` | — | — | Free (was `R_*`; scratch moved to low DP) |
 
-`ACTORS` = `$028400` (long base; `X = index×16`).  
+`ACTORS` = `$02A400` (long base; `X = index×16`).  
 `BANK_WORK` / `BANK2` = `$020000` for HUD string / score BCD offsets (`>BANK2,x`).
 
 ---
@@ -227,9 +227,9 @@ Host writes these before `CALL 768`. Packed 4bpp; already upright (CW + row XOR 
 
 ---
 
-## Game-build arcade RAM (`RAM4D` @ `$028460` == `#4D00`)
+## Game-build arcade RAM (`RAM4D` @ `$02A460` == `#4D00`)
 
-Field equates in [`iigs/equates.s`](../iigs/equates.s) (`PAC_X`, `RED_DIR`, `DOTS_EATEN`, `LEVEL_STATE`, …). Offsets match [`src/ram.inc`](../src/ram.inc). Soft `STICK_IN0` / fruit timers sit just after the `#4E` block (`$028590+`).
+Field equates in [`iigs/equates.s`](../iigs/equates.s) (`PAC_X`, `RED_DIR`, `DOTS_EATEN`, `LEVEL_STATE`, …). Offsets match [`src/ram.inc`](../src/ram.inc). Soft `STICK_IN0` / fruit timers sit just after the `#4E` block (`$02A590+`).
 
 `ActorPublish` converts arcade pixel (Y,X) → upright SHR `ACT_X`/`ACT_Y` (tile map from `j_0065` / `gen_maze1` upright extract, then ×6/8 + `SPR_BASE_*`).
 
@@ -242,7 +242,7 @@ Field equates in [`iigs/equates.s`](../iigs/equates.s) (`PAC_X`, `RED_DIR`, `DOT
 
 ## Gaps / constraints
 
-1. **Code must stay below `$02/8000`** (working RAM starts there).
+1. **Code must stay below `$02/A000`** (working RAM starts there).
 2. Six actors: 6×16 = 96 → actors through `$845F`; game RAM starts at `$8460`.
 3. Dirty playfield changes must update **both** SHR and the BCK strip.
 4. Odd sprite/mask forms are **host-injected** (not generated on target in the current harness).

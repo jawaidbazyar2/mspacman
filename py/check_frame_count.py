@@ -25,7 +25,7 @@ from gs2_render_test import (  # noqa: E402
     spawn_gs2,
 )
 
-FRAME = 0x028900
+FRAME = 0x02A900
 SHADOW = 0xE0C035
 
 

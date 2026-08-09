@@ -4,6 +4,9 @@
 * fright flag (not a global POWER_PILL_ACT gate). Recovered non-blue ghosts
 * kill during an energizer; blue ones are eaten.
 *
+* Eat-blue: set GHOSTS_KILLED_PENDING + freeze; defer STATE=eyes until
+* EatGhostAnimTick ends (== j_1235 / j_1277). Sound stubs only.
+*
 	mx	%00
 
 CollideAll
@@ -15,6 +18,12 @@ CollideAll
 	plp
 	rts
 :ok
+* Already posing an eaten ghost — do not stack another eat. == j_1789
+	lda	>GHOSTS_KILLED_PENDING
+	beq	:chk
+	plp
+	rts
+:chk
 * First near alive ghost decides: fright → eat, else → die. == j_1763
 	jsr	NearRed
 	bcc	:p
@@ -25,8 +34,7 @@ CollideAll
 	brl	:die
 :eatR	lda	#0
 	sta	>RED_FRIGHT
-	lda	#1
-	sta	>RED_STATE
+	lda	#1			; ghost index 1 = red
 	bra	:ate
 :p	jsr	NearPink
 	bcc	:b
@@ -37,8 +45,7 @@ CollideAll
 	brl	:die
 :eatP	lda	#0
 	sta	>PINK_FRIGHT
-	lda	#1
-	sta	>PINK_STATE
+	lda	#2
 	bra	:ate
 :b	jsr	NearBlue
 	bcc	:o
@@ -49,23 +56,29 @@ CollideAll
 	brl	:die
 :eatB	lda	#0
 	sta	>BLUE_FRIGHT
-	lda	#1
-	sta	>BLUE_STATE
+	lda	#3
 	bra	:ate
 :o	jsr	NearOrange
-	bcc	:out
+	bcc	:none
 	lda	>ORANGE_STATE
-	bne	:out
+	bne	:none
 	lda	>ORANGE_FRIGHT
 	bne	:eatO
 	brl	:die
 :eatO	lda	#0
 	sta	>ORANGE_FRIGHT
-	lda	#1
-	sta	>ORANGE_STATE
-:ate	jsr	ScoreGhost
+	lda	#4
+:ate
+* == j_1763 eat path: pending + score ladder; STATE deferred to freeze end
+	sta	>GHOSTS_KILLED_PENDING
+	lda	#0
+	sta	>KILLED_GHOST_ANIM
+	lda	#$4A			; == RST#30 task timer
+	sta	>EAT_FREEZE_TIMER
+	jsr	ScoreGhost
+	jsr	EatGhostSoundStub	; == #1786 CH3 bit3
 	jsr	FrightPaletteUpdate
-:out	plp
+:none	plp
 	rts
 
 * == j_090D side effects when colliding with a hostile (non-blue) ghost
@@ -170,16 +183,25 @@ AbsLt4
 	cmp	#4
 	rts
 
+* == #177A–#1780: inc count, B=count+1 → table #2B17 → 200/400/800/1600 BCD
 ScoreGhost
 	php
-	rep	#$30
-	ldx	#20
-]g	phx
-	jsr	ScoreAdd10
-	plx
-	dex
-	bne	]g
+	sep	#$30
+	lda	>GHOSTS_KILLED_COUNT
+	inc
+	cmp	#5
+	bcc	:ok
+	lda	#4
+:ok	sta	>GHOSTS_KILLED_COUNT
+	dec				; 0..3 table slot
+	asl				; word index
+	tax
+	jsr	ScoreAddBCD
 	jsr	DrawScore
 	jsr	CheckHighScore
 	plp
+	rts
+
+EatGhostSoundStub
+* == #1786 set 3,(CH3_E_NUM) — WSG not ported
 	rts

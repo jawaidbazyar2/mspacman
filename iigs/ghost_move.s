@@ -12,6 +12,12 @@ GhostsMoveAll
 	plp
 	rts
 
+GhostSpeedFor
+* In: A = fright flag (0=normal); Z from caller's LDA (JSR preserves P).
+* Level1 ghosts share red's patterns (#4D56 / #4D5A). Do not AND #$FF here:
+* file mx %00 would emit 16-bit imm and BRK under runtime 8-bit A.
+	bne	GhostSpeedBlue
+* fall through — normal
 GhostSpeedStep
 * 32-bit ROL on SPD_RED_NORM; C = move (same fix as RotSpeedNorm)
 	sep	#$20
@@ -34,6 +40,28 @@ GhostSpeedStep
 	sec
 :out	rts
 
+GhostSpeedBlue
+* == speed_pat_red_blue #4D5A — level1 denser holes (~31% vs ~47%)
+	sep	#$20
+	lda	>SPD_RED_BLUE
+	asl	a
+	sta	>SPD_RED_BLUE
+	lda	>SPD_RED_BLUE+1
+	rol	a
+	sta	>SPD_RED_BLUE+1
+	lda	>SPD_RED_BLUE+2
+	rol	a
+	sta	>SPD_RED_BLUE+2
+	lda	>SPD_RED_BLUE+3
+	rol	a
+	sta	>SPD_RED_BLUE+3
+	bcc	:out
+	lda	>SPD_RED_BLUE
+	ora	#$01
+	sta	>SPD_RED_BLUE
+	sec
+:out	rts
+
 GhostStepXY
 * In: Y addr in R_TMP (low16 of RED_Y etc), dy at tile_dy addr in R_OFF
 * Uses R_ACT as ghost index unused — expects:
@@ -42,21 +70,23 @@ GhostStepXY
 
 * ---------------------------------------------------------------
 GhostMoveRed
-* == j_1b36 — maze AI only when SUBSTATE≠0 (outside) and alive
+* == j_1b36 — maze when SUBSTATE≠0 and STATE=0; eyes (STATE=1) also move
 	php
 	sep	#$20
 	lda	>RED_SUBSTATE
 	beq	:skip
 	lda	>RED_STATE
-	bne	:skip
-	bra	:go
+	beq	:alive
+	cmp	#1
+	bne	:skip			; STATE≥2: door entry via EyesTick
+* Eyes: every half-tick (== j_10c0→j_1bd8, no speed gate)
+	bra	:do
+:alive	lda	>RED_FRIGHT
+	jsr	GhostSpeedFor
+	bcs	:do
 :skip	plp
 	rts
-:go	jsr	GhostSpeedStep
-	bcs	:do
-	plp
-	rts
-:do	sep	#$20			; GhostSpeedStep leaves 16-bit A
+:do	sep	#$20			; GhostSpeed* leaves 16-bit A
 * == j_1bd8: decide on the motion axis only (not both X&Y).
 * Vertical movers spawn at X&7==0; requiring both forever skipped AI.
 	lda	>RED_TILE_DY
@@ -114,20 +144,21 @@ GhostMoveRed
 	rts
 
 GhostMovePink
-* == j_1c4b — maze AI only when SUBSTATE==1
+* == j_1c4b — maze when SUBSTATE==1 and STATE=0; eyes (STATE=1) from anywhere
 	php
 	sep	#$20
-	lda	>PINK_SUBSTATE
+	lda	>PINK_STATE
+	beq	:maze
+	cmp	#1
+	bne	:skip			; STATE≥2: EyesTick door entry
+	bra	:do			; eyes: ignore SUBSTATE
+:maze	lda	>PINK_SUBSTATE
 	cmp	#1
 	bne	:skip
-	lda	>PINK_STATE
-	bne	:skip
-	bra	:go
-:skip	plp
-	rts
-:go	jsr	GhostSpeedStep
+	lda	>PINK_FRIGHT
+	jsr	GhostSpeedFor
 	bcs	:do
-	plp
+:skip	plp
 	rts
 :do	sep	#$20
 	lda	>PINK_TILE_DY
@@ -184,20 +215,21 @@ GhostMovePink
 	rts
 
 GhostMoveBlue
-* == j_1d22 — maze AI only when SUBSTATE==1
+* == j_1d22 — maze when SUBSTATE==1 and STATE=0; eyes (STATE=1) from anywhere
 	php
 	sep	#$20
-	lda	>BLUE_SUBSTATE
+	lda	>BLUE_STATE
+	beq	:maze
 	cmp	#1
 	bne	:skip
-	lda	>BLUE_STATE
+	bra	:do
+:maze	lda	>BLUE_SUBSTATE
+	cmp	#1
 	bne	:skip
-	bra	:go
-:skip	plp
-	rts
-:go	jsr	GhostSpeedStep
+	lda	>BLUE_FRIGHT
+	jsr	GhostSpeedFor
 	bcs	:do
-	plp
+:skip	plp
 	rts
 :do	sep	#$20
 	lda	>BLUE_TILE_DY
@@ -254,20 +286,21 @@ GhostMoveBlue
 	rts
 
 GhostMoveOrange
-* == j_1df9 — maze AI only when SUBSTATE==1
+* == j_1df9 — maze when SUBSTATE==1 and STATE=0; eyes (STATE=1) from anywhere
 	php
 	sep	#$20
-	lda	>ORANGE_SUBSTATE
+	lda	>ORANGE_STATE
+	beq	:maze
 	cmp	#1
 	bne	:skip
-	lda	>ORANGE_STATE
+	bra	:do
+:maze	lda	>ORANGE_SUBSTATE
+	cmp	#1
 	bne	:skip
-	bra	:go
-:skip	plp
-	rts
-:go	jsr	GhostSpeedStep
+	lda	>ORANGE_FRIGHT
+	jsr	GhostSpeedFor
 	bcs	:do
-	plp
+:skip	plp
 	rts
 :do	sep	#$20
 	lda	>ORANGE_TILE_DY
@@ -355,7 +388,15 @@ RedDecide
 	sta	>PATH_CUR_Y
 	lda	>RED_TILE_X
 	sta	>PATH_CUR_X
-	lda	>RED_FRIGHT
+	lda	>RED_STATE
+	cmp	#1
+	bne	:norm
+	lda	EyesHomeTile		; == #2842 dest above door
+	sta	>PATH_DST_Y
+	lda	EyesHomeTile+1
+	sta	>PATH_DST_X
+	bra	:aim
+:norm	lda	>RED_FRIGHT
 	bne	:scat
 	lda	>GHOST_ORIENT_IDX
 	and	#$01
@@ -407,7 +448,15 @@ PinkDecide
 	sta	>PATH_CUR_Y
 	lda	>PINK_TILE_X
 	sta	>PATH_CUR_X
-	lda	>PINK_FRIGHT
+	lda	>PINK_STATE
+	cmp	#1
+	bne	:norm
+	lda	EyesHomeTile
+	sta	>PATH_DST_Y
+	lda	EyesHomeTile+1
+	sta	>PATH_DST_X
+	bra	:aim
+:norm	lda	>PINK_FRIGHT
 	bne	:scat
 	lda	>GHOST_ORIENT_IDX
 	and	#$01
@@ -480,7 +529,15 @@ BlueDecide
 	sta	>PATH_CUR_Y
 	lda	>BLUE_TILE_X
 	sta	>PATH_CUR_X
-	lda	>BLUE_FRIGHT
+	lda	>BLUE_STATE
+	cmp	#1
+	bne	:norm
+	lda	EyesHomeTile
+	sta	>PATH_DST_Y
+	lda	EyesHomeTile+1
+	sta	>PATH_DST_X
+	bra	:aim
+:norm	lda	>BLUE_FRIGHT
 	bne	:scat
 	lda	>GHOST_ORIENT_IDX
 	and	#$01
@@ -532,7 +589,15 @@ OrangeDecide
 	sta	>PATH_CUR_Y
 	lda	>ORANGE_TILE_X
 	sta	>PATH_CUR_X
-	lda	>ORANGE_FRIGHT
+	lda	>ORANGE_STATE
+	cmp	#1
+	bne	:norm
+	lda	EyesHomeTile
+	sta	>PATH_DST_Y
+	lda	EyesHomeTile+1
+	sta	>PATH_DST_X
+	bra	:aim
+:norm	lda	>ORANGE_FRIGHT
 	bne	:scat
 	lda	>GHOST_ORIENT_IDX
 	and	#$01

@@ -196,8 +196,12 @@ ActorPublish
 	jsr	GhostSprFromDir
 	sep	#$20
 	sta	>ACTORS+ACT_SPR,x
-	lda	#COL_BLINKY
-	sta	>ACTORS+ACT_COLOR,x
+	lda	>RED_STATE
+	beq	:rCol
+	lda	#COL_EYES
+	bra	:rSet
+:rCol	lda	#COL_BLINKY
+:rSet	sta	>ACTORS+ACT_COLOR,x
 * Pinky
 	sep	#$30
 	lda	>PINK_X
@@ -215,8 +219,12 @@ ActorPublish
 	jsr	GhostSprFromDir
 	sep	#$20
 	sta	>ACTORS+ACT_SPR,x
-	lda	#COL_PINKY
-	sta	>ACTORS+ACT_COLOR,x
+	lda	>PINK_STATE
+	beq	:pCol
+	lda	#COL_EYES
+	bra	:pSet
+:pCol	lda	#COL_PINKY
+:pSet	sta	>ACTORS+ACT_COLOR,x
 * Inky
 	sep	#$30
 	lda	>BLUE_X
@@ -234,8 +242,12 @@ ActorPublish
 	jsr	GhostSprFromDir
 	sep	#$20
 	sta	>ACTORS+ACT_SPR,x
-	lda	#COL_INKY
-	sta	>ACTORS+ACT_COLOR,x
+	lda	>BLUE_STATE
+	beq	:bCol
+	lda	#COL_EYES
+	bra	:bSet
+:bCol	lda	#COL_INKY
+:bSet	sta	>ACTORS+ACT_COLOR,x
 * Clyde
 	sep	#$30
 	lda	>ORANGE_X
@@ -253,8 +265,12 @@ ActorPublish
 	jsr	GhostSprFromDir
 	sep	#$20
 	sta	>ACTORS+ACT_SPR,x
-	lda	#COL_CLYDE
-	sta	>ACTORS+ACT_COLOR,x
+	lda	>ORANGE_STATE
+	beq	:oCol
+	lda	#COL_EYES
+	bra	:oSet
+:oCol	lda	#COL_CLYDE
+:oSet	sta	>ACTORS+ACT_COLOR,x
 * Fruit — inactive: FLAG_NODRAW (never blit at 0,0; BckXY X-72 underflows)
 	sep	#$20
 	lda	>FRUIT_ACTIVE
@@ -326,6 +342,7 @@ ActorPublish
 	adc	<R_ACT
 	sep	#$20
 	sta	>ACTORS+ACT_SPR,x
+	jsr	EatGhostPublish		; after TunnelVis — == j_1235 points + hide pac
 	plp
 	rts
 
@@ -334,3 +351,47 @@ GameMouthTab
 	db	0,1,0,2
 	db	0,1,0,2
 	db	0,1,2,1
+
+* == j_1235 display: eaten ghost → points frame $28+; pac color 0 → NODRAW.
+* Clears FLAG_POINTS on all ghosts first so freeze end restores body blit.
+EatGhostPublish
+	php
+	sep	#$20
+	ldx	#0
+]clr	lda	>ACTORS+ACT_FLAGS,x
+	and	#$FB			; clear FLAG_POINTS
+	sta	>ACTORS+ACT_FLAGS,x
+	rep	#$30
+	txa
+	clc
+	adc	#16
+	tax
+	sep	#$20
+	cpx	#64
+	bcc	]clr
+	lda	>GHOSTS_KILLED_PENDING
+	beq	:out
+	dec				; 0..3
+	rep	#$30
+	and	#$0003
+	asl
+	asl
+	asl
+	asl				; *16 actor base
+	tax
+	sep	#$20
+	lda	>GHOSTS_KILLED_COUNT
+	beq	:out
+	dec				; 0..3 → ACT_SPR index for PointsBlit
+	and	#$03
+	sta	>ACTORS+ACT_SPR,x
+	lda	>ACTORS+ACT_FLAGS,x
+	ora	#FLAG_POINTS
+	and	#$FD			; clear FLAG_NODRAW so points show
+	sta	>ACTORS+ACT_FLAGS,x
+	ldx	#80			; PAC_ACTOR
+	lda	>ACTORS+ACT_FLAGS,x
+	ora	#FLAG_NODRAW
+	sta	>ACTORS+ACT_FLAGS,x
+:out	plp
+	rts

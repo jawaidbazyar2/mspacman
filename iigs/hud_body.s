@@ -364,6 +364,33 @@ ScoreAdd10
 	plp
 	rts
 
+* X = word index into GhostScoreTab (0,2,4,6 for 200/400/800/1600).
+* == j_2a65 add/daa of table #2B1B…#2B21 (ghost ladder).
+ScoreAddBCD
+	php
+	sep	#$30
+	sed
+	clc
+	lda	>SCORE_LO
+	adc	GhostScoreTab,x
+	sta	>SCORE_LO
+	lda	>SCORE_MID
+	adc	GhostScoreTab+1,x
+	sta	>SCORE_MID
+	lda	>SCORE_HI
+	adc	#$00
+	sta	>SCORE_HI
+	cld
+	plp
+	rts
+
+* Little-endian BCD words from #2B1B (ghost 1..4).
+GhostScoreTab
+	db	$00,$02			; 200
+	db	$00,$04			; 400
+	db	$00,$08			; 800
+	db	$00,$16			; 1600
+
 CheckHighScore
 * Compare P1 vs high score MSB→LSB (arcade j_2a91); copy + redraw when beaten.
 	php

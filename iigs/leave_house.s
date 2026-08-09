@@ -10,11 +10,9 @@
 LeaveHouse
 	php
 	sep	#$20
-* v1 stand-in for ghosts_killed_pending: skip while any eyes out
-	lda	>RED_STATE
-	ora	>PINK_STATE
-	ora	>BLUE_STATE
-	ora	>ORANGE_STATE
+* == #0C42: only eat-pose pending blocks (not eyes STATE — that was a v1 stand-in
+* and left house/exit ghosts frozen until eyes finished returning).
+	lda	>GHOSTS_KILLED_PENDING
 	bne	:out
 * RLCA half-rate (== #4D94): bit7→C and wraps into bit0
 	lda	>GHOST_HOME_MOVE
@@ -25,16 +23,92 @@ LeaveHouse
 	bra	:go
 :nowrap	sta	>GHOST_HOME_MOVE
 	bra	:out
-:go	jsr	LeaveRed
+:go	jsr	HouseSanity		; unstick house-SUBSTATE while in maze
+	jsr	LeaveRed
 	jsr	LeavePink
 	jsr	LeaveBlue
 	jsr	LeaveOrange
 :out	plp
 	rts
 
+* If SUBSTATE says "in house" but pixels are outside the house bbox,
+* promote to SUBSTATE=1 so GhostMove (maze) owns them — otherwise Leave*
+* walks them through walls at half-rate (no collision).
+* BBox: Y=$64..$80, X=$70..$90 (door shaft + blue/orange pens).
+HouseSanity
+	php
+	sep	#$30
+	lda	>RED_STATE
+	bne	:p
+	lda	>RED_SUBSTATE
+	bne	:p			; red: only 0 is house-side
+	lda	>RED_X
+	tax
+	lda	>RED_Y
+	jsr	IsInHouse
+	bcs	:p
+	lda	#1
+	sta	>RED_SUBSTATE
+:p	lda	>PINK_STATE
+	bne	:b
+	lda	>PINK_SUBSTATE
+	cmp	#1
+	beq	:b
+	lda	>PINK_X
+	tax
+	lda	>PINK_Y
+	jsr	IsInHouse
+	bcs	:b
+	lda	#1
+	sta	>PINK_SUBSTATE
+:b	lda	>BLUE_STATE
+	bne	:o
+	lda	>BLUE_SUBSTATE
+	cmp	#1
+	beq	:o
+	lda	>BLUE_X
+	tax
+	lda	>BLUE_Y
+	jsr	IsInHouse
+	bcs	:o
+	lda	#1
+	sta	>BLUE_SUBSTATE
+:o	lda	>ORANGE_STATE
+	bne	:done
+	lda	>ORANGE_SUBSTATE
+	cmp	#1
+	beq	:done
+	lda	>ORANGE_X
+	tax
+	lda	>ORANGE_Y
+	jsr	IsInHouse
+	bcs	:done
+	lda	#1
+	sta	>ORANGE_SUBSTATE
+:done	plp
+	rts
+
+* A=Y, X=X. SEC=inside house bbox, CLC=outside.
+IsInHouse
+	cmp	#$64
+	bcc	:no
+	cmp	#$81
+	bcs	:no
+	txa
+	cmp	#$70
+	bcc	:no
+	cmp	#$91
+	bcs	:no
+	sec
+	rts
+:no	clc
+	rts
+
 LeaveRed
 	php
 	sep	#$20
+	lda	>RED_STATE
+	bne	:done			; eyes: maze/entry via GhostMove / EyesTick
 	lda	>RED_SUBSTATE
 	bne	:done			; only when home (eyes re-entry)
 	lda	>RED_Y
@@ -68,10 +142,12 @@ LeaveRed
 LeavePink
 	php
 	sep	#$20
+	lda	>PINK_STATE
+	bne	:done			; eyes: not house leave
 	lda	>PINK_SUBSTATE
 	cmp	#1
 	bne	:act
-	plp
+:done	plp
 	rts
 :act	cmp	#0
 	bne	:up			; 2 = crossing door
@@ -131,10 +207,12 @@ LeavePink
 LeaveBlue
 	php
 	sep	#$20
+	lda	>BLUE_STATE
+	bne	:done			; eyes: not house leave
 	lda	>BLUE_SUBSTATE
 	cmp	#1
 	bne	:act
-	plp
+:done	plp
 	rts
 :act	cmp	#0
 	bne	:chk3
@@ -212,10 +290,12 @@ LeaveBlue
 LeaveOrange
 	php
 	sep	#$20
+	lda	>ORANGE_STATE
+	bne	:done			; eyes: not house leave
 	lda	>ORANGE_SUBSTATE
 	cmp	#1
 	bne	:act
-	plp
+:done	plp
 	rts
 :act	cmp	#0
 	bne	:chk3

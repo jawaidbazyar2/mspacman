@@ -71,7 +71,7 @@ FRUIT_PERIOD   equ 360		; frames between fruit-type changes
 FRUIT_TILE_X   equ 14		; fixed demo tile (below ghost house)
 FRUIT_TILE_Y   equ 17
 PAC_RAIL_START equ 24		; Ms. Pac rail waypoint (mid-path visibility)
-* Working RAM starts at $8000 so compiled blits may grow through $7xxx.
+* Working RAM starts at $A000 so compiled blits may grow through $9xxx.
 * Erase restores from BCK strip — no per-actor save-under.
 * SHADOW $B7: inhibit text/HGR/aux/TEXT2; bit3=0 → SHR on; bit6=0 → IOLC intact.
 
@@ -103,12 +103,14 @@ ACT_DEST       equ 12		; SHR offset cached at DrawSprite
 ACT_BDEST      equ 14		; BCK offset cached at DrawSprite (EraseSprite)
 FLAG_DRAWN     equ $01
 FLAG_NODRAW    equ $02		; skip DrawSprite (inactive fruit, tunnel / Y clip)
+FLAG_POINTS    equ $04		; eat-ghost freeze: blit $28–$2B points (not body)
 
 * Ghost body pens (palette slots from gen_palette color-ROM fill)
 COL_BLINKY     equ 5		; red (fright: palette poke → blue/white)
 COL_PINKY      equ 7		; pink
 COL_INKY       equ 9		; cyan
 COL_CLYDE      equ 11		; orange
+COL_EYES       equ 0		; ghost blit slot 4 — body→transparent (eyes only)
 COL_POWER      equ 14		; energizer fade (palette poke only)
 BODY_PEN       equ 6		; marker in sprite assets
 COL_DIGIT      equ 13		; yellow ink for HUD glyphs (tile art is pen 3)

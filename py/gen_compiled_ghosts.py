@@ -7,9 +7,10 @@ table indexed by:
 
   index = color_slot*16 + (ACT_SPR & 7)*2 + (X & 1)
   color_slot = (ACT_COLOR - 5) / 2   ; 5,7,9,11 → 0..3
+  color_slot = 4 when ACT_COLOR == 0 (COL_EYES: body→0, eyes only)
 
 Fright blue/flash is a runtime palette poke on pens 5/7/9/11 (keeps code
-under $02/8000 — do not add compiled fright color slots).
+under $02/A000 — do not add compiled fright color slots).
 
 Transparent mask bytes are omitted; adjacent opaque bytes are coalesced into
 16-bit ops by py/blit_emit.py.
@@ -35,9 +36,9 @@ DEFAULT_OUT = ROOT / "iigs" / "compiled_ghosts.s"
 
 SPR_BYTES = 84
 BODY_PEN = 6
-# color_slot 0..3
-COLORS = (5, 7, 9, 11)  # Blinky, Pinky, Inky, Clyde
-COLOR_NAMES = ("Blinky", "Pinky", "Inky", "Clyde")
+# color_slot 0..3 body pens; slot 4 = eyes (body → 0)
+COLORS = (5, 7, 9, 11, 0)  # Blinky, Pinky, Inky, Clyde, Eyes
+COLOR_NAMES = ("Blinky", "Pinky", "Inky", "Clyde", "Eyes")
 GHOST_BASE = 0x20
 NFRAMES = 8  # $20..$27
 
@@ -50,6 +51,19 @@ def remap_body_byte(b: int, body: int) -> int:
     if lo == BODY_PEN:
         lo = body
     return ((hi & 0xF) << 4) | (lo & 0xF)
+
+
+def mask_from_colored(colored: bytes) -> bytes:
+    """Opaque where nibble != 0 (eyes slot drops body from the mask too)."""
+    out = bytearray(len(colored))
+    for i, b in enumerate(colored):
+        m = 0
+        if b & 0xF0:
+            m |= 0xF0
+        if b & 0x0F:
+            m |= 0x0F
+        out[i] = m
+    return bytes(out)
 
 
 def load_sheet(path: Path) -> bytes:
@@ -119,8 +133,11 @@ def main() -> int:
             ):
                 lab = f"CG{ci}_{frame}{tag}"
                 raw = spr_sheet[base : base + SPR_BYTES]
-                msk = msk_sheet[base : base + SPR_BYTES]
                 colored = bytes(remap_body_byte(b, pen) for b in raw)
+                if pen == 0:
+                    msk = mask_from_colored(colored)
+                else:
+                    msk = msk_sheet[base : base + SPR_BYTES]
                 if args.word16:
                     check_equivalence(colored, msk)
                 body_lines.extend(

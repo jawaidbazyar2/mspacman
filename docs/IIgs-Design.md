@@ -561,7 +561,7 @@ Living checklist: [`IIgs-LogicPort.md`](IIgs-LogicPort.md).
 
 | Bank / range | Contents |
 |--------------|----------|
-| `$02/0000` | Code (&lt; `$8000`) + tilemap@`$8000` + actors + dirty + HUD |
+| `$02/0000` | Code (&lt; `$A000`) + tilemap@`$A000` + actors + dirty + HUD |
 | `$02/8460` | **Game only:** arcade `#4D00`–`#4E3F` mirror (`RAM4D`) |
 | `$03/0000` | Tiles, even/odd sprites+masks, maze, stitched cells |
 | `$01/2000` | SHR (`S_SHR`) — normal shadow |

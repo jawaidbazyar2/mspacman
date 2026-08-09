@@ -43,8 +43,17 @@ ActorTick
 	lda	>LEVEL_STATE
 	cmp	#3
 	bne	:out
-	jsr	EyesHomeStub
-	jsr	CollideAll
+	jsr	ApplyKillGhost		; == j_1066 (pending→STATE after freeze)
+	jsr	EyesTick		; == j_1094…j_10b4 eyes travel / enter
+* == #102E: while eat-pose pending, freeze motion (no pac/ghost/fright dec)
+	lda	>GHOSTS_KILLED_PENDING
+	beq	:move
+	jsr	EatGhostAnimTick	; == j_1235 + $4A timer
+	plp
+	rts
+:move	jsr	CollideAll
+	lda	>GHOSTS_KILLED_PENDING
+	bne	:out			; == #103F ate this half-tick → no move
 	jsr	MsPacMove
 	jsr	GhostsMoveAll
 	jsr	FrightTimerDec		; == j_1376 (×2 via ActorTick)
@@ -55,6 +64,65 @@ ActorTick
 GhostAnimStub
 	rts
 SirenStub
+	rts
+
+* == j_1235 + RST#30 $4A stand-in. Points/hide via ActorPublish flags.
+EatGhostAnimTick
+	php
+	sep	#$20
+	lda	>EAT_FREEZE_TIMER
+	beq	:teardown
+	dec
+	sta	>EAT_FREEZE_TIMER
+	bne	:done
+:teardown
+* == j_1277: eyes restore, kill_ghost_state ← pending, clear pending/anim
+	lda	>GHOSTS_KILLED_PENDING
+	sta	>KILL_GHOST_STATE
+	lda	#0
+	sta	>GHOSTS_KILLED_PENDING
+	sta	>KILLED_GHOST_ANIM
+	sta	>EAT_FREEZE_TIMER
+	jsr	EyesSoundStub		; == #128E CH2 bit6
+:done	plp
+	rts
+
+EyesSoundStub
+* == #128E set 6,(CH2_E_NUM) — WSG not ported
+	rts
+
+* == j_1066: promote KILL_GHOST_STATE → that ghost STATE=1 (eyes)
+ApplyKillGhost
+	php
+	sep	#$20
+	lda	>KILL_GHOST_STATE
+	beq	:out
+	cmp	#1
+	bne	:p
+	lda	#0
+	sta	>KILL_GHOST_STATE
+	lda	#1
+	sta	>RED_STATE
+	bra	:out
+:p	cmp	#2
+	bne	:b
+	lda	#0
+	sta	>KILL_GHOST_STATE
+	lda	#1
+	sta	>PINK_STATE
+	bra	:out
+:b	cmp	#3
+	bne	:o
+	lda	#0
+	sta	>KILL_GHOST_STATE
+	lda	#1
+	sta	>BLUE_STATE
+	bra	:out
+:o	lda	#0
+	sta	>KILL_GHOST_STATE
+	lda	#1
+	sta	>ORANGE_STATE
+:out	plp
 	rts
 
 * Countdown fright word; clear when 0 or no fright flags. == j_1376
@@ -99,6 +167,11 @@ ClearFrightState
 	sta	>PINK_REVERSE
 	sta	>BLUE_REVERSE
 	sta	>ORANGE_REVERSE
+	sta	>GHOSTS_KILLED_PENDING
+	sta	>GHOSTS_KILLED_COUNT	; == #13D2
+	sta	>KILLED_GHOST_ANIM
+	sta	>EAT_FREEZE_TIMER
+	sta	>KILL_GHOST_STATE
 	rep	#$30
 	lda	#0
 	sta	>FRIGHT_TIMER
@@ -230,16 +303,55 @@ FrightEdibleRGB
 :blue	lda	#$022F
 	rts
 
-EyesHomeStub
-* Eyes (state=1): snap to house interior + SUBSTATE=0 so LeaveHouse re-exits.
-* == eyes arrive-home simplified (arcade post-entry Y=$80)
+EyesTick
+* == j_1094…j_10b4: STATE=1 maze travel (GhostMove*); door at ($64,$80);
+* STATE=2 enter down to Y=$80; blue/orange STATE=3 slide to pen then home.
 	php
+	sep	#$20
+	jsr	EyesTickRed
+	jsr	EyesTickPink
+	jsr	EyesTickBlue
+	jsr	EyesTickOrange
+	plp
+	rts
+
+* Door arrive: tile match to EyesHomeTile ($2C,$2E), then snap pixels.
+* Exact ($64,$80) is easy to miss — pathfind centers on X=$84 (tile mid).
+
+EyesTickRed
 	sep	#$20
 	lda	>RED_STATE
 	cmp	#1
-	bne	:p
-	lda	#$80
+	beq	:atDoor
+	cmp	#2
+	beq	:enter
+	rts
+:atDoor	lda	>RED_TILE_Y
+	cmp	EyesHomeTile
+	bne	:rts
+	lda	>RED_TILE_X
+	cmp	EyesHomeTile+1
+	bne	:rts
+	lda	#$64			; snap to arcade door pixel
 	sta	>RED_Y
+	lda	#$80
+	sta	>RED_X
+	lda	#2
+	sta	>RED_STATE
+	rts
+:enter	lda	>RED_Y
+	inc
+	sta	>RED_Y
+	lda	#DIR_DOWN
+	sta	>RED_DIR
+	sta	>RED_PREV_DIR
+	lda	#1
+	sta	>RED_TILE_DY
+	lda	#0
+	sta	>RED_TILE_DY+1
+	lda	>RED_Y
+	cmp	#$80
+	bne	:rts
 	lda	#$80
 	sta	>RED_X
 	lda	#$2F
@@ -247,7 +359,7 @@ EyesHomeStub
 	lda	#$2E
 	sta	>RED_TILE_X
 	lda	#$FF
-	sta	>RED_TILE_DY		; up for leave
+	sta	>RED_TILE_DY
 	lda	#0
 	sta	>RED_TILE_DY+1
 	lda	#DIR_UP
@@ -255,12 +367,45 @@ EyesHomeStub
 	lda	#0
 	sta	>RED_STATE
 	sta	>RED_SUBSTATE
-:p	lda	>PINK_STATE
+	sta	>RED_FRIGHT
+:rts	rts
+
+EyesTickPink
+	sep	#$20
+	lda	>PINK_STATE
 	cmp	#1
-	bne	:b
-	lda	#$80
+	beq	:atDoor
+	cmp	#2
+	beq	:enter
+	rts
+:atDoor	lda	>PINK_TILE_Y
+	cmp	EyesHomeTile
+	bne	:rts
+	lda	>PINK_TILE_X
+	cmp	EyesHomeTile+1
+	bne	:rts
+	lda	#$64
 	sta	>PINK_Y
 	lda	#$80
+	sta	>PINK_X
+	lda	#2
+	sta	>PINK_STATE
+	rts
+:enter	lda	>PINK_Y
+	inc
+	sta	>PINK_Y
+	lda	#DIR_DOWN
+	sta	>PINK_DIR
+	sta	>PINK_PREV_DIR
+	lda	#1
+	sta	>PINK_TILE_DY
+	lda	#0
+	sta	>PINK_TILE_DY+1
+	lda	>PINK_Y
+	cmp	#$80
+	bne	:rts
+	lda	#$80
+	sta	>PINK_Y
 	sta	>PINK_X
 	lda	#$2F
 	sta	>PINK_TILE_Y
@@ -275,10 +420,62 @@ EyesHomeStub
 	lda	#0
 	sta	>PINK_STATE
 	sta	>PINK_SUBSTATE
-:b	lda	>BLUE_STATE
+	sta	>PINK_FRIGHT
+:rts	rts
+
+EyesTickBlue
+	sep	#$20
+	lda	>BLUE_STATE
 	cmp	#1
-	bne	:o
+	beq	:atDoor
+	cmp	#2
+	beq	:enter
+	cmp	#3
+	beq	:slide
+	rts
+:atDoor	lda	>BLUE_TILE_Y
+	cmp	EyesHomeTile
+	bne	:done
+	lda	>BLUE_TILE_X
+	cmp	EyesHomeTile+1
+	bne	:done
+	lda	#$64
+	sta	>BLUE_Y
 	lda	#$80
+	sta	>BLUE_X
+	lda	#2
+	sta	>BLUE_STATE
+:done	rts
+:enter	lda	>BLUE_Y
+	inc
+	sta	>BLUE_Y
+	lda	#DIR_DOWN
+	sta	>BLUE_DIR
+	sta	>BLUE_PREV_DIR
+	lda	#1
+	sta	>BLUE_TILE_DY
+	lda	#0
+	sta	>BLUE_TILE_DY+1
+	lda	>BLUE_Y
+	cmp	#$80
+	bne	:done
+	lda	#3
+	sta	>BLUE_STATE
+	rts
+:slide	lda	>BLUE_X			; arcade left → +X to $90
+	inc
+	sta	>BLUE_X
+	lda	#DIR_LEFT
+	sta	>BLUE_DIR
+	sta	>BLUE_PREV_DIR
+	lda	#0
+	sta	>BLUE_TILE_DY
+	lda	#1
+	sta	>BLUE_TILE_DY+1
+	lda	>BLUE_X
+	cmp	#$90
+	bne	:done
+	lda	#$80			; pen: center Y, left X
 	sta	>BLUE_Y
 	lda	#$90
 	sta	>BLUE_X
@@ -295,8 +492,60 @@ EyesHomeStub
 	lda	#0
 	sta	>BLUE_STATE
 	sta	>BLUE_SUBSTATE
-:o	lda	>ORANGE_STATE
+	sta	>BLUE_FRIGHT
+	rts
+
+EyesTickOrange
+	sep	#$20
+	lda	>ORANGE_STATE
 	cmp	#1
+	beq	:atDoor
+	cmp	#2
+	beq	:enter
+	cmp	#3
+	beq	:slide
+	rts
+:atDoor	lda	>ORANGE_TILE_Y
+	cmp	EyesHomeTile
+	bne	:done
+	lda	>ORANGE_TILE_X
+	cmp	EyesHomeTile+1
+	bne	:done
+	lda	#$64
+	sta	>ORANGE_Y
+	lda	#$80
+	sta	>ORANGE_X
+	lda	#2
+	sta	>ORANGE_STATE
+:done	rts
+:enter	lda	>ORANGE_Y
+	inc
+	sta	>ORANGE_Y
+	lda	#DIR_DOWN
+	sta	>ORANGE_DIR
+	sta	>ORANGE_PREV_DIR
+	lda	#1
+	sta	>ORANGE_TILE_DY
+	lda	#0
+	sta	>ORANGE_TILE_DY+1
+	lda	>ORANGE_Y
+	cmp	#$80
+	bne	:done
+	lda	#3
+	sta	>ORANGE_STATE
+	rts
+:slide	lda	>ORANGE_X		; arcade right → -X to $70
+	dec
+	sta	>ORANGE_X
+	lda	#DIR_RIGHT
+	sta	>ORANGE_DIR
+	sta	>ORANGE_PREV_DIR
+	lda	#0
+	sta	>ORANGE_TILE_DY
+	lda	#$FF
+	sta	>ORANGE_TILE_DY+1
+	lda	>ORANGE_X
+	cmp	#$70
 	bne	:done
 	lda	#$80
 	sta	>ORANGE_Y
@@ -315,5 +564,5 @@ EyesHomeStub
 	lda	#0
 	sta	>ORANGE_STATE
 	sta	>ORANGE_SUBSTATE
-:done	plp
+	sta	>ORANGE_FRIGHT
 	rts

@@ -34,19 +34,19 @@ from gs2_render_test import (  # noqa: E402
     spawn_gs2,
 )
 
-FRAME_COUNT = 0x028900
-LEVEL_STATE = 0x028564
-POWER_PILL_ACT = 0x028506
-GHOST_ORIENT_IDX = 0x028521
-GHOST_ORIENT_CNT = 0x028522
-GHOST_ORIENT_TBL = 0x0284E6
-PAC_TILE_Y, PAC_TILE_X = 0x028499, 0x02849A
-RED_TILE_Y, RED_TILE_X = 0x02846A, 0x02846B
-RED_DIR = 0x02848C
-RED_FRIGHT = 0x028507
-RED_SUBSTATE = 0x028500
-RED_REVERSE = 0x028511
-PATH_DST_Y, PATH_DST_X = 0x0284A0, 0x0284A1
+FRAME_COUNT = 0x02A900
+LEVEL_STATE = 0x02A564
+POWER_PILL_ACT = 0x02A506
+GHOST_ORIENT_IDX = 0x02A521
+GHOST_ORIENT_CNT = 0x02A522
+GHOST_ORIENT_TBL = 0x02A4E6
+PAC_TILE_Y, PAC_TILE_X = 0x02A499, 0x02A49A
+RED_TILE_Y, RED_TILE_X = 0x02A46A, 0x02A46B
+RED_DIR = 0x02A48C
+RED_FRIGHT = 0x02A507
+RED_SUBSTATE = 0x02A500
+RED_REVERSE = 0x02A511
+PATH_DST_Y, PATH_DST_X = 0x02A4A0, 0x02A4A1
 
 
 def u8(client: Client, addr: int) -> int:
@@ -126,7 +126,7 @@ def main() -> int:
                 rty, rtx = u8(client, RED_TILE_Y), u8(client, RED_TILE_X)
                 dy = abs(pty - rty)
                 dx = abs(ptx - rtx)
-                print(f"  dist2_red_pac={dy*dy + dx*dx} red_px=({u8(client, 0x028460):02X},{u8(client, 0x028461):02X})")
+                print(f"  dist2_red_pac={dy*dy + dx*dx} red_px=({u8(client, 0x02A460):02X},{u8(client, 0x02A461):02X})")
                 client.continue_()
     finally:
         proc.terminate()

@@ -31,6 +31,9 @@ ScatterPink	db	$1D,$39		; top left
 ScatterBlue	db	$40,$20		; bottom right
 ScatterOrange	db	$40,$3B		; bottom left
 
+* Eyes return target — arcade #2E2C as (Y,X) = ($2C,$2E) above house door
+EyesHomeTile	db	$2C,$2E
+
 * Fruit release thresholds (Ms. Pac)
 FruitDots1	equ	64
 FruitDots2	equ	176

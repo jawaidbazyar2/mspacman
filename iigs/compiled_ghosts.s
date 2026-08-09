@@ -73,6 +73,22 @@ GhostBlitTable
 	da	CG3_6O	; Clyde pen=11 spr=$26 odd
 	da	CG3_7E	; Clyde pen=11 spr=$27 even
 	da	CG3_7O	; Clyde pen=11 spr=$27 odd
+	da	CG4_0E	; Eyes pen=0 spr=$20 even
+	da	CG4_0O	; Eyes pen=0 spr=$20 odd
+	da	CG4_1E	; Eyes pen=0 spr=$21 even
+	da	CG4_1O	; Eyes pen=0 spr=$21 odd
+	da	CG4_2E	; Eyes pen=0 spr=$22 even
+	da	CG4_2O	; Eyes pen=0 spr=$22 odd
+	da	CG4_3E	; Eyes pen=0 spr=$23 even
+	da	CG4_3O	; Eyes pen=0 spr=$23 odd
+	da	CG4_4E	; Eyes pen=0 spr=$24 even
+	da	CG4_4O	; Eyes pen=0 spr=$24 odd
+	da	CG4_5E	; Eyes pen=0 spr=$25 even
+	da	CG4_5O	; Eyes pen=0 spr=$25 odd
+	da	CG4_6E	; Eyes pen=0 spr=$26 even
+	da	CG4_6O	; Eyes pen=0 spr=$26 odd
+	da	CG4_7E	; Eyes pen=0 spr=$27 even
+	da	CG4_7O	; Eyes pen=0 spr=$27 odd
 
 CG0_0E
 	php
@@ -5031,6 +5047,398 @@ CG3_7O
 	sta	$2642,y
 	lda	#$BB
 	sta	$2645,y
+	plp
+	rts
+
+CG4_0E
+	php
+	rep	#$20
+	lda	$2282,y
+	and	#$0FF0
+	ora	#$1001
+	sta	$2282,y
+	lda	$2284,y
+	and	#$0F00
+	ora	#$1011
+	sta	$2284,y
+	lda	$2322,y
+	and	#$0FF0
+	ora	#$F001
+	sta	$2322,y
+	lda	$2324,y
+	and	#$0F00
+	ora	#$F01F
+	sta	$2324,y
+	sep	#$20
+	plp
+	rts
+
+CG4_0O
+	php
+	rep	#$20
+	lda	$2284,y
+	and	#$00F0
+	ora	#$1101
+	sta	$2284,y
+	lda	$2324,y
+	and	#$00F0
+	ora	#$FF01
+	sta	$2324,y
+	sep	#$20
+	lda	#$11
+	sta	$2283,y
+	lda	#$1F
+	sta	$2323,y
+	plp
+	rts
+
+CG4_1E
+	php
+	rep	#$20
+	lda	$2282,y
+	and	#$0FF0
+	ora	#$1001
+	sta	$2282,y
+	lda	$2284,y
+	and	#$0F00
+	ora	#$1011
+	sta	$2284,y
+	lda	$2322,y
+	and	#$0FF0
+	ora	#$F001
+	sta	$2322,y
+	lda	$2324,y
+	and	#$0F00
+	ora	#$F01F
+	sta	$2324,y
+	sep	#$20
+	plp
+	rts
+
+CG4_1O
+	php
+	rep	#$20
+	lda	$2284,y
+	and	#$00F0
+	ora	#$1101
+	sta	$2284,y
+	lda	$2324,y
+	and	#$00F0
+	ora	#$FF01
+	sta	$2324,y
+	sep	#$20
+	lda	#$11
+	sta	$2283,y
+	lda	#$1F
+	sta	$2323,y
+	plp
+	rts
+
+CG4_2E
+	php
+	rep	#$20
+	lda	#$1111
+	sta	$2323,y
+	sep	#$20
+	lda	$2282,y
+	and	#$F0
+	ora	#$01
+	sta	$2282,y
+	lda	$2284,y
+	and	#$0F
+	ora	#$10
+	sta	$2284,y
+	lda	#$11
+	sta	$2322,y
+	lda	$23C2,y
+	and	#$F0
+	ora	#$0F
+	sta	$23C2,y
+	lda	$23C4,y
+	and	#$0F
+	ora	#$F0
+	sta	$23C4,y
+	plp
+	rts
+
+CG4_2O
+	php
+	rep	#$20
+	lda	$2283,y
+	and	#$F00F
+	ora	#$0110
+	sta	$2283,y
+	lda	$2322,y
+	and	#$00F0
+	ora	#$1101
+	sta	$2322,y
+	lda	$2324,y
+	and	#$0F00
+	ora	#$1011
+	sta	$2324,y
+	lda	$23C3,y
+	and	#$F00F
+	ora	#$0FF0
+	sta	$23C3,y
+	sep	#$20
+	plp
+	rts
+
+CG4_3E
+	php
+	rep	#$20
+	lda	#$1111
+	sta	$2323,y
+	sep	#$20
+	lda	$2282,y
+	and	#$F0
+	ora	#$01
+	sta	$2282,y
+	lda	$2284,y
+	and	#$0F
+	ora	#$10
+	sta	$2284,y
+	lda	#$11
+	sta	$2322,y
+	lda	$23C2,y
+	and	#$F0
+	ora	#$0F
+	sta	$23C2,y
+	lda	$23C4,y
+	and	#$0F
+	ora	#$F0
+	sta	$23C4,y
+	plp
+	rts
+
+CG4_3O
+	php
+	rep	#$20
+	lda	$2283,y
+	and	#$F00F
+	ora	#$0110
+	sta	$2283,y
+	lda	$2322,y
+	and	#$00F0
+	ora	#$1101
+	sta	$2322,y
+	lda	$2324,y
+	and	#$0F00
+	ora	#$1011
+	sta	$2324,y
+	lda	$23C3,y
+	and	#$F00F
+	ora	#$0FF0
+	sta	$23C3,y
+	sep	#$20
+	plp
+	rts
+
+CG4_4E
+	php
+	rep	#$20
+	lda	$2281,y
+	and	#$00F0
+	ora	#$1101
+	sta	$2281,y
+	lda	$2283,y
+	and	#$0FF0
+	ora	#$1001
+	sta	$2283,y
+	lda	$2321,y
+	and	#$00F0
+	ora	#$F10F
+	sta	$2321,y
+	lda	$2323,y
+	and	#$0FF0
+	ora	#$100F
+	sta	$2323,y
+	sep	#$20
+	plp
+	rts
+
+CG4_4O
+	php
+	rep	#$20
+	lda	$2283,y
+	and	#$000F
+	ora	#$1110
+	sta	$2283,y
+	lda	$2323,y
+	and	#$000F
+	ora	#$F110
+	sta	$2323,y
+	sep	#$20
+	lda	#$11
+	sta	$2282,y
+	lda	#$FF
+	sta	$2322,y
+	plp
+	rts
+
+CG4_5E
+	php
+	rep	#$20
+	lda	$2281,y
+	and	#$00F0
+	ora	#$1101
+	sta	$2281,y
+	lda	$2283,y
+	and	#$0FF0
+	ora	#$1001
+	sta	$2283,y
+	lda	$2321,y
+	and	#$00F0
+	ora	#$F10F
+	sta	$2321,y
+	lda	$2323,y
+	and	#$0FF0
+	ora	#$100F
+	sta	$2323,y
+	sep	#$20
+	plp
+	rts
+
+CG4_5O
+	php
+	rep	#$20
+	lda	$2283,y
+	and	#$000F
+	ora	#$1110
+	sta	$2283,y
+	lda	$2323,y
+	and	#$000F
+	ora	#$F110
+	sta	$2323,y
+	sep	#$20
+	lda	#$11
+	sta	$2282,y
+	lda	#$FF
+	sta	$2322,y
+	plp
+	rts
+
+CG4_6E
+	php
+	rep	#$20
+	lda	#$F111
+	sta	$21E3,y
+	lda	#$1111
+	sta	$2283,y
+	sep	#$20
+	lda	$2142,y
+	and	#$F0
+	ora	#$0F
+	sta	$2142,y
+	lda	$2144,y
+	and	#$0F
+	ora	#$F0
+	sta	$2144,y
+	lda	#$1F
+	sta	$21E2,y
+	lda	#$11
+	sta	$2282,y
+	lda	$2322,y
+	and	#$F0
+	ora	#$01
+	sta	$2322,y
+	lda	$2324,y
+	and	#$0F
+	ora	#$10
+	sta	$2324,y
+	plp
+	rts
+
+CG4_6O
+	php
+	rep	#$20
+	lda	$2143,y
+	and	#$F00F
+	ora	#$0FF0
+	sta	$2143,y
+	lda	$21E2,y
+	and	#$00F0
+	ora	#$F101
+	sta	$21E2,y
+	lda	$21E4,y
+	and	#$0F00
+	ora	#$101F
+	sta	$21E4,y
+	lda	$2282,y
+	and	#$00F0
+	ora	#$1101
+	sta	$2282,y
+	lda	$2284,y
+	and	#$0F00
+	ora	#$1011
+	sta	$2284,y
+	lda	$2323,y
+	and	#$F00F
+	ora	#$0110
+	sta	$2323,y
+	sep	#$20
+	plp
+	rts
+
+CG4_7E
+	php
+	rep	#$20
+	lda	#$F111
+	sta	$21E3,y
+	lda	#$1111
+	sta	$2283,y
+	sep	#$20
+	lda	$2142,y
+	and	#$F0
+	ora	#$0F
+	sta	$2142,y
+	lda	$2144,y
+	and	#$0F
+	ora	#$F0
+	sta	$2144,y
+	lda	#$1F
+	sta	$21E2,y
+	lda	#$11
+	sta	$2282,y
+	lda	$2322,y
+	and	#$F0
+	ora	#$01
+	sta	$2322,y
+	lda	$2324,y
+	and	#$0F
+	ora	#$10
+	sta	$2324,y
+	plp
+	rts
+
+CG4_7O
+	php
+	rep	#$20
+	lda	$2143,y
+	and	#$F00F
+	ora	#$0FF0
+	sta	$2143,y
+	lda	$21E2,y
+	and	#$00F0
+	ora	#$F101
+	sta	$21E2,y
+	lda	$21E4,y
+	and	#$0F00
+	ora	#$101F
+	sta	$21E4,y
+	lda	$2282,y
+	and	#$00F0
+	ora	#$1101
+	sta	$2282,y
+	lda	$2284,y
+	and	#$0F00
+	ora	#$1011
+	sta	$2284,y
+	lda	$2323,y
+	and	#$F00F
+	ora	#$0110
+	sta	$2323,y
+	sep	#$20
 	plp
 	rts
 

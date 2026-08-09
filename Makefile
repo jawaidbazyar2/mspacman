@@ -100,7 +100,7 @@ tiles-preview: maze
 
 # Shared compiled blit deps
 IIGS_COMPILED := $(IIGS_DIR)/compiled_ghosts.s $(IIGS_DIR)/compiled_fruits.s \
-		$(IIGS_DIR)/compiled_mspac.s
+		$(IIGS_DIR)/compiled_points.s $(IIGS_DIR)/compiled_mspac.s
 
 # Assemble IIgs rail demo → build/iigs/harness.bin
 iigs: palette rails gfx $(IIGS_COMPILED) $(IIGS_BIN)
@@ -121,6 +121,10 @@ $(IIGS_DIR)/compiled_ghosts.s: py/gen_compiled_ghosts.py \
 $(IIGS_DIR)/compiled_fruits.s: py/gen_compiled_fruits.py \
 		$(SPRITE_ROM) $(COLOR_ROM) $(PALETTE_ROM) py/gen_shr_gfx.py py/gen_palette.py
 	python3 py/gen_compiled_fruits.py --sprites $(SPRITE_ROM) -o $(IIGS_DIR)/compiled_fruits.s
+
+$(IIGS_DIR)/compiled_points.s: py/gen_compiled_points.py \
+		$(SPRITE_ROM) py/gen_shr_gfx.py
+	python3 py/gen_compiled_points.py --sprites $(SPRITE_ROM) -o $(IIGS_DIR)/compiled_points.s
 
 $(IIGS_DIR)/compiled_mspac.s: py/gen_compiled_mspac.py \
 		$(SPRITE_ROM) $(COLOR_ROM) $(PALETTE_ROM) py/gen_shr_gfx.py py/gen_palette.py
@@ -183,6 +187,11 @@ $(IIGS_GAME_BIN): $(IIGS_GAME_SRCS) $(MERLIN32) | $(IIGS_BUILD)
 	cd $(IIGS_DIR) && $(MERLIN32) -V $(MERLIN_LIB) link_game.s; \
 		test -f game.bin
 	mv -f $(IIGS_DIR)/game.bin $(IIGS_GAME_BIN)
+	@sz=$$(wc -c < $(IIGS_GAME_BIN)); \
+		if [ $$sz -ge 40960 ]; then \
+			echo "error: game.bin is $$sz bytes (must be < \$$A000 work RAM)"; exit 1; \
+		fi; \
+		echo "game.bin $$sz bytes (work RAM @ \$$A000)"
 	@mv -f $(IIGS_DIR)/_Output.txt $(IIGS_BUILD)/game_Output.txt 2>/dev/null; true
 	@rm -f $(IIGS_DIR)/_FileInformation.txt $(IIGS_DIR)/game.bin_Output.txt \
 		$(IIGS_DIR)/error_output.txt 2>/dev/null; true

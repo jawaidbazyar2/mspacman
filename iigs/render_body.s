@@ -735,15 +735,28 @@ DrawSprite
 	jsr	BckXY
 	lda	<R_ACT
 	cmp	#FRUIT_ACTOR
-	beq	:fruitBlit
+	bne	:notFruit
+	brl	:fruitBlit
+:notFruit
 	cmp	#PAC_ACTOR
-	beq	:pacBlit
-* Ghost: index = color_slot*16 + (ACT_SPR&7)*2 + (X&1)
-* slot: 5/7/9/11 → 0..3 (fright recolors via palette poke, not extra slots)
+	bne	:ghostish
+	brl	:pacBlit
+:ghostish
+* Eat-ghost freeze: FLAG_POINTS → sprites $28–$2B (compiled bank $18)
 	lda	<R_BASE
 	tax
+	lda	>ACTORS+ACT_FLAGS,x
+	and	#$00FF
+	and	#FLAG_POINTS
+	bne	:pointsBlit
+* Ghost: index = color_slot*16 + (ACT_SPR&7)*2 + (X&1)
+* slot: 5/7/9/11 → 0..3; COL_EYES (0) → slot 4 (body transparent)
 	lda	>ACTORS+ACT_COLOR,x
 	and	#$00FF
+	bne	:bodySlot
+	lda	#4*16			; eyes-only compiled slot
+	bra	:gotSlot
+:bodySlot
 	sec
 	sbc	#5
 	lsr				; 5/7/9/11 → 0..3
@@ -752,6 +765,7 @@ DrawSprite
 	asl
 	asl
 	asl				; *16
+:gotSlot
 	sta	<R_TMP
 	lda	>ACTORS+ACT_SPR,x
 	and	#$0007
@@ -766,6 +780,21 @@ DrawSprite
 	lda	<R_DEST
 	tay
 	jsr	GhostBlitGo
+	bra	:blitDone
+:pointsBlit
+* Points: index = (ACT_SPR&3)*2 + (X&1)
+	lda	>ACTORS+ACT_SPR,x
+	and	#$0003
+	asl				; slot*2
+	sta	<R_OFF
+	lda	<R_X
+	and	#$0001
+	ora	<R_OFF
+	asl				; word index
+	tax
+	lda	<R_DEST
+	tay
+	jsr	PointsBlitGo
 	bra	:blitDone
 :fruitBlit
 * Fruit: index = (ACT_SPR&7)*2 + (X&1)

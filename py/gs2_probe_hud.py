@@ -37,11 +37,11 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise SystemExit(f"gs2debug missing: {exc}") from exc
 
-TILEMAP = 0x028000
+TILEMAP = 0x02A000
 TILEMAP_LEN = 868
-DIRTY_COUNT = 0x028800
-FRAME_COUNT = 0x028900
-SCORE = 0x028908
+DIRTY_COUNT = 0x02A800
+FRAME_COUNT = 0x02A900
+SCORE = 0x02A908
 PALETTE = 0x019E00
 
 TILE_DOT = 0x10
