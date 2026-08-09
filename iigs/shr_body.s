@@ -13,10 +13,10 @@ InitSHR
 	lda	#$C1
 	sta	>NEWVIDEO
 	sta	>TXTCLR
-* Inhibit every shadow except SHR (bit3=0). Includes IOLC (bit6) so
-* $01/A000–FFFF is RAM for BCK — must set this BEFORE clearing BCK or
-* stores into $01/Cxxx hit I/O and wedge VBL. Soft-switches use $E0/$E1.
-	lda	#$F7
+* Normal SHR shadow on bank $01 (bit3=0). Bit6 clear — IOLC intact;
+* BCK lives at BCK_PIXELS (static $04/2000 or GS/OS segment), not $01/A000.
+* Soft-switches via $E0/$E1.
+	lda	#$B7
 	sta	>SHADOW
 	rep	#$30
 	lda	#$0000
@@ -25,7 +25,7 @@ InitSHR
 	dex
 	dex
 	bpl	]clr
-* Zero PF backing strip ($01/A000, stride S_BCK) before DrawMaze.
+* Zero PF backing strip (long BCK_PIXELS, stride S_BCK) before DrawMaze.
 * Use CPX end (not BPL) — count is >$8000 so BPL would abort early.
 	ldx	#0
 ]bck	sta	>BCK_PIXELS,x
@@ -84,7 +84,7 @@ BlinkPowerPills
 	rts
 
 SetBorder
-* A = color 0–15. $E0/C034 (IOLC inhibited — not $00/C034).
+* A = color 0–15. Prefer $E0/C034 (Mega II path).
 	php
 	sep	#$20
 	and	#$0F
@@ -93,7 +93,7 @@ SetBorder
 	rts
 
 WaitVBL
-* $E1/C019 bit7=1 during blank (TN #40). Required when IOLC inhibited.
+* $E1/C019 bit7=1 during blank (TN #40).
 	php
 	sep	#$20
 	lda	#BRD_VBL

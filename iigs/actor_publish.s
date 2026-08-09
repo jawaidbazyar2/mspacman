@@ -131,133 +131,139 @@ ActorTunnelVis
 	cmp	#SPR_BASE_X+168		; 72+28*6 — past rightmost tile origin
 	bcs	:hide
 	sep	#$20
-	lda	>BANK2+ACT_FLAGS,x
+	lda	>ACTORS+ACT_FLAGS,x
 	and	#$FD			; clear FLAG_NODRAW
-	sta	>BANK2+ACT_FLAGS,x
+	sta	>ACTORS+ACT_FLAGS,x
 	plp
 	rts
 :hide	sep	#$20
-	lda	>BANK2+ACT_FLAGS,x
+	lda	>ACTORS+ACT_FLAGS,x
 	ora	#FLAG_NODRAW
-	sta	>BANK2+ACT_FLAGS,x
+	sta	>ACTORS+ACT_FLAGS,x
 	plp
 	rts
 
 ActorPublish
 	php
 	rep	#$30
-* Blinky
+* Blinky — LDX has no 24-bit form; load X via LDA/TAX so GS/OS EXT works.
 	sep	#$30
+	lda	>RED_X
+	tax
 	lda	>RED_Y
-	ldx	>RED_X
 	jsr	ArcadeToScreen
 	rep	#$30
-	ldx	#$8400
+	ldx	#0
 	lda	<R_X
-	sta	>BANK2+ACT_X,x
+	sta	>ACTORS+ACT_X,x
 	lda	<R_Y
-	sta	>BANK2+ACT_Y,x
+	sta	>ACTORS+ACT_Y,x
 	jsr	ActorTunnelVis
 	lda	>RED_DIR
 	jsr	GhostSprFromDir
 	sep	#$20
-	sta	>BANK2+ACT_SPR,x
+	sta	>ACTORS+ACT_SPR,x
 	lda	#COL_BLINKY
-	sta	>BANK2+ACT_COLOR,x
+	sta	>ACTORS+ACT_COLOR,x
 * Pinky
 	sep	#$30
+	lda	>PINK_X
+	tax
 	lda	>PINK_Y
-	ldx	>PINK_X
 	jsr	ArcadeToScreen
 	rep	#$30
-	ldx	#$8410
+	ldx	#16
 	lda	<R_X
-	sta	>BANK2+ACT_X,x
+	sta	>ACTORS+ACT_X,x
 	lda	<R_Y
-	sta	>BANK2+ACT_Y,x
+	sta	>ACTORS+ACT_Y,x
 	jsr	ActorTunnelVis
 	lda	>PINK_DIR
 	jsr	GhostSprFromDir
 	sep	#$20
-	sta	>BANK2+ACT_SPR,x
+	sta	>ACTORS+ACT_SPR,x
 	lda	#COL_PINKY
-	sta	>BANK2+ACT_COLOR,x
+	sta	>ACTORS+ACT_COLOR,x
 * Inky
 	sep	#$30
+	lda	>BLUE_X
+	tax
 	lda	>BLUE_Y
-	ldx	>BLUE_X
 	jsr	ArcadeToScreen
 	rep	#$30
-	ldx	#$8420
+	ldx	#32
 	lda	<R_X
-	sta	>BANK2+ACT_X,x
+	sta	>ACTORS+ACT_X,x
 	lda	<R_Y
-	sta	>BANK2+ACT_Y,x
+	sta	>ACTORS+ACT_Y,x
 	jsr	ActorTunnelVis
 	lda	>BLUE_DIR
 	jsr	GhostSprFromDir
 	sep	#$20
-	sta	>BANK2+ACT_SPR,x
+	sta	>ACTORS+ACT_SPR,x
 	lda	#COL_INKY
-	sta	>BANK2+ACT_COLOR,x
+	sta	>ACTORS+ACT_COLOR,x
 * Clyde
 	sep	#$30
+	lda	>ORANGE_X
+	tax
 	lda	>ORANGE_Y
-	ldx	>ORANGE_X
 	jsr	ArcadeToScreen
 	rep	#$30
-	ldx	#$8430
+	ldx	#48
 	lda	<R_X
-	sta	>BANK2+ACT_X,x
+	sta	>ACTORS+ACT_X,x
 	lda	<R_Y
-	sta	>BANK2+ACT_Y,x
+	sta	>ACTORS+ACT_Y,x
 	jsr	ActorTunnelVis
 	lda	>ORANGE_DIR
 	jsr	GhostSprFromDir
 	sep	#$20
-	sta	>BANK2+ACT_SPR,x
+	sta	>ACTORS+ACT_SPR,x
 	lda	#COL_CLYDE
-	sta	>BANK2+ACT_COLOR,x
+	sta	>ACTORS+ACT_COLOR,x
 * Fruit — inactive: FLAG_NODRAW (never blit at 0,0; BckXY X-72 underflows)
 	sep	#$20
 	lda	>FRUIT_ACTIVE
 	bne	:frOn
 	rep	#$30
-	ldx	#$8440
+	ldx	#64
 	lda	#FLAG_NODRAW
 	sep	#$20
-	sta	>BANK2+ACT_FLAGS,x
+	sta	>ACTORS+ACT_FLAGS,x
 	bra	:pac
 :frOn	sep	#$30
+	lda	>FRUIT_PIXEL_X
+	tax
 	lda	>FRUIT_PIXEL_Y
-	ldx	>FRUIT_PIXEL_X
 	jsr	ArcadeToScreen
 	rep	#$30
-	ldx	#$8440
+	ldx	#64
 	lda	<R_X
-	sta	>BANK2+ACT_X,x
+	sta	>ACTORS+ACT_X,x
 	lda	<R_Y
-	sta	>BANK2+ACT_Y,x
+	sta	>ACTORS+ACT_Y,x
 	sep	#$20
 	lda	>LEVEL
 	cmp	#MAX_FRUIT_TYPE+1
 	bcc	:fs
 	lda	#MAX_FRUIT_TYPE
-:fs	sta	>BANK2+ACT_SPR,x
-	lda	>BANK2+ACT_FLAGS,x
+:fs	sta	>ACTORS+ACT_SPR,x
+	lda	>ACTORS+ACT_FLAGS,x
 	and	#$FD			; clear FLAG_NODRAW
-	sta	>BANK2+ACT_FLAGS,x
+	sta	>ACTORS+ACT_FLAGS,x
 * Ms. Pac
 :pac	sep	#$30
+	lda	>PAC_X
+	tax
 	lda	>PAC_Y
-	ldx	>PAC_X
 	jsr	ArcadeToScreen
 	rep	#$30
-	ldx	#$8450
+	ldx	#80
 	lda	<R_X
-	sta	>BANK2+ACT_X,x
+	sta	>ACTORS+ACT_X,x
 	lda	<R_Y
-	sta	>BANK2+ACT_Y,x
+	sta	>ACTORS+ACT_Y,x
 	jsr	ActorTunnelVis
 	lda	>PAC_DIR
 	and	#$0003
@@ -288,7 +294,7 @@ ActorPublish
 	clc
 	adc	<R_ACT
 	sep	#$20
-	sta	>BANK2+ACT_SPR,x
+	sta	>ACTORS+ACT_SPR,x
 	plp
 	rts
 

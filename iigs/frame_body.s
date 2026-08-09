@@ -1,10 +1,15 @@
 *
-* Shared Start + MainLoop (demo and game builds).
+* Shared GameEnter + MainLoop (demo and game builds).
 * Mode-specific work is FrameTick (DemoTick or LogicTick).
 * InitActors is provided by the build (rails_body vs game_init).
 *
+* Static: Start (stack/DP) is assembled here when BUILD_GSOS=0.
+* GS/OS: Start lives in gsos_entry.s and jsr's GameEnter.
+*
 	mx	%00
 
+	do	BUILD_GSOS
+	else
 Start
 	sei
 	clc
@@ -16,7 +21,9 @@ Start
 	tcd
 	phk
 	plb
+	fin
 
+GameEnter
 	jsr	InitSHR
 	jsr	InitRowAddr
 	jsr	CopyMaze
@@ -85,6 +92,10 @@ ExitDemo
 	lda	#$41
 	sta	>NEWVIDEO
 	lda	>KBDSTRB
+	do	BUILD_GSOS
+	jmp	QuitGSOS
+	else
 	sec
 	xce
 ]hang	bra	]hang
+	fin

@@ -1,30 +1,51 @@
 # IIgs harness memory map (v1)
 
-Authoritative addresses live in [`iigs/equates.s`](../iigs/equates.s). Host inject paths: [`py/gs2_render_test.py`](../py/gs2_render_test.py). Sizes below match current `make gfx` / `make maze` / `make iigs` outputs.
+Shared sizes/pens live in [`iigs/equates.s`](../iigs/equates.s). **Static** host addresses are in [`iigs/mem_static.s`](../iigs/mem_static.s). Host inject paths: [`py/gs2_render_test.py`](../py/gs2_render_test.py).
+
+**Two assemble-time hosts** (same game bodies):
+
+| Host | Make | Output | Memory |
+|------|------|--------|--------|
+| **Static** | `make iigs` / `iigs-game` | `harness.bin` / `game.bin` | Fixed banks below; inject + `CALL 768` |
+| **GS/OS** | `make iigs-gsos` | `MSPACMAN.SYS16` → `~/src/IIgsDisks/mspacmangs.2mg` via `cp2` | Relocatable OMF; BCK + assets are data segments |
 
 **Convention:** `BB/AAAA` = bank `BB`, offset `AAAA`. Long address `$bbAAAA`.
 
-While running: **DB = `$02`** (code bank), **DP = `$0000`**, **stack** = `$01FF` (bank `$00` / current stack bank after `TCS`). SHR blits temporarily set **DB = `$01`**.
+Static while running: **DB = `$02`** (code bank), **DP = `$0000`**, **stack** = `$01FF`. SHR blits temporarily set **DB = `$01`**. BCK is always **long** through `BCK_PIXELS` (never abs in bank `$01`).
 
 ---
 
-## Bank overview
+## Bank overview (static inject)
 
 | Bank | Role |
 |------|------|
 | `$00` | Soft-switches, page-3 trampoline, stack |
-| `$01` | SHR shadow (`$2000–$9FFF`) + PF **BCK** strip (`$A000+`) — SHR shadow only |
+| `$01` | SHR shadow only (`$2000–$9FFF`) — normal SHR shadow; no IOLC/BCK hacks |
 | `$02` | Harness code + game/render RAM |
 | `$03` | Injected graphics / maze assets (read-only at runtime) |
+| `$04` | PF **BCK** strip at `$04/2000` (`S_BCK` stride, long refs) |
 | `$E1` | Displayed SHR (tracks `$01` SHR region; host PNG capture) |
 
 ```
 $00  soft-switches, CALL 768 stub
-$01  SHR $2000–9FFF ──shadow──► $E1   |  BCK strip $A000+ (S_BCK stride)
+$01  SHR $2000–9FFF ──shadow──► $E1
 $02  code | … | tilemap | actors | dirty | scratch
 $03  tiles | sprites/masks even+odd | maze | stitched cells
+$04  BCK strip @ $2000 (S_BCK)
 ```
 
+### GS/OS OMF segments
+
+| Segment | Contents |
+|---------|----------|
+| Main (code) | Relocatable game; `ext BCK_PIXELS`, `ext AST_*`, `ext` work symbols |
+| Bck (data) | `BCK_PIXELS ds BCK_CLEAR_BYTES` — loader patches erase/draw longs |
+| Assets (data) | `PUTBIN` tiles/sprites/maze (same bytes as static bank `$03`) |
+| Work (data) | Tilemap, actors, arcade `#4D`/`#4E` mirror, dirty list, row tables — `seg_work.s` |
+
+SHR remains bank `$01` with normal shadowing (no odd-bank / shadow-all). Work RAM is an OMF data segment (not fixed `$028xxx`).
+
+**65816 / Merlin caveat:** `LDX` / `LDY` have no 24-bit absolute form. `ldx >EXT_LABEL` assembles as 16-bit `LDX abs` against **DB**, so GS/OS work-segment symbols must be read with `lda >LABEL` / `tax` (see `actor_publish.s`).
 ---
 
 ## Bank `$00` — I/O and entry
@@ -36,7 +57,7 @@ $03  tiles | sprites/masks even+odd | maze | stitched cells
 | `$E0/C010` | `KBDSTRB` | — | Clear keyboard strobe |
 | `$E1/C019` | `RDVBLBAR` | — | VBL sense (bit7 set in VBL) |
 | `$E0/C029` | `NEWVIDEO` | — | SHR enable (`$C1` in harness) |
-| `$E0/C035` | `SHADOW` | — | `$F7`: inhibit all shadowing except SHR (bit3=0) |
+| `$E0/C035` | `SHADOW` | — | `$B7`: inhibit text/HGR/aux/TEXT2; bit3=0 SHR on; bit6=0 IOLC intact |
 | `$E0/C034` | `BORDCOLOR` | — | Border colour nibble |
 | `$E0/C050` | `TXTCLR` | — | Graphics mode |
 
@@ -63,7 +84,7 @@ instead of 6 / 4. Always spell these with an explicit `<`.
 | `$22` | `R_CARRY` | Nibble / mul scratch |
 | `$24` | `R_TMP` | General temp |
 | `$26` | `R_ACT` | Actor index |
-| `$28` | `R_BASE` | Actor base (`ACTORS16+…`) |
+| `$28` | `R_BASE` | Actor base (`index×16` into `ACTORS`) |
 | `$2A` | `R_SAVE` | Scratch |
 | `$2C` | `R_BODY` | Body pen for remap |
 | `$2E` | `R_BTMP` | Blit temp |
@@ -87,18 +108,23 @@ the code image instead of direct page.
 
 ---
 
-## Bank `$01` — SHR + playfield backing strip
+## Bank `$01` — SHR shadow
 
 | Address | Symbol | Size | Notes |
 |---------|--------|------|-------|
 | `$01/2000`–`$01/9CFF` | `SHR_PIXELS` | 32000 | 320×200 4bpp; stride **`S_SHR` = 160** |
 | `$01/9D00`–`$01/9DFF` | `SHR_SCB` | 256 | Scanline control (palette 0, 320 mode) |
 | `$01/9E00`–`$01/9E1F` | `SHR_PALETTE` | 32 | Palette 0 (16× SHR `$0RGB` words) |
-| `$01/A000`–… | `BCK_PIXELS` / `BCK_BASE` | `BCK_CLEAR_BYTES` | Maze/tiles only; stride **`S_BCK` = 88** (176 px from X=72); zeroed in `InitSHR` |
 
-Playfield blit origin: **(76, 7)**; size **168×186** (28×31 × 6×6). BCK origin X = `SPR_BASE_X` (72) so 14×12 erase fits. `BckXY`: `ROW_BCK[Y] + (X-72)/2`.
+Playfield blit origin: **(76, 7)**; size **168×186** (28×31 × 6×6). Soft-switches via `$E0`/`$E1`. Do **not** poke `$E1` SHR pixels on the hot path.
 
-`SHADOW=$F7` before BCK clear (IOLC off → `$01/A000+` is RAM). Soft-switches via `$E0`/`$E1`, not `$00`. Do **not** poke `$E1` SHR pixels on the hot path.
+## Bank `$04` — playfield backing strip (static)
+
+| Address | Symbol | Size | Notes |
+|---------|--------|------|-------|
+| `$04/2000`–… | `BCK_PIXELS` | `BCK_CLEAR_BYTES` | Maze/tiles only; stride **`S_BCK` = 88**; long `>BCK_PIXELS,x` |
+
+BCK origin X = `SPR_BASE_X` (72) so 14×12 erase fits. `BckXY`: `ROW_BCK[Y] + (X-72)/2`. GS/OS: same symbol is an OMF data-segment label (loader-relocated).
 
 ---
 
@@ -126,7 +152,7 @@ Merlin `org $0000` → loaded at `$02/0000`.
 
 ### Actor record (`ACT_SIZE` = 16)
 
-Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with `>BANK2+field,x`.
+Base = `$028400 + index×16`. Indexed in asm as `X = index×16` with `>ACTORS+field,x`.
 
 | Off | Symbol | Type | Who writes | Who reads |
 |-----|--------|------|------------|-----------|
@@ -161,8 +187,8 @@ Base = `$028400 + index×16`. Indexed in asm as `X = ACTORS16 + index×16` with 
 
 | `$02/8A00`–`$02/8AFF` | — | — | Free (was `R_*`; scratch moved to low DP) |
 
-`BANK2` = `$020000` (long base for `,x` with 16-bit offset).  
-`ACTORS16` = `$8400`.
+`ACTORS` = `$028400` (long base; `X = index×16`).  
+`BANK_WORK` / `BANK2` = `$020000` for HUD string / score BCD offsets (`>BANK2,x`).
 
 ---
 
@@ -195,7 +221,7 @@ Host writes these before `CALL 768`. Packed 4bpp; already upright (CW + row XOR 
 | `ACT_WP` | Rails | Rails only |
 | `ACT_FLAGS` | Render | Render |
 | `TILEMAP` / dirty list | Game logic | Tile redraw (`DrawTile` → SHR + BCK) |
-| BCK strip (`$01/A000`) | `DrawMaze` / `DrawTile` | `EraseSprite` (abs restore → SHR) |
+| BCK strip (`BCK_PIXELS`) | `DrawMaze` / `DrawTile` | `EraseSprite` (long restore → SHR) |
 | `$03/*` assets | Host inject | Render (read) |
 | SHR `$01/2000` | Render | Display |
 

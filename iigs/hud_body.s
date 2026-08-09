@@ -69,13 +69,17 @@ DrawHudChrome
 	rts
 
 DrawHudString
-* X = bank-$02 offset of a $FF-terminated tile-code string; R_X/R_Y = origin.
+* X = code-bank offset of a $FF-terminated tile-code string; R_X/R_Y = origin.
+* Reads via DB=PHK so static ($02) and GS/OS (relocated code) both work.
 * Advances R_X one glyph per character.
 	php
 	rep	#$30
 	stx	<R_SAVE
+	phb
+	phk
+	plb
 ]ch	ldx	<R_SAVE
-	lda	>BANK2,x
+	lda	|$0000,x
 	and	#$00FF
 	cmp	#$00FF
 	beq	:done
@@ -89,7 +93,8 @@ DrawHudString
 	inc
 	sta	<R_SAVE
 	bra	]ch
-:done	plp
+:done	plb
+	plp
 	rts
 
 DrawScore
@@ -101,7 +106,7 @@ DrawScore
 	sta	<R_X
 	lda	#HUD_SCORE_Y
 	sta	<R_Y
-	ldx	#SCORE16
+	ldx	#0			; SCORE_LO + 0..2
 	jsr	DrawScoreBCD
 	plp
 	rts
@@ -115,13 +120,13 @@ DrawHiscore
 	sta	<R_X
 	lda	#HUD_HISCORE_Y
 	sta	<R_Y
-	ldx	#HISCORE16
+	ldx	#3			; SCORE_LO + 3..5 == HISCORE_LO..HI
 	jsr	DrawScoreBCD
 	plp
 	rts
 
 DrawScoreBCD
-* X = bank-$02 offset of a 3-byte BCD score (lo/mid/hi); R_X/R_Y = origin.
+* X = byte offset from SCORE_LO (0=P1, 3=hiscore); R_X/R_Y = origin.
 * Six digits high→low, blanking up to HUD_BLANK_LEAD leading zeros so a fresh
 * score reads "00" like the arcade (j_2abe / j_2ace).
 	php
@@ -135,7 +140,7 @@ DrawScoreBCD
 	clc
 	adc	<R_ACT
 	tax
-	lda	>BANK2,x
+	lda	>SCORE_LO,x
 	and	#$00FF
 	sta	<R_SAVE			; BCD digit pair
 	lsr
@@ -392,8 +397,8 @@ EatDotsAtPac
 * EraseSprite would restore the eaten pellet from the backing store.
 	php
 	rep	#$30
-	ldx	#$8450			; PAC_ACTOR base
-	lda	>BANK2+ACT_X,x
+	ldx	#80			; PAC_ACTOR base
+	lda	>ACTORS+ACT_X,x
 	sec
 	sbc	#SPR_BASE_X
 	bcc	:done			; left of the playfield
@@ -401,8 +406,8 @@ EatDotsAtPac
 	cmp	#PF_COLS
 	bcs	:done
 	sta	<R_TX
-	ldx	#$8450
-	lda	>BANK2+ACT_Y,x
+	ldx	#80
+	lda	>ACTORS+ACT_Y,x
 	sec
 	sbc	#SPR_BASE_Y
 	bcc	:done

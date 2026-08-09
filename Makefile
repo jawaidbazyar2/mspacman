@@ -30,12 +30,15 @@ IIGS_DIR  := iigs
 IIGS_BUILD := $(BUILD_DIR)/iigs
 IIGS_BIN  := $(IIGS_BUILD)/harness.bin
 IIGS_GAME_BIN := $(IIGS_BUILD)/game.bin
+IIGS_GSOS_BIN := $(IIGS_BUILD)/MSPACMAN.SYS16
+CP2       ?= $(HOME)/src/cp2_1.0.5_osx-x64_sc/cp2
+IIGS_GSOS_DISK ?= $(HOME)/src/IIgsDisks/mspacmangs.2mg
 
 GSSQUARED ?= $(HOME)/src/gssquared/build/GSSquared
 GS2_PY    := $(HOME)/src/gssquared/clients/python/src
 
 .PHONY: all clean verify sjasmplus-check gfx gfx-ppm palette maze tiles-preview \
-	iigs iigs-test iigs-demo iigs-game iigs-game-test iigs-game-demo
+	iigs iigs-test iigs-demo iigs-game iigs-game-test iigs-game-demo iigs-gsos
 
 all: $(BIN)
 
@@ -105,6 +108,11 @@ iigs: palette rails gfx $(IIGS_COMPILED) $(IIGS_BIN)
 # Assemble IIgs game-logic build → build/iigs/game.bin
 iigs-game: palette gfx maze $(IIGS_COMPILED) $(IIGS_GAME_BIN)
 
+# Relocatable GS/OS S16 → build/iigs/MSPACMAN.SYS16, then cp2 onto disk image
+iigs-gsos: palette gfx maze $(IIGS_COMPILED) $(IIGS_GSOS_BIN)
+	cd $(IIGS_BUILD) && $(CP2) add --overwrite --strip-paths "$(IIGS_GSOS_DISK)" MSPACMAN.SYS16
+	$(CP2) set-attr "$(IIGS_GSOS_DISK)" type=0xb3,aux=0x0000 MSPACMAN.SYS16
+
 $(IIGS_DIR)/compiled_ghosts.s: py/gen_compiled_ghosts.py \
 		$(GFX_DIR)/sprites14x12.bin $(GFX_DIR)/sprites14x12.mask.bin \
 		$(GFX_DIR)/sprites14x12.odd.bin $(GFX_DIR)/sprites14x12.odd.mask.bin
@@ -124,19 +132,37 @@ $(IIGS_DIR)/ghost_work_blit.s: py/gen_ghost_work_blit.py
 $(IIGS_BUILD):
 	mkdir -p $(IIGS_BUILD)
 
-IIGS_DEMO_SRCS := $(IIGS_DIR)/link_demo.s $(IIGS_DIR)/all_demo.s $(IIGS_DIR)/equates.s \
+IIGS_DEMO_SRCS := $(IIGS_DIR)/link_demo.s $(IIGS_DIR)/all_demo.s \
+		$(IIGS_DIR)/mem_static.s $(IIGS_DIR)/equates.s \
 		$(IIGS_DIR)/frame_body.s $(IIGS_DIR)/demo_tick.s \
 		$(IIGS_DIR)/shr_body.s $(IIGS_DIR)/render_body.s \
 		$(IIGS_COMPILED) \
 		$(IIGS_DIR)/rails_body.s $(IIGS_DIR)/hud_body.s \
 		$(IIGS_DIR)/rails_data.s $(IIGS_DIR)/palette_data.s
 
-IIGS_GAME_SRCS := $(IIGS_DIR)/link_game.s $(IIGS_DIR)/all_game.s $(IIGS_DIR)/equates.s \
+IIGS_GAME_SRCS := $(IIGS_DIR)/link_game.s $(IIGS_DIR)/all_game.s \
+		$(IIGS_DIR)/mem_static.s $(IIGS_DIR)/equates.s \
 		$(IIGS_DIR)/frame_body.s $(IIGS_DIR)/game_tick.s \
 		$(IIGS_DIR)/input_adapt.s $(IIGS_DIR)/logic_data.s \
 		$(IIGS_DIR)/maze_state.s $(IIGS_DIR)/ghost_ai.s \
 		$(IIGS_DIR)/mspac_move.s $(IIGS_DIR)/ghost_move.s \
 		$(IIGS_DIR)/collide.s $(IIGS_DIR)/fruit.s \
+		$(IIGS_DIR)/leave_house.s \
+		$(IIGS_DIR)/play_tick.s $(IIGS_DIR)/level_fsm.s \
+		$(IIGS_DIR)/actor_publish.s $(IIGS_DIR)/game_init.s \
+		$(IIGS_DIR)/shr_body.s $(IIGS_DIR)/render_body.s \
+		$(IIGS_COMPILED) \
+		$(IIGS_DIR)/hud_body.s $(IIGS_DIR)/palette_data.s
+
+IIGS_GSOS_SRCS := $(IIGS_DIR)/link_gsos_game.s $(IIGS_DIR)/all_gsos_main.s \
+		$(IIGS_DIR)/mem_gsos.s $(IIGS_DIR)/gsos_entry.s \
+		$(IIGS_DIR)/seg_bck.s $(IIGS_DIR)/seg_assets.s $(IIGS_DIR)/seg_work.s \
+		$(IIGS_DIR)/equates.s $(IIGS_DIR)/frame_body.s \
+		$(IIGS_DIR)/game_tick.s $(IIGS_DIR)/input_adapt.s \
+		$(IIGS_DIR)/logic_data.s $(IIGS_DIR)/maze_state.s \
+		$(IIGS_DIR)/ghost_ai.s $(IIGS_DIR)/mspac_move.s \
+		$(IIGS_DIR)/ghost_move.s $(IIGS_DIR)/collide.s \
+		$(IIGS_DIR)/fruit.s $(IIGS_DIR)/leave_house.s \
 		$(IIGS_DIR)/play_tick.s $(IIGS_DIR)/level_fsm.s \
 		$(IIGS_DIR)/actor_publish.s $(IIGS_DIR)/game_init.s \
 		$(IIGS_DIR)/shr_body.s $(IIGS_DIR)/render_body.s \
@@ -159,6 +185,17 @@ $(IIGS_GAME_BIN): $(IIGS_GAME_SRCS) $(MERLIN32) | $(IIGS_BUILD)
 	mv -f $(IIGS_DIR)/game.bin $(IIGS_GAME_BIN)
 	@mv -f $(IIGS_DIR)/_Output.txt $(IIGS_BUILD)/game_Output.txt 2>/dev/null; true
 	@rm -f $(IIGS_DIR)/_FileInformation.txt $(IIGS_DIR)/game.bin_Output.txt \
+		$(IIGS_DIR)/error_output.txt 2>/dev/null; true
+
+$(IIGS_GSOS_BIN): $(IIGS_GSOS_SRCS) $(GFX_DIR)/tiles6.bin $(GFX_DIR)/maze1_cells.bin \
+		$(MERLIN32) | $(IIGS_BUILD)
+	rm -f $(IIGS_DIR)/MSPACMAN.SYS16
+	cd $(IIGS_DIR) && $(MERLIN32) -V $(MERLIN_LIB) link_gsos_game.s; \
+		test -f MSPACMAN.SYS16
+	mv -f $(IIGS_DIR)/MSPACMAN.SYS16 $(IIGS_GSOS_BIN)
+	@mv -f $(IIGS_DIR)/_Output.txt $(IIGS_BUILD)/gsos_Output.txt 2>/dev/null; true
+	@rm -f $(IIGS_DIR)/_FileInformation.txt $(IIGS_DIR)/MSPACMAN.SYS16_Output.txt \
+		$(IIGS_DIR)/MSPACMAN.SYS16_S0*_Output.txt $(IIGS_DIR)/MSPACMAN.SYS16_Symbols.txt \
 		$(IIGS_DIR)/error_output.txt 2>/dev/null; true
 
 # Spawn GSSquared, inject harness + assets, dump SHR frame PNG.
@@ -187,5 +224,5 @@ iigs-game-demo:
 
 clean:
 	rm -rf $(BUILD_DIR)
-	rm -f $(IIGS_DIR)/harness.bin $(IIGS_DIR)/game.bin $(IIGS_DIR)/_FileInformation.txt \
-		$(IIGS_DIR)/*_Output.txt 2>/dev/null; true
+	rm -f $(IIGS_DIR)/harness.bin $(IIGS_DIR)/game.bin $(IIGS_DIR)/MSPACMAN.SYS16 \
+		$(IIGS_DIR)/_FileInformation.txt $(IIGS_DIR)/*_Output.txt 2>/dev/null; true

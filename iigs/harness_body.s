@@ -35,7 +35,7 @@ SetActorAtWP
 * Sets ACT_WP, ACT_X/Y (new), and ACT_OX/OY = new (old)
 	php
 	sep	#$20
-	sta	>$02000A,x		; ACT_WP
+	sta	>ACTORS+ACT_WP,x		; ACT_WP
 	rep	#$20
 	and	#$00FF
 	asl
@@ -43,14 +43,14 @@ SetActorAtWP
 	lda	RailPath,y
 	and	#$00FF
 	jsr	TileToScreenX
-	sta	>$020000,x		; ACT_X
-	sta	>$020004,x		; ACT_OX = new
+	sta	>ACTORS+ACT_X,x		; ACT_X
+	sta	>ACTORS+ACT_OX,x		; ACT_OX = new
 	iny
 	lda	RailPath,y
 	and	#$00FF
 	jsr	TileToScreenY
-	sta	>$020002,x		; ACT_Y
-	sta	>$020006,x		; ACT_OY = new
+	sta	>ACTORS+ACT_Y,x		; ACT_Y
+	sta	>ACTORS+ACT_OY,x		; ACT_OY = new
 	plp
 	rts
 
@@ -58,7 +58,7 @@ DirToNextWP
 * X = actor base with ACT_WP set. Returns A = DIR_* toward next waypoint.
 	php
 	rep	#$30
-	lda	>$02000A,x		; ACT_WP
+	lda	>ACTORS+ACT_WP,x		; ACT_WP
 	and	#$00FF
 	asl
 	tay
@@ -69,7 +69,7 @@ DirToNextWP
 	lda	RailPath,y
 	and	#$00FF
 	sta	<R_TY		; cur tile Y
-	lda	>$02000A,x
+	lda	>ACTORS+ACT_WP,x
 	and	#$00FF
 	inc
 	cmp	#RAIL_LEN
@@ -107,7 +107,7 @@ InitGhostSprFacing
 	clc
 	adc	#$0020
 	sep	#$20
-	sta	>$020008,x		; ACT_SPR
+	sta	>ACTORS+ACT_SPR,x		; ACT_SPR
 	plp
 	rts
 
@@ -129,7 +129,7 @@ SetGhostSprFromDir
 	clc
 	adc	#$0020
 	sep	#$20
-	sta	>$020008,x		; ACT_SPR
+	sta	>ACTORS+ACT_SPR,x		; ACT_SPR
 	plp
 	rts
 
@@ -157,9 +157,9 @@ SetMsPacSprFromDir
 	sta	<R_TMP		; dir
 	bit	#$0001			; odd dir → Y axis
 	bne	:useY
-	lda	>$020000,x		; ACT_X
+	lda	>ACTORS+ACT_X,x		; ACT_X
 	bra	:gotAxis
-:useY	lda	>$020002,x		; ACT_Y
+:useY	lda	>ACTORS+ACT_Y,x		; ACT_Y
 :gotAxis	and	#$0007
 	lsr				; p = (axis&7)>>1
 	sta	<R_ACT
@@ -179,7 +179,7 @@ SetMsPacSprFromDir
 	clc
 	adc	<R_ACT
 	sep	#$20
-	sta	>$020008,x		; ACT_SPR
+	sta	>ACTORS+ACT_SPR,x		; ACT_SPR
 	plp
 	rts
 
@@ -187,77 +187,77 @@ InitActors
 * Four ghosts + fixed fruit + Ms. Pac; rails RAIL_START0..3 / PAC_RAIL_START
 	php
 	rep	#$30
-	ldx	#$8400
+	ldx	#0
 	lda	#RAIL_START0
 	jsr	SetActorAtWP
 	jsr	InitGhostSprFacing
 	sep	#$20
 	lda	#0
-	sta	>$020009,x
+	sta	>ACTORS+ACT_FLAGS,x
 	lda	#COL_BLINKY
-	sta	>$02000B,x
+	sta	>ACTORS+ACT_COLOR,x
 	rep	#$20
 
-	ldx	#$8410
+	ldx	#16
 	lda	#RAIL_START1
 	jsr	SetActorAtWP
 	jsr	InitGhostSprFacing
 	sep	#$20
 	lda	#0
-	sta	>$020009,x
+	sta	>ACTORS+ACT_FLAGS,x
 	lda	#COL_PINKY
-	sta	>$02000B,x
+	sta	>ACTORS+ACT_COLOR,x
 	rep	#$20
 
-	ldx	#$8420
+	ldx	#32
 	lda	#RAIL_START2
 	jsr	SetActorAtWP
 	jsr	InitGhostSprFacing
 	sep	#$20
 	lda	#0
-	sta	>$020009,x
+	sta	>ACTORS+ACT_FLAGS,x
 	lda	#COL_INKY
-	sta	>$02000B,x
+	sta	>ACTORS+ACT_COLOR,x
 	rep	#$20
 
-	ldx	#$8430
+	ldx	#48
 	lda	#RAIL_START3
 	jsr	SetActorAtWP
 	jsr	InitGhostSprFacing
 	sep	#$20
 	lda	#0
-	sta	>$020009,x
+	sta	>ACTORS+ACT_FLAGS,x
 	lda	#COL_CLYDE
-	sta	>$02000B,x
+	sta	>ACTORS+ACT_COLOR,x
 	rep	#$20
 
 * Fruit actor 4 — fixed tile; ACT_SPR = fruit type 0..7
-	ldx	#$8440
+	ldx	#64
 	lda	#FRUIT_TILE_X
 	jsr	TileToScreenX
-	sta	>$020000,x		; ACT_X
-	sta	>$020004,x		; ACT_OX
+	sta	>ACTORS+ACT_X,x		; ACT_X
+	sta	>ACTORS+ACT_OX,x		; ACT_OX
 	lda	#FRUIT_TILE_Y
 	jsr	TileToScreenY
-	sta	>$020002,x		; ACT_Y
-	sta	>$020006,x		; ACT_OY
+	sta	>ACTORS+ACT_Y,x		; ACT_Y
+	sta	>ACTORS+ACT_OY,x		; ACT_OY
 	sep	#$20
 	lda	#0
-	sta	>$020008,x		; ACT_SPR = cherry
-	sta	>$020009,x		; ACT_FLAGS
-	sta	>$02000A,x		; ACT_WP unused
-	sta	>$02000B,x		; ACT_COLOR unused
+	sta	>ACTORS+ACT_SPR,x		; ACT_SPR = cherry
+	sta	>ACTORS+ACT_FLAGS,x		; ACT_FLAGS
+	sta	>ACTORS+ACT_WP,x		; ACT_WP unused
+	sta	>ACTORS+ACT_COLOR,x		; ACT_COLOR unused
 	rep	#$20
 
 * Ms. Pac actor 5 — rails; ACT_SPR = dir*3 + mouth
-	ldx	#$8450
+	ldx	#80
 	lda	#PAC_RAIL_START
 	jsr	SetActorAtWP
 	jsr	InitMsPacSprFacing
 	sep	#$20
 	lda	#0
-	sta	>$020009,x		; ACT_FLAGS
-	sta	>$02000B,x		; ACT_COLOR unused
+	sta	>ACTORS+ACT_FLAGS,x		; ACT_FLAGS
+	sta	>ACTORS+ACT_COLOR,x		; ACT_COLOR unused
 	rep	#$20
 	plp
 	rts
@@ -281,12 +281,12 @@ AdvanceFruit
 	bra	:frDiv
 :frRem	cmp	#0
 	bne	:frDone
-	ldx	#$8440			; fruit actor base
+	ldx	#64			; fruit actor base
 	sep	#$20
-	lda	>$020008,x		; ACT_SPR
+	lda	>ACTORS+ACT_SPR,x		; ACT_SPR
 	inc
 	and	#$07
-	sta	>$020008,x
+	sta	>ACTORS+ACT_SPR,x
 	rep	#$20
 :frDone	plp
 	rts
@@ -304,7 +304,6 @@ AdvanceRails
 	asl
 	asl
 	clc
-	adc	#$8400
 	tax
 	lda	#0			; 0 = ghost sprite setter
 	jsr	RailStepActor
@@ -314,7 +313,7 @@ AdvanceRails
 	cmp	#NUM_GHOSTS
 	bcs	:arPac
 	jmp	]ar
-:arPac	ldx	#$8450			; PAC_ACTOR base
+:arPac	ldx	#80			; PAC_ACTOR base
 	lda	#1			; 1 = Ms. Pac sprite setter
 	jsr	RailStepActor
 	plp
@@ -326,7 +325,7 @@ RailStepActor
 	rep	#$30
 	sta	<R_BTMP		; setter mode (rails phase only)
 	phx
-	lda	>$02000A,x		; ACT_WP (byte in low)
+	lda	>ACTORS+ACT_WP,x		; ACT_WP (byte in low)
 	and	#$00FF
 	asl
 	tay
@@ -340,41 +339,41 @@ RailStepActor
 	jsr	TileToScreenY
 	sta	<R_Y
 	plx
-	lda	>$020000,x
+	lda	>ACTORS+ACT_X,x
 	cmp	<R_X
 	beq	:yAxis
 	bcc	:goRight
 	dec
-	sta	>$020000,x
+	sta	>ACTORS+ACT_X,x
 	lda	#DIR_LEFT
 	jsr	RailSetSpr
 	bra	:rsDone
 :goRight	inc
-	sta	>$020000,x
+	sta	>ACTORS+ACT_X,x
 	lda	#DIR_RIGHT
 	jsr	RailSetSpr
 	bra	:rsDone
-:yAxis	lda	>$020002,x
+:yAxis	lda	>ACTORS+ACT_Y,x
 	cmp	<R_Y
 	beq	:hit
 	bcc	:goDown
 	dec
-	sta	>$020002,x
+	sta	>ACTORS+ACT_Y,x
 	lda	#DIR_UP
 	jsr	RailSetSpr
 	bra	:rsDone
 :goDown	inc
-	sta	>$020002,x
+	sta	>ACTORS+ACT_Y,x
 	lda	#DIR_DOWN
 	jsr	RailSetSpr
 	bra	:rsDone
 :hit	sep	#$20
-	lda	>$02000A,x
+	lda	>ACTORS+ACT_WP,x
 	inc
 	cmp	#RAIL_LEN
 	bcc	:storeWp
 	lda	#0
-:storeWp	sta	>$02000A,x
+:storeWp	sta	>ACTORS+ACT_WP,x
 	rep	#$20
 :rsDone	plp
 	rts

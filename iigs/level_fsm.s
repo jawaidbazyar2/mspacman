@@ -74,16 +74,16 @@ ResetActorsOnly
 	jsr	ActorPublish
 * commit new==old so no erase streak
 	rep	#$30
-	ldx	#$8400
-]c	lda	>BANK2+ACT_X,x
-	sta	>BANK2+ACT_OX,x
-	lda	>BANK2+ACT_Y,x
-	sta	>BANK2+ACT_OY,x
+	ldx	#0
+]c	lda	>ACTORS+ACT_X,x
+	sta	>ACTORS+ACT_OX,x
+	lda	>ACTORS+ACT_Y,x
+	sta	>ACTORS+ACT_OY,x
 	txa
 	clc
 	adc	#16
 	tax
-	cpx	#$8460
+	cpx	#NUM_ACTORS*16	; X = index×16 (not $8400+)
 	bcc	]c
 	plp
 	rts

@@ -30,8 +30,9 @@ Pathfind2966
 	clc
 	adc	DirDelta+1,x
 	sta	>PATH_TMP_X
+	lda	>PATH_TMP_X		; LDX has no 24-bit form (GS/OS EXT)
+	tax
 	lda	>PATH_TMP_Y
-	ldx	>PATH_TMP_X
 	jsr	IsWallArcade
 	bcs	:next
 	jsr	Dist2TmpToDst		; → R_X

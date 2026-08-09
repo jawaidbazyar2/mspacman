@@ -104,8 +104,9 @@ EatAtPacTile
 * == j_1806 eat path (partial)
 	php
 	sep	#$30
+	lda	>PAC_TILE_X		; LDX has no 24-bit form (GS/OS EXT)
+	tax
 	lda	>PAC_TILE_Y
-	ldx	>PAC_TILE_X
 	jsr	ArcadeTileIndex
 	rep	#$30			; word cmps (Merlin MX across JSR)
 	cmp	#$FFFF

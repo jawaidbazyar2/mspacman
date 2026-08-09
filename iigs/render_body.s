@@ -32,9 +32,7 @@ DP_I           equ $EE
 DP_J           equ $EF
 DP_SORT        equ $F0		; 6 bytes: actor indices, Y-ascending
 DP_YKEY        equ $F6		; 6 bytes: Y low for actor 0..5 (by actor #)
-* Bank $02 long base: >BANK2+field,x with X = ACTORS16
-BANK2          equ $020000
-ACTORS16       equ $8400
+* Actors: >ACTORS+field,x with X = index×16
 
 CopyMaze
 	php
@@ -284,9 +282,9 @@ DrawTile
 	lda	<R_BDEST
 	tax
 	lda	<R_BTMP
-	sta	BCK_BASE,x
+	sta	>BCK_PIXELS,x
 	lda	<R_TMP
-	sta	BCK_BASE+1,x
+	sta	>BCK_PIXELS+1,x
 	plx
 	txa
 	clc
@@ -371,9 +369,9 @@ DrawMaze
 	lda	<R_BDEST
 	tax
 	lda	<R_BTMP
-	sta	BCK_BASE,x
+	sta	>BCK_PIXELS,x
 	lda	<R_TMP
-	sta	BCK_BASE+1,x
+	sta	>BCK_PIXELS+1,x
 	plx
 	txa
 	clc
@@ -434,11 +432,9 @@ SortActorsByY
 	asl
 	asl
 	clc
-	adc	#ACTORS16
-	clc
 	adc	<DP_YOFF
 	tax
-	lda	>BANK2,x			; Y word
+	lda	>ACTORS,x		; Y word at ACTORS+idx*16+DP_YOFF
 	sep	#$30
 	ldx	<DP_I
 	sta	<DP_YKEY,x			; low byte only
@@ -533,13 +529,11 @@ CopySpritePos
 	asl
 	asl
 	asl
-	clc
-	adc	#ACTORS16
 	tax
-	lda	>BANK2+ACT_X,x
-	sta	>BANK2+ACT_OX,x
-	lda	>BANK2+ACT_Y,x
-	sta	>BANK2+ACT_OY,x
+	lda	>ACTORS+ACT_X,x
+	sta	>ACTORS+ACT_OX,x
+	lda	>ACTORS+ACT_Y,x
+	sta	>ACTORS+ACT_OY,x
 	lda	<R_ACT
 	inc
 	sta	<R_ACT
@@ -568,125 +562,123 @@ EraseSprite
 	asl
 	asl
 	asl
-	clc
-	adc	#ACTORS16
 	sta	<R_BASE
 	tax
-	lda	>BANK2+ACT_FLAGS,x
+	lda	>ACTORS+ACT_FLAGS,x
 	and	#$0001
 	bne	:er
 	plb
 	plp
 	rts
 * X still holds the actor base, so read both cached offsets straight into Y/X.
-:er	lda	>BANK2+ACT_DEST,x
+:er	lda	>ACTORS+ACT_DEST,x
 	tay				; Y = SHR offset
-	lda	>BANK2+ACT_BDEST,x
+	lda	>ACTORS+ACT_BDEST,x
 	tax				; X = BCK offset
 * Unrolled 12×7. Row r offsets: BCK r*88+{0,2,4,5} / SHR r*160+…
 * Decimal only — Merlin a+b*c is left-to-right (breaks S_BCK*n).
-	lda	BCK_BASE+0,x
+	lda	>BCK_PIXELS+0,x
 	sta	|SHR_PIXELS+0,y
-	lda	BCK_BASE+2,x
+	lda	>BCK_PIXELS+2,x
 	sta	|SHR_PIXELS+2,y
-	lda	BCK_BASE+4,x
+	lda	>BCK_PIXELS+4,x
 	sta	|SHR_PIXELS+4,y
-	lda	BCK_BASE+5,x
+	lda	>BCK_PIXELS+5,x
 	sta	|SHR_PIXELS+5,y
-	lda	BCK_BASE+88,x
+	lda	>BCK_PIXELS+88,x
 	sta	|SHR_PIXELS+160,y
-	lda	BCK_BASE+90,x
+	lda	>BCK_PIXELS+90,x
 	sta	|SHR_PIXELS+162,y
-	lda	BCK_BASE+92,x
+	lda	>BCK_PIXELS+92,x
 	sta	|SHR_PIXELS+164,y
-	lda	BCK_BASE+93,x
+	lda	>BCK_PIXELS+93,x
 	sta	|SHR_PIXELS+165,y
-	lda	BCK_BASE+176,x
+	lda	>BCK_PIXELS+176,x
 	sta	|SHR_PIXELS+320,y
-	lda	BCK_BASE+178,x
+	lda	>BCK_PIXELS+178,x
 	sta	|SHR_PIXELS+322,y
-	lda	BCK_BASE+180,x
+	lda	>BCK_PIXELS+180,x
 	sta	|SHR_PIXELS+324,y
-	lda	BCK_BASE+181,x
+	lda	>BCK_PIXELS+181,x
 	sta	|SHR_PIXELS+325,y
-	lda	BCK_BASE+264,x
+	lda	>BCK_PIXELS+264,x
 	sta	|SHR_PIXELS+480,y
-	lda	BCK_BASE+266,x
+	lda	>BCK_PIXELS+266,x
 	sta	|SHR_PIXELS+482,y
-	lda	BCK_BASE+268,x
+	lda	>BCK_PIXELS+268,x
 	sta	|SHR_PIXELS+484,y
-	lda	BCK_BASE+269,x
+	lda	>BCK_PIXELS+269,x
 	sta	|SHR_PIXELS+485,y
-	lda	BCK_BASE+352,x
+	lda	>BCK_PIXELS+352,x
 	sta	|SHR_PIXELS+640,y
-	lda	BCK_BASE+354,x
+	lda	>BCK_PIXELS+354,x
 	sta	|SHR_PIXELS+642,y
-	lda	BCK_BASE+356,x
+	lda	>BCK_PIXELS+356,x
 	sta	|SHR_PIXELS+644,y
-	lda	BCK_BASE+357,x
+	lda	>BCK_PIXELS+357,x
 	sta	|SHR_PIXELS+645,y
-	lda	BCK_BASE+440,x
+	lda	>BCK_PIXELS+440,x
 	sta	|SHR_PIXELS+800,y
-	lda	BCK_BASE+442,x
+	lda	>BCK_PIXELS+442,x
 	sta	|SHR_PIXELS+802,y
-	lda	BCK_BASE+444,x
+	lda	>BCK_PIXELS+444,x
 	sta	|SHR_PIXELS+804,y
-	lda	BCK_BASE+445,x
+	lda	>BCK_PIXELS+445,x
 	sta	|SHR_PIXELS+805,y
-	lda	BCK_BASE+528,x
+	lda	>BCK_PIXELS+528,x
 	sta	|SHR_PIXELS+960,y
-	lda	BCK_BASE+530,x
+	lda	>BCK_PIXELS+530,x
 	sta	|SHR_PIXELS+962,y
-	lda	BCK_BASE+532,x
+	lda	>BCK_PIXELS+532,x
 	sta	|SHR_PIXELS+964,y
-	lda	BCK_BASE+533,x
+	lda	>BCK_PIXELS+533,x
 	sta	|SHR_PIXELS+965,y
-	lda	BCK_BASE+616,x
+	lda	>BCK_PIXELS+616,x
 	sta	|SHR_PIXELS+1120,y
-	lda	BCK_BASE+618,x
+	lda	>BCK_PIXELS+618,x
 	sta	|SHR_PIXELS+1122,y
-	lda	BCK_BASE+620,x
+	lda	>BCK_PIXELS+620,x
 	sta	|SHR_PIXELS+1124,y
-	lda	BCK_BASE+621,x
+	lda	>BCK_PIXELS+621,x
 	sta	|SHR_PIXELS+1125,y
-	lda	BCK_BASE+704,x
+	lda	>BCK_PIXELS+704,x
 	sta	|SHR_PIXELS+1280,y
-	lda	BCK_BASE+706,x
+	lda	>BCK_PIXELS+706,x
 	sta	|SHR_PIXELS+1282,y
-	lda	BCK_BASE+708,x
+	lda	>BCK_PIXELS+708,x
 	sta	|SHR_PIXELS+1284,y
-	lda	BCK_BASE+709,x
+	lda	>BCK_PIXELS+709,x
 	sta	|SHR_PIXELS+1285,y
-	lda	BCK_BASE+792,x
+	lda	>BCK_PIXELS+792,x
 	sta	|SHR_PIXELS+1440,y
-	lda	BCK_BASE+794,x
+	lda	>BCK_PIXELS+794,x
 	sta	|SHR_PIXELS+1442,y
-	lda	BCK_BASE+796,x
+	lda	>BCK_PIXELS+796,x
 	sta	|SHR_PIXELS+1444,y
-	lda	BCK_BASE+797,x
+	lda	>BCK_PIXELS+797,x
 	sta	|SHR_PIXELS+1445,y
-	lda	BCK_BASE+880,x
+	lda	>BCK_PIXELS+880,x
 	sta	|SHR_PIXELS+1600,y
-	lda	BCK_BASE+882,x
+	lda	>BCK_PIXELS+882,x
 	sta	|SHR_PIXELS+1602,y
-	lda	BCK_BASE+884,x
+	lda	>BCK_PIXELS+884,x
 	sta	|SHR_PIXELS+1604,y
-	lda	BCK_BASE+885,x
+	lda	>BCK_PIXELS+885,x
 	sta	|SHR_PIXELS+1605,y
-	lda	BCK_BASE+968,x
+	lda	>BCK_PIXELS+968,x
 	sta	|SHR_PIXELS+1760,y
-	lda	BCK_BASE+970,x
+	lda	>BCK_PIXELS+970,x
 	sta	|SHR_PIXELS+1762,y
-	lda	BCK_BASE+972,x
+	lda	>BCK_PIXELS+972,x
 	sta	|SHR_PIXELS+1764,y
-	lda	BCK_BASE+973,x
+	lda	>BCK_PIXELS+973,x
 	sta	|SHR_PIXELS+1765,y
 	lda	<R_BASE
 	tax
 	sep	#$20
-	lda	>BANK2+ACT_FLAGS,x
+	lda	>ACTORS+ACT_FLAGS,x
 	and	#$FE
-	sta	>BANK2+ACT_FLAGS,x
+	sta	>ACTORS+ACT_FLAGS,x
 	plb
 	plp
 	rts
@@ -710,20 +702,18 @@ DrawSprite
 	asl
 	asl
 	asl
-	clc
-	adc	#ACTORS16
 	sta	<R_BASE
 	tax
-	lda	>BANK2+ACT_FLAGS,x
+	lda	>ACTORS+ACT_FLAGS,x
 	and	#$00FF
 	and	#FLAG_NODRAW
 	beq	:doDraw
 	plb
 	plp
 	rts
-:doDraw	lda	>BANK2+ACT_X,x
+:doDraw	lda	>ACTORS+ACT_X,x
 	sta	<R_X
-	lda	>BANK2+ACT_Y,x
+	lda	>ACTORS+ACT_Y,x
 	sta	<R_Y
 	jsr	ScreenXY
 	jsr	BckXY
@@ -736,7 +726,7 @@ DrawSprite
 * slot: 5/7/9/11 → 0..3 (fright recolors via palette poke, not extra slots)
 	lda	<R_BASE
 	tax
-	lda	>BANK2+ACT_COLOR,x
+	lda	>ACTORS+ACT_COLOR,x
 	and	#$00FF
 	sec
 	sbc	#5
@@ -747,7 +737,7 @@ DrawSprite
 	asl
 	asl				; *16
 	sta	<R_TMP
-	lda	>BANK2+ACT_SPR,x
+	lda	>ACTORS+ACT_SPR,x
 	and	#$0007
 	asl				; frame*2
 	sta	<R_OFF
@@ -765,7 +755,7 @@ DrawSprite
 * Fruit: index = (ACT_SPR&7)*2 + (X&1)
 	lda	<R_BASE
 	tax
-	lda	>BANK2+ACT_SPR,x
+	lda	>ACTORS+ACT_SPR,x
 	and	#$0007
 	asl				; type*2
 	sta	<R_OFF
@@ -782,7 +772,7 @@ DrawSprite
 * Ms. Pac: index = (ACT_SPR & $0F)*2 + (X&1); ACT_SPR = dir*3+mouth
 	lda	<R_BASE
 	tax
-	lda	>BANK2+ACT_SPR,x
+	lda	>ACTORS+ACT_SPR,x
 	and	#$000F
 	asl				; slot*2
 	sta	<R_OFF
@@ -798,13 +788,13 @@ DrawSprite
 	lda	<R_BASE
 	tax
 	lda	<R_DEST
-	sta	>BANK2+ACT_DEST,x
+	sta	>ACTORS+ACT_DEST,x
 	lda	<R_BDEST
-	sta	>BANK2+ACT_BDEST,x
+	sta	>ACTORS+ACT_BDEST,x
 	sep	#$20
-	lda	>BANK2+ACT_FLAGS,x
+	lda	>ACTORS+ACT_FLAGS,x
 	ora	#$01
-	sta	>BANK2+ACT_FLAGS,x
+	sta	>ACTORS+ACT_FLAGS,x
 	plb
 	plp
 	rts

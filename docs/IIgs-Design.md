@@ -247,7 +247,7 @@ Do **not** model the four power pills as soft sprites on the IIgs. Keep the soft
 
 - Soft-blit actors over the 168×186 playfield only (HUD is separate).
 - **Logical size 12×12; blit cell 14×12.** Visible art is 12×12 (arcade 16×16 at 0.75). Store and blit as a **14×12** cell with **masking** so the two extra horizontal pixels stay transparent. At 4bpp, 14 px = **exactly 7 bytes/row** — a fixed width for every sprite frame (even and odd).
-- **Backing-store erase:** PF strip at `$01/A000` (stride **`S_BCK`**, no sprites). On erase, abs-copy the 14×12 rect from BCK → SHR (`S_SHR`). `SHADOW=$F7` (SHR shadow only) so `$A000+` is usable RAM. Draw is masked blit only (no per-actor save-under).
+- **Backing-store erase:** PF strip at `BCK_PIXELS` (static `$04/2000` or GS/OS data segment; stride **`S_BCK`**, no sprites). On erase, long-copy the 14×12 rect from BCK → SHR (`S_SHR`). Draw is masked blit only (no per-actor save-under).
 - **Dirty tiles update SHR + BCK:** `DrawTile` dual-cursor (`S_SHR` / `S_BCK`). Erase sprites first, apply dirty, then draw.
 - **Draw order (v1):** fruit, then Ms. Pac, then ghosts (back → front). When matching arcade eat-ghost / power-pill priority matters visually, adjust ghost↔pac order to match the VBLANK priority swaps in `mspac.asm`; fruit stays under the actors.
 
@@ -564,7 +564,18 @@ Living checklist: [`IIgs-LogicPort.md`](IIgs-LogicPort.md).
 | `$02/0000` | Code (&lt; `$8000`) + tilemap@`$8000` + actors + dirty + HUD |
 | `$02/8460` | **Game only:** arcade `#4D00`–`#4E3F` mirror (`RAM4D`) |
 | `$03/0000` | Tiles, even/odd sprites+masks, maze, stitched cells |
-| `$01/2000` | SHR (`S_SHR`); **`$01/A000`** BCK strip (`S_BCK`) |
+| `$01/2000` | SHR (`S_SHR`) — normal shadow |
+| `$04/2000` | **Static** BCK strip (`S_BCK`); GS/OS = OMF data segment `BCK_PIXELS` |
 | `$E1/2000` | Displayed SHR (host capture) |
 
 Playfield origin: **(76, 7)**. Demo writes screen-space `ACT_*` from rails; game simulates arcade pixels and **publishes** via `ActorPublish` (6/8 map).
+
+### Dual host builds
+
+| | Static | GS/OS |
+|--|--------|-------|
+| Entry | [`all_demo.s`](../iigs/all_demo.s) / [`all_game.s`](../iigs/all_game.s) + [`mem_static.s`](../iigs/mem_static.s) | [`link_gsos_game.s`](../iigs/link_gsos_game.s) + [`mem_gsos.s`](../iigs/mem_gsos.s) |
+| Output | `build/iigs/game.bin` (inject) | `build/iigs/MSPACMAN.SYS16` (`make iigs-gsos` → `cp2` onto `mspacmangs.2mg`) |
+| BCK | `$04/2000` long | Relocatable data segment (loader patches `>BCK_PIXELS` refs) |
+| Assets | Inject `$03` | OMF `PUTBIN` segment |
+| Shared | `frame_body` `GameEnter` / render / logic puts | same |

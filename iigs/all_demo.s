@@ -8,6 +8,7 @@
 
 	org	$0000
 
+	put	mem_static.s
 	put	equates.s
 	put	frame_body.s
 	put	demo_tick.s
