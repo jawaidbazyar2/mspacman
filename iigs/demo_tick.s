@@ -19,11 +19,17 @@ DemoTick
 	plp
 	rts
 
-* Demo: any meaningful key ends the rail demo (carry set → ExitDemo).
+* Demo: any key strobe ends the rail demo (carry set → ExitDemo).
+* Called every frame — only quit on $C000 bit7 (new press), not AKD alone.
 HandleKey
 	php
 	sep	#$20
+	lda	>KBD
+	bpl	:no
 	sta	>KBDSTRB
 	plp
-	sec				; always quit
+	sec
+	rts
+:no	plp
+	clc
 	rts

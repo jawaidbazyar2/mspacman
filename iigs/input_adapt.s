@@ -2,22 +2,31 @@
 * Keyboard → soft IN0 (active-low) — == IN0 @ #5000 / design §4.
 * A=up Z=down ←=left →=right; Esc=pause toggle; Q=quit.
 *
+* Directions use IIe/IIgs any-key-down (AKD = bit7 of $C010 on read):
+* level-sensitive like the arcade 4-way stick. Esc/Q stay strobe-edged
+* so a held key does not re-fire every frame.
+*
 	mx	%00
 
 HandleKey
-* Called when KBD bit7 set. Carry set → ExitDemo.
+* Call every frame. Carry set → ExitDemo (Q).
 	php
 	sep	#$20
+* Strobe edge ($C000 bit7): pause / quit only
 	lda	>KBD
+	bpl	:akd
 	and	#$7F
-	sta	>KBDSTRB
 	cmp	#KEY_ESC
 	beq	:pause
 	cmp	#'Q'
 	beq	:quit
 	cmp	#'q'
 	beq	:quit
-* Direction latch (IIgs keyboard is strobe, not matrix)
+* Direction (or other) key — fall through; AKD supplies held state
+:akd
+	lda	>KBDSTRB		; read clears strobe; bit7=AKD, 0–6=key
+	bpl	:none			; nothing held → stick centered
+	and	#$7F
 	cmp	#KEY_A
 	beq	:up
 	cmp	#'A'
@@ -34,11 +43,14 @@ HandleKey
 	beq	:lf
 	cmp	#KEY_RIGHT
 	beq	:rt
+:none	lda	#$FF			; active-low: all released
+	sta	>STICK_IN0
 	plp
 	clc
 	rts
 :pause
 * Toggle DEMO_FREEZE — MainLoop skips erase/draw/FrameTick while set.
+	lda	>KBDSTRB		; clear strobe (also samples AKD; unused)
 	lda	>DEMO_FREEZE
 	beq	:pOn
 	lda	#0
@@ -68,6 +80,7 @@ HandleKey
 	plp
 	clc
 	rts
-:quit	plp
+:quit	lda	>KBDSTRB
+	plp
 	sec
 	rts

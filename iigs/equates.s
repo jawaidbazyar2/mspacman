@@ -12,8 +12,8 @@
 NEWVIDEO       equ $E0C029
 SHADOW         equ $E0C035
 RDVBLBAR       equ $E1C019
-KBD            equ $E0C000
-KBDSTRB        equ $E0C010
+KBD            equ $E0C000	; bit7=strobe; 0–6=key
+KBDSTRB        equ $E0C010	; read: clear strobe; bit7=AKD (IIe/IIgs); 0–6=key
 BORDCOLOR      equ $E0C034	; low nibble = border
 TXTCLR         equ $E0C050
 

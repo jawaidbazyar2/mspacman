@@ -49,13 +49,9 @@ GameEnter
 MainLoop
 * erase(old) → dirty → draw(new) → old←new → FrameTick → sort → WaitVBL
 	sep	#$20
-	lda	>KBD
-	bpl	:nokey
-	cmp	#$FF
-	beq	:nokey
-	jsr	HandleKey		; build-specific: quit and/or stick
+	jsr	HandleKey		; every frame: AKD stick (game) / strobe quit (demo)
 	bcs	:exit
-:nokey	rep	#$30
+	rep	#$30
 	lda	>DEMO_FREEZE
 	and	#$00FF
 	bne	:frozen
