@@ -161,16 +161,8 @@ InitArcadeActors
 	sta	>BLUE_STATE
 	lda	#0
 	sta	>ORANGE_STATE
-	lda	#0
-	sta	>RED_FRIGHT
-	lda	#0
-	sta	>PINK_FRIGHT
-	lda	#0
-	sta	>BLUE_FRIGHT
-	lda	#0
-	sta	>ORANGE_FRIGHT
-	lda	#0
-	sta	>POWER_PILL_ACT
+* == j_1398 / death restart task #11: wipe energizer state + SHR body pens
+	jsr	ClearFrightState
 * Red starts outside; pink/blue/orange bounce in house until released
 	lda	#1
 	sta	>RED_SUBSTATE

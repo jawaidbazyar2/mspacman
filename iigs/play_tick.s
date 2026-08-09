@@ -75,7 +75,19 @@ FrightTimerDec
 	sta	>FRIGHT_TIMER
 	bne	:done16
 :end16	sep	#$20
-:end	lda	#0
+:end	jsr	ClearFrightState		; == j_1398
+:done16	plp
+	rts
+:done	plp
+	rts
+
+* == j_1398 — end energizer: clear pill/fright/timer/flash + restore body pens.
+* Also used after death respawn (arcade task #11 zeros #4D00–#4DFF before
+* task #04 re-seeds actors; without this, SHR pens stay blue).
+ClearFrightState
+	php
+	sep	#$20
+	lda	#0
 	sta	>POWER_PILL_ACT
 	sta	>RED_FRIGHT
 	sta	>PINK_FRIGHT
@@ -83,13 +95,15 @@ FrightTimerDec
 	sta	>ORANGE_FRIGHT
 	sta	>FRIGHT_FLASH_CNT
 	sta	>FRIGHT_FLASH_PHASE
+	sta	>RED_REVERSE
+	sta	>PINK_REVERSE
+	sta	>BLUE_REVERSE
+	sta	>ORANGE_REVERSE
 	rep	#$30
 	lda	#0
 	sta	>FRIGHT_TIMER
-	jsr	FrightPaletteUpdate	; restore per-ghost body pens
-:done16	plp
-	rts
-:done	plp
+	jsr	FrightPaletteUpdate
+	plp
 	rts
 
 * Periodic ghost reverses + scatter→chase. == j_0e36 (Ms. Pac patch)

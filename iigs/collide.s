@@ -1,5 +1,8 @@
 *
-* Pac ↔ ghost collisions — == j_171d / j_1789.
+* Pac ↔ ghost collisions — == j_171d / j_1763 / j_1789.
+* Arcade always runs hostile check then resolves blue via that ghost's
+* fright flag (not a global POWER_PILL_ACT gate). Recovered non-blue ghosts
+* kill during an energizer; blue ones are eaten.
 *
 	mx	%00
 
@@ -11,39 +14,61 @@ CollideAll
 	beq	:ok
 	plp
 	rts
-:ok	lda	>POWER_PILL_ACT
-	bne	:fr
-	jsr	CollideHostile
-	plp
-	rts
-:fr	jsr	CollideFright
-	plp
-	rts
-
-CollideHostile
-* == j_171d
-	php
-	sep	#$20
+:ok
+* First near alive ghost decides: fright → eat, else → die. == j_1763
 	jsr	NearRed
 	bcc	:p
+	lda	>RED_STATE
+	bne	:p
 	lda	>RED_FRIGHT
-	ora	>RED_STATE
-	beq	:die
+	bne	:eatR
+	brl	:die
+:eatR	lda	#0
+	sta	>RED_FRIGHT
+	lda	#1
+	sta	>RED_STATE
+	bra	:ate
 :p	jsr	NearPink
 	bcc	:b
+	lda	>PINK_STATE
+	bne	:b
 	lda	>PINK_FRIGHT
-	ora	>PINK_STATE
-	beq	:die
+	bne	:eatP
+	brl	:die
+:eatP	lda	#0
+	sta	>PINK_FRIGHT
+	lda	#1
+	sta	>PINK_STATE
+	bra	:ate
 :b	jsr	NearBlue
 	bcc	:o
+	lda	>BLUE_STATE
+	bne	:o
 	lda	>BLUE_FRIGHT
-	ora	>BLUE_STATE
-	beq	:die
+	bne	:eatB
+	brl	:die
+:eatB	lda	#0
+	sta	>BLUE_FRIGHT
+	lda	#1
+	sta	>BLUE_STATE
+	bra	:ate
 :o	jsr	NearOrange
 	bcc	:out
-	lda	>ORANGE_FRIGHT
-	ora	>ORANGE_STATE
+	lda	>ORANGE_STATE
 	bne	:out
+	lda	>ORANGE_FRIGHT
+	bne	:eatO
+	brl	:die
+:eatO	lda	#0
+	sta	>ORANGE_FRIGHT
+	lda	#1
+	sta	>ORANGE_STATE
+:ate	jsr	ScoreGhost
+	jsr	FrightPaletteUpdate
+:out	plp
+	rts
+
+* == j_090D side effects when colliding with a hostile (non-blue) ghost
 :die	lda	#4
 	sta	>LEVEL_STATE
 	lda	#90
@@ -52,50 +77,6 @@ CollideHostile
 	sta	>DIED_THIS_LEVEL
 	lda	#0
 	sta	>PILLS_AFTER_DEATH
-:out	plp
-	rts
-
-CollideFright
-* == j_1789
-	php
-	sep	#$20
-	jsr	NearRed
-	bcc	:fp
-	lda	>RED_FRIGHT
-	beq	:fp
-	lda	#0
-	sta	>RED_FRIGHT
-	lda	#1
-	sta	>RED_STATE
-	jsr	ScoreGhost
-:fp	jsr	NearPink
-	bcc	:fb
-	lda	>PINK_FRIGHT
-	beq	:fb
-	lda	#0
-	sta	>PINK_FRIGHT
-	lda	#1
-	sta	>PINK_STATE
-	jsr	ScoreGhost
-:fb	jsr	NearBlue
-	bcc	:fo
-	lda	>BLUE_FRIGHT
-	beq	:fo
-	lda	#0
-	sta	>BLUE_FRIGHT
-	lda	#1
-	sta	>BLUE_STATE
-	jsr	ScoreGhost
-:fo	jsr	NearOrange
-	bcc	:out
-	lda	>ORANGE_FRIGHT
-	beq	:out
-	lda	#0
-	sta	>ORANGE_FRIGHT
-	lda	#1
-	sta	>ORANGE_STATE
-	jsr	ScoreGhost
-:out	jsr	FrightPaletteUpdate	; eaten ghost reverts; others stay blue
 	plp
 	rts
 

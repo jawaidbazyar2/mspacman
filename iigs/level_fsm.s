@@ -68,7 +68,8 @@ LevelFsm
 	rts
 
 ResetActorsOnly
-* Re-apply #253D spawn without redrawing maze.
+* Death / board-clear respawn — == #0988 task #11 (clear #4Dxx fright) +
+* task #04 (#253D spawn). InitArcadeActors calls ClearFrightState.
 	php
 	jsr	InitArcadeActors
 	jsr	ActorPublish
