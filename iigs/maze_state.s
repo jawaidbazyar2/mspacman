@@ -132,6 +132,8 @@ EatAtPacTile
 :dot	sep	#$20
 	lda	#TILE_EMPTY
 	sta	>TILEMAP,x
+	lda	#$01			; == j_19fd: pac_move_delay = 1 (dot)
+	sta	>PAC_MOVE_DELAY
 	lda	>DOTS_EATEN
 	inc
 	sta	>DOTS_EATEN
@@ -150,6 +152,8 @@ EatPowerAtX
 	sep	#$20
 	lda	#TILE_EMPTY
 	sta	>TILEMAP,x
+	lda	#$06			; == j_19fc: pac_move_delay = 6 (energizer)
+	sta	>PAC_MOVE_DELAY
 	lda	#1
 	sta	>POWER_PILL_ACT
 	sta	>RED_FRIGHT
