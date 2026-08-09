@@ -8,7 +8,7 @@ How to build and run the Merlin32 soft-render harness (four ghosts on rails) und
 |------------|-----------------------------------------------|
 | GSSquared binary | `$HOME/src/gssquared/build/GSSquared` (`GSSQUARED`) |
 | GSSquared Python client | `$HOME/src/gssquared/clients/python/src` (`PYTHONPATH`) |
-| Merlin32 | `$HOME/src/Merlin32_v1.1/MacOs/Merlin32` |
+| Merlin32 | `$HOME/src/Merlin32_v1.2_b2/MacOs/Merlin32` |
 | Tile/sprite ROMs | `mspacman-orig/5e`, `5f` (+ color/palette PROMs for palette) |
 | CPU boots (maze decode) | `boot1`–`boot6` in repo root |
 

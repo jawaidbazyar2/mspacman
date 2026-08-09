@@ -572,7 +572,17 @@ EraseSprite
 	rts
 * X still holds the actor base, so read both cached offsets straight into Y/X.
 :er	lda	>ACTORS+ACT_DEST,x
-	tay				; Y = SHR offset
+* Refuse a stale DEST from a pre-clip frame (12 rows → $01/C0xx).
+	cmp	#SPR_Y_LIMIT*S_SHR	; 189*160
+	bcc	:erOk
+	sep	#$20
+	lda	>ACTORS+ACT_FLAGS,x
+	and	#$FE
+	sta	>ACTORS+ACT_FLAGS,x
+	plb
+	plp
+	rts
+:erOk	tay				; Y = SHR offset
 	lda	>ACTORS+ACT_BDEST,x
 	tax				; X = BCK offset
 * Unrolled 12×7. Row r offsets: BCK r*88+{0,2,4,5} / SHR r*160+…
@@ -715,7 +725,13 @@ DrawSprite
 	sta	<R_X
 	lda	>ACTORS+ACT_Y,x
 	sta	<R_Y
-	jsr	ScreenXY
+* Belt: never blit a 12-row cell past SHR (DBR=$01 → $C0xx soft-switches).
+	cmp	#SPR_Y_LIMIT
+	bcc	:yOk
+	plb
+	plp
+	rts
+:yOk	jsr	ScreenXY
 	jsr	BckXY
 	lda	<R_ACT
 	cmp	#FRUIT_ACTOR

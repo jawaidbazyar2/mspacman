@@ -53,6 +53,10 @@ SPR_BYTES      equ 84
 * Merlin cannot fold negative equates into #imm expressions — use bases.
 SPR_BASE_X     equ 72		; PF_ORIGIN_X - 4
 SPR_BASE_Y     equ 4		; PF_ORIGIN_Y - 3
+* Last legal sprite top Y for a full 12-row blit (rows Y..Y+11 ≤ 199).
+* Y ≥ SPR_Y_LIMIT → FLAG_NODRAW. Past this, unrolled sta $2000,y with
+* DBR=$01 walks into SCB/palette and then $C0xx soft-switches (disk motor).
+SPR_Y_LIMIT    equ 189		; 200 - SPR_CELL_H
 * BCK origin = sprite base so 14×12 erase never indexes before the strip.
 * BCK_PIXELS itself is defined by mem_static.s / GS/OS BCK segment.
 BCK_ORIGIN_X   equ SPR_BASE_X
@@ -98,7 +102,7 @@ ACT_COLOR      equ 11		; SHR pen for body (replaces marker pen 6)
 ACT_DEST       equ 12		; SHR offset cached at DrawSprite
 ACT_BDEST      equ 14		; BCK offset cached at DrawSprite (EraseSprite)
 FLAG_DRAWN     equ $01
-FLAG_NODRAW    equ $02		; skip DrawSprite (inactive fruit, tunnel null zone)
+FLAG_NODRAW    equ $02		; skip DrawSprite (inactive fruit, tunnel / Y clip)
 
 * Ghost body pens (palette slots from gen_palette color-ROM fill)
 COL_BLINKY     equ 5		; red (fright: palette poke → blue/white)

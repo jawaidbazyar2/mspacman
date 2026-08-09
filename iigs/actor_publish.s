@@ -24,12 +24,18 @@ ArcadeToScreen
 	sec
 	sbc	<R_ACT
 	sta	<R_TX
-* our_ty = (ay>>3) - 1
+* our_ty = (ay>>3) - 1. ay < 8 underflows 8-bit DEC to $FF → tile*6
+* ≈1530 and ScreenXY's Y&$FF puts the blit near row 254 → $01/C0xx.
+* Happy path falls through (still sep #$30). OOB is a trailing block —
+* never bra over a rep #$30 into code Merlin then assembles as 16-bit.
 	lda	<R_TMP
 	lsr
 	lsr
 	lsr
+	beq	:yOOB			; ay < 8 — above maze
 	dec
+	cmp	#PF_ROWS		; 31 — one past last maze row
+	bcs	:yOOB
 	sta	<R_TY
 * sub_x = 4-(ax&7), sub_y = (ay&7)-4  (signed bytes)
 	lda	<R_OFF
@@ -67,6 +73,29 @@ ArcadeToScreen
 	clc
 	adc	<R_Y
 	sta	<R_Y
+	plp
+	rts
+
+:yOOB	rep	#$30
+	lda	#SPR_Y_LIMIT		; ActorTunnelVis → FLAG_NODRAW
+	sta	<R_Y
+* Finish X so tunnel check stays valid
+	lda	<R_TX
+	and	#$00FF
+	jsr	:tileBase
+	clc
+	adc	#SPR_BASE_X
+	sta	<R_X
+	lda	<R_OFF
+	and	#$0007
+	sta	<R_ACT
+	lda	#4
+	sec
+	sbc	<R_ACT
+	jsr	:subScale
+	clc
+	adc	<R_X
+	sta	<R_X
 	plp
 	rts
 
@@ -118,10 +147,11 @@ GhostSprFromDir
 	plp
 	rts
 
-* X = actor base ($8400…). Uses R_X = screen sprite X after ArcadeToScreen.
-* FLAG_NODRAW when outside the 28-wide PF band in screen space.
+* X = actor base ($8400…). Uses R_X / R_Y after ArcadeToScreen.
+* FLAG_NODRAW outside the PF sprite band (tunnel null zone + vertical clip).
 * Leftmost arcade column can map ACT_X < SPR_BASE_X (72) → BCK underflow
 * and tunnel garbage; arcade X>=$F0 alone was not enough on the left.
+* Vertical: 12-row blit with Y ≥ SPR_Y_LIMIT writes past SHR into $C0xx.
 ActorTunnelVis
 	php
 	rep	#$30
@@ -129,6 +159,9 @@ ActorTunnelVis
 	cmp	#SPR_BASE_X		; 72 — BCK / sprite origin
 	bcc	:hide
 	cmp	#SPR_BASE_X+168		; 72+28*6 — past rightmost tile origin
+	bcs	:hide
+	lda	<R_Y
+	cmp	#SPR_Y_LIMIT		; 189 — last row of 12px cell would be ≥200
 	bcs	:hide
 	sep	#$20
 	lda	>ACTORS+ACT_FLAGS,x
@@ -243,15 +276,13 @@ ActorPublish
 	sta	>ACTORS+ACT_X,x
 	lda	<R_Y
 	sta	>ACTORS+ACT_Y,x
+	jsr	ActorTunnelVis		; same X/Y band as ghosts (was clear-only)
 	sep	#$20
 	lda	>LEVEL
 	cmp	#MAX_FRUIT_TYPE+1
 	bcc	:fs
 	lda	#MAX_FRUIT_TYPE
 :fs	sta	>ACTORS+ACT_SPR,x
-	lda	>ACTORS+ACT_FLAGS,x
-	and	#$FD			; clear FLAG_NODRAW
-	sta	>ACTORS+ACT_FLAGS,x
 * Ms. Pac
 :pac	sep	#$30
 	lda	>PAC_X

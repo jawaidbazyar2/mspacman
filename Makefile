@@ -24,8 +24,8 @@ SPRITE_ROM := mspacman-orig/5f
 COLOR_ROM := mspacman-orig/82s123.7f
 PALETTE_ROM := mspacman-orig/82s126.4a
 
-MERLIN32  ?= $(HOME)/src/Merlin32_v1.1/MacOs/Merlin32
-MERLIN_LIB ?= $(HOME)/src/Merlin32_v1.1/Library
+MERLIN32  ?= $(HOME)/src/Merlin32_v1.2_b2/MacOs/Merlin32
+MERLIN_LIB ?= $(HOME)/src/Merlin32_v1.2_b2/Library
 IIGS_DIR  := iigs
 IIGS_BUILD := $(BUILD_DIR)/iigs
 IIGS_BIN  := $(IIGS_BUILD)/harness.bin
