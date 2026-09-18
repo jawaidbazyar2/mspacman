@@ -137,6 +137,42 @@ Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system
   - `py/preview_tiles_8x8.py` — native 8×8 maze/tile PPM+PNG to check rotate/flip before scale
   - `py/gen_palette.py` — arcade PROMs → SHR palette 0 + `iigs/palette_data.s`
   - `py/gen_maze1.py` — level-1 upright 28×31 tilemap + stitched 6×6 cells
+  - `py/gs2_*.py` / `py/check_frame_count.py` — Makefile/CI only (`make iigs-test`, `make iigs-demo`). **Do not** use these (or `gs2debug` / `PYTHONPATH`) for live debugging.
+
+## GSSquared live debug (MCP)
+
+The **gs2-debug** MCP server (`.cursor/mcp.json`) is the debug interface. Same protocol tools as the old Python `gs2debug` client (`read_mem`, `write_mem`, `pause`, `wait_stopped`, `bp_set`, `type_text`, …) — call them as MCP tools, do not spawn Python against `gssquared/clients/python`.
+
+Config: `gs2-mcp --gs2-bin …/gssquared/build/GSSquared`. One emulator at a time. After `bp_set`, `step_into`, or `pause`, call `wait_stopped`. Stop the emu with `quit` (protocol QUIT), not `kill`.
+
+### Bring-up (static inject)
+
+Addresses: [`iigs/mem_static.s`](iigs/mem_static.s). Binaries from `make gfx maze iigs` (or `iigs-game`). Domain `MAIN`. Chunk `write_mem` at ≤16KB (`data` is hex).
+
+1. `launch` with platform `IIgs` (or `5`). Wait ~5s for ROM boot.
+2. Control-Reset (Ctrl+F12, **not** OpenApple): `key_down` scancode `224` mod `0x40`, then scancode `69` mod `0xC0`; `key_up` `69` / `0xC0`, then `224` / `0`. Wait ~2s for Applesoft.
+3. `pause` + `wait_stopped`.
+4. `write_mem` inject: harness `0x020000`, tiles `0x030000`, sprites `0x031200`, masks `0x032700`, odd sprites `0x033C00`, odd masks `0x035100`, maze `0x036600`, cells `0x037000`.
+5. Trampoline at `0x000300`: `18 FB 5C 00 00 02` (`CLC` / `XCE` / `JML $020000`).
+6. `continue_exec`, then `type_text` `"CALL 768\n"` with `delay_s` ~0.25 (GS2 drops keys if typed too fast after reset).
+
+### Peek while running
+
+`pause` + `wait_stopped`, then `read_mem`. Useful static-host locations:
+
+| Symbol | Address | Size |
+|--------|---------|------|
+| `TILEMAP` | `0x02A000` | 868 |
+| `FRAME_COUNT` | `0x02A900` | 2 |
+| `DEMO_FREEZE` | `0x02A904` | 1 |
+| `SCORE_*` / `HISCORE_*` | `0x02A908` | 6 |
+| `LIVES` / `LEVEL` | `0x02A90E` | 1+1 |
+| SHR pixels | `0x012000` | 32000 |
+| SHR palette | `0x019E00` | 32 |
+
+Freeze a completed draw: poke `DEMO_FREEZE=1` at `0x02A904`, `continue_exec`, settle, `pause` again.
+
+Makefile PNG dump (`make iigs-test`) still uses `py/gs2_render_test.py` under the hood — that is CI, not the agent debug path.
 
 ## Working conventions for agents
 
@@ -146,7 +182,8 @@ Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system
 4. Z80 verification (when touching unlocked Z80): assemble → mapped image → byte-compare to `boot1`–`boot6` (`make verify` / `py/verify_boots.py`).
 5. For arcade behavior: **boots win for bytes**; **listing / locked source wins for comments and intent**.
 6. IIgs port work is in scope; follow `docs/IIgs-Design.md`. Keep changes focused on the asked task.
-7. Do not commit unless asked. Do not treat `sjasmplus/` third-party tree as something to casually edit.
+7. Live GSSquared debugging uses the **gs2-debug MCP** tools. Do not drive the emu via `gs2debug` / `PYTHONPATH=…/clients/python` from agent sessions.
+8. Do not commit unless asked. Do not treat `sjasmplus/` third-party tree as something to casually edit.
 
 ## Useful layout
 
@@ -159,6 +196,7 @@ mspacman/
   src/mspac.asm       ← LOCKED assemblable Z80 (verify-clean)
   src/ram.inc         ← documented RAM/I/O EQU symbols (generated)
   py/                 ← Python helpers (save here before running)
+  .cursor/mcp.json    ← gs2-debug MCP (live GSSquared debug)
   Makefile
   boot1 … boot6       ← golden mspacmab CPU ROMs (byte truth)
   mspacmab.zip

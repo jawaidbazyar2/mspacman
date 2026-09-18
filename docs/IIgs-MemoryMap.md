@@ -1,6 +1,6 @@
 # IIgs harness memory map (v1)
 
-Shared sizes/pens live in [`iigs/equates.s`](../iigs/equates.s). **Static** host addresses are in [`iigs/mem_static.s`](../iigs/mem_static.s). Host inject paths: [`py/gs2_render_test.py`](../py/gs2_render_test.py).
+Shared sizes/pens live in [`iigs/equates.s`](../iigs/equates.s). **Static** host addresses are in [`iigs/mem_static.s`](../iigs/mem_static.s). Host inject: gs2-debug MCP `write_mem` (domain `MAIN`; cookbook in [`AGENTS.md`](../AGENTS.md)). `$E1` SHR tracks bank `$01` for display.
 
 **Two assemble-time hosts** (same game bodies):
 
@@ -222,7 +222,7 @@ Host writes these before `CALL 768`. Packed 4bpp; already upright (CW + row XOR 
 | `ACT_FLAGS` | Render | Render |
 | `TILEMAP` / dirty list | Game logic | Tile redraw (`DrawTile` → SHR + BCK) |
 | BCK strip (`BCK_PIXELS`) | `DrawMaze` / `DrawTile` | `EraseSprite` (long restore → SHR) |
-| `$03/*` assets | Host inject | Render (read) |
+| `$03/*` assets | Host inject (MCP `write_mem`) | Render (read) |
 | SHR `$01/2000` | Render | Display |
 
 ---

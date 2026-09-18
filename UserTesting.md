@@ -2,12 +2,14 @@
 
 How to build and run the Merlin32 soft-render harness (four ghosts on rails) under [GSSquared](https://github.com/) so you can watch motion live.
 
+Live peek/poke/breakpoints/keys use the **gs2-debug MCP** server (`.cursor/mcp.json`) — same protocol tools as the old Python `gs2debug` client. Agent cookbook: [`AGENTS.md`](AGENTS.md) § GSSquared live debug. `make iigs-demo` / `make iigs-test` still spawn via `py/gs2_*.py` for the one-command human/CI path.
+
 ## Prerequisites
 
 | Dependency | Default path (override with env / make vars) |
 |------------|-----------------------------------------------|
 | GSSquared binary | `$HOME/src/gssquared/build/GSSquared` (`GSSQUARED`) |
-| GSSquared Python client | `$HOME/src/gssquared/clients/python/src` (`PYTHONPATH`) |
+| gs2-debug MCP | `.cursor/mcp.json` → `gs2-mcp --gs2-bin` that GSSquared |
 | Merlin32 | `$HOME/src/Merlin32_v1.2_b2/MacOs/Merlin32` |
 | Tile/sprite ROMs | `mspacman-orig/5e`, `5f` (+ color/palette PROMs for palette) |
 | CPU boots (maze decode) | `boot1`–`boot6` in repo root |
@@ -31,12 +33,6 @@ Builds if needed, spawns GSSquared, injects, runs the rail demo, waits for **Ent
 make iigs-demo
 ```
 
-Same thing directly:
-
-```bash
-python3 py/gs2_run_demo.py
-```
-
 - Watch the GSSquared window (border = phase profiler).  
 - **Any key in the emulator** → 65816 `ExitDemo`.  
 - **Enter in the terminal** → quit GSSquared.
@@ -49,12 +45,7 @@ Spawns GSSquared, runs briefly, freezes, writes `build/iigs/frame.png`, quits:
 make iigs-test
 ```
 
-Timed run without the interactive waiter:
-
-```bash
-PYTHONPATH=$HOME/src/gssquared/clients/python/src \
-  python3 py/gs2_render_test.py --run-seconds 60
-```
+Timed run without the interactive waiter: `make iigs-test` (short capture) or MCP `launch` IIgs, inject, then `pause` / `read_mem` as in [`AGENTS.md`](AGENTS.md).
 
 ## What you should see
 
@@ -78,22 +69,20 @@ PYTHONPATH=$HOME/src/gssquared/clients/python/src \
 
 Order in time: purple ×6 → green ×6 → light blue → orange → yellow → **black** → (repeat).
 
-State check without eyeballing pixels (score, high score, lives, level, dots eaten):
+State check without eyeballing pixels: MCP `pause` + `wait_stopped` + `read_mem` domain `MAIN` (static host):
 
-```bash
-PYTHONPATH=$HOME/src/gssquared/clients/python/src \
-  python3 py/gs2_probe_hud.py --run-seconds 14
-```
+| What | Address | Length |
+|------|---------|--------|
+| `FRAME_COUNT` | `0x02A900` | 2 |
+| score + high score (BCD) | `0x02A908` | 6 |
+| `LIVES` / `LEVEL` | `0x02A90E` | 1+1 |
+| `TILEMAP` (dots eaten vs `maze1_28x31.bin`) | `0x02A000` | 868 |
 
-## Useful flags
+Poke P1 score to hit the 10000 high-score copy without waiting 1000 ticks: `write_mem` at `0x02A908`.
 
-| Flag | Meaning |
-|------|---------|
-| `--gs2 PATH` | GSSquared binary (default `$GSSQUARED` or `~/src/gssquared/build/GSSquared`) |
-| `--socket PATH` | Debug socket when spawning (default `/tmp/gs2-mspacman.sock`) |
-| `--attach SOCK` | Attach to an already-running GS2; do not spawn or quit it |
-| `--run-seconds N` | Seconds of live demo before host freeze + PNG |
-| `--bin` / `--gfx` / `--out` | Harness binary, asset dir, PNG path |
+## MCP tools (live debug)
+
+Same names as the old Python `Client` methods. Typical session: `launch` (platform `IIgs`) → boot/reset/inject → `pause` / `wait_stopped` → `read_mem` / `write_mem` / `bp_set` / `type_text`. Stop with `quit`. See [`AGENTS.md`](AGENTS.md).
 
 ## Notes
 

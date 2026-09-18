@@ -471,7 +471,7 @@ Two Merlin32 builds share the soft-render shell (`frame_body.s`: erase → dirty
 | Shared shell | [`iigs/frame_body.s`](../iigs/frame_body.s), render/HUD/SHR, compiled blits |
 | Demo | [`iigs/all_demo.s`](../iigs/all_demo.s) / [`link_demo.s`](../iigs/link_demo.s), `demo_tick.s`, `rails_body.s` |
 | Game | [`iigs/all_game.s`](../iigs/all_game.s) / [`link_game.s`](../iigs/link_game.s), `game_tick.s`, logic modules |
-| Host driver | [`py/gs2_render_test.py`](../py/gs2_render_test.py), [`py/gs2_run_demo.py`](../py/gs2_run_demo.py) |
+| Host driver | **gs2-debug MCP** (live debug; [`AGENTS.md`](../AGENTS.md)); `make iigs-test` / `iigs-demo` still wrap [`py/gs2_render_test.py`](../py/gs2_render_test.py) for PNG / one-command demo |
 | Port checklist | [`IIgs-LogicPort.md`](IIgs-LogicPort.md) |
 
 ```bash
@@ -509,7 +509,7 @@ The 76 px gutters either side of the playfield carry the chrome the arcade puts 
 
 Dot eating rides the same seam: `EatDotsAtPac` maps Ms. Pac's `ACT_X`/`ACT_Y` back to a tile, clears `$10`/`$14` from `TILEMAP`, and queues the cell so `ApplyDirty` rewrites it empty into **both** SHR and BCK before the next erase (§3.1).
 
-Host check: [`py/gs2_probe_hud.py`](../py/gs2_probe_hud.py) reports frames, score / high score, lives, level and dots eaten (`--seed-score` reaches the 10000 rollover without waiting 1000 ticks).
+Host check (MCP `read_mem` / `write_mem`, domain `MAIN`): `FRAME_COUNT` `$02A900`, score+hiscore `$02A908` (6 BCD bytes), `LIVES`/`LEVEL` `$02A90E`, `TILEMAP` `$02A000`. Poke score at `$02A908` to reach the 10000 rollover without waiting 1000 ticks.
 
 ---
 

@@ -35,6 +35,8 @@ CP2       ?= $(HOME)/src/cp2_1.0.5_osx-x64_sc/cp2
 IIGS_GSOS_DISK ?= $(HOME)/src/IIgsDisks/mspacmangs.2mg
 
 GSSQUARED ?= $(HOME)/src/gssquared/build/GSSquared
+# Python gs2debug: Makefile/CI spawn only (iigs-test / iigs-demo).
+# Live debug is the gs2-debug MCP server (.cursor/mcp.json) — see AGENTS.md.
 GS2_PY    := $(HOME)/src/gssquared/clients/python/src
 
 .PHONY: all clean verify sjasmplus-check gfx gfx-ppm palette maze tiles-preview \
