@@ -49,7 +49,7 @@ SDL_LIBS := -L/usr/local/lib -lSDL3 -Wl,-rpath,/usr/local/lib
 
 .PHONY: all clean verify sjasmplus-check gfx gfx-ppm palette maze tiles-preview \
 	iigs iigs-test iigs-demo iigs-game iigs-game-test iigs-game-demo iigs-gsos \
-	lift lift-check
+	lift lift-check c c-check
 
 all: $(BIN)
 
@@ -69,6 +69,28 @@ $(LIFT_BIN): $(LIFT_SRCS) $(LIFT_DIR)/lift.h $(BIN) | $(BUILD_DIR)/lift
 
 lift-check: $(LIFT_BIN)
 	$(LIFT_BIN) --check 600
+
+# Phase-2 host: a copy of the phase-1 sources under c/, plus lifted routines.
+# lift/ itself stays the pure Z80 host.
+C_BIN := $(BUILD_DIR)/c/mspac-c
+C_SRCS := $(wildcard c/*.c) c/fiber_arm64.S $(LIFT_DIR)/third_party/Z80/sources/Z80.c
+
+$(BUILD_DIR)/c:
+	mkdir -p $(BUILD_DIR)/c
+
+c: $(C_BIN)
+
+$(C_BIN): $(wildcard c/*.c) $(wildcard c/*.h) c/fiber_arm64.S $(BIN) | $(BUILD_DIR)/c
+	cc -std=c11 -O2 -Wall -Wextra -Wconversion -fno-strict-aliasing \
+		-I c \
+		-I $(LIFT_DIR)/third_party/Z80/API \
+		-I $(LIFT_DIR)/third_party/Zeta/API \
+		$(SDL_CFLAGS) \
+		-DZ80_STATIC -DZ80_WITH_EXECUTE \
+		-o $@ $(C_SRCS) $(SDL_LIBS)
+
+c-check: $(C_BIN)
+	$(C_BIN) --replay testplay1
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
