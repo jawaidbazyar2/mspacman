@@ -14,10 +14,11 @@
 #define LIFT_FB_H             224
 #define LIFT_SCREEN_W         224
 #define LIFT_SCREEN_H         288
-#define LIFT_RING             256
 #define LIFT_MAX_READS        256
 #define LIFT_MAX_LIFTS        64
 #define LIFT_DSW1_DEFAULT     0xC9
+#define LIFT_FRAME_HDR        20
+#define LIFT_FRAME_BYTES      2660
 
 enum {
 	LIFT_STOP_BUDGET = 0,
@@ -25,20 +26,10 @@ enum {
 };
 
 typedef struct {
-	uint64_t h[5];
 	uint8_t stop;
 	uint16_t nreads;
 	uint8_t reads[LIFT_MAX_READS];
 } LiftFrame;
-
-/* Full images of the hashed regions, for the last LIFT_RING frames. */
-typedef struct {
-	uint8_t work[0x1F0];
-	uint8_t video[0x400];
-	uint8_t color[0x400];
-	uint8_t spr[0x10];
-	uint8_t spr2[16];
-} LiftSnap;
 
 typedef struct {
 	int have_gfx;
@@ -67,18 +58,16 @@ typedef struct {
 	int recording;
 	int replaying;
 	char dir[512];
-	LiftFrame *play;
 	uint32_t play_count;
-	uint32_t play_pos;
 	uint16_t read_pos;
+	uint16_t replay_nreads;
+	uint8_t replay_reads[LIFT_MAX_READS];
 	FILE *inputs;
-	FILE *hashes;
+	FILE *frames;
 	uint8_t dsw1;
 	uint8_t reset_ram[0x1000];
-	LiftFrame ring[LIFT_RING];
-	LiftSnap snap[LIFT_RING];
-	uint32_t ring_i;
-	uint32_t ring_n;
+	uint8_t packed[LIFT_FRAME_BYTES];
+	char mismatch_msg[160];
 } LiftCorpus;
 
 typedef struct Board {
@@ -120,7 +109,10 @@ void input_poll(Board *b);
 
 int corpus_open_record(Board *b, const char *dir);
 int corpus_open_replay(Board *b, const char *dir);
+int corpus_begin_frame(Board *b);
 void corpus_note_frame(Board *b);
 void corpus_close(Board *b);
+/* -1 when the records match. Otherwise the first differing offset, with a field name in msg. */
+int corpus_diff_at(const uint8_t *expect, const uint8_t *got, char *msg, size_t cap);
 
 #endif

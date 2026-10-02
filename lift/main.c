@@ -37,11 +37,8 @@ static void load_assets(Board *b)
 
 static int run_check(Board *b, int n)
 {
-	uint64_t *h = calloc((size_t)n * 5, sizeof *h);
-	uint8_t *stop = calloc((size_t)n, 1);
-	if (!h || !stop) {
-		free(h);
-		free(stop);
+	uint8_t *recs = malloc((size_t)n * LIFT_FRAME_BYTES);
+	if (!recs) {
 		fprintf(stderr, "lift: out of memory\n");
 		return 1;
 	}
@@ -51,8 +48,7 @@ static int run_check(Board *b, int n)
 		board_frame(b);
 		if (b->cur.stop == LIFT_STOP_IDLE)
 			idle++;
-		stop[i] = b->cur.stop;
-		memcpy(h + (size_t)i * 5, b->cur.h, 5 * sizeof(uint64_t));
+		memcpy(recs + (size_t)i * LIFT_FRAME_BYTES, b->corpus.packed, LIFT_FRAME_BYTES);
 	}
 
 	b->frame_index = 0;
@@ -64,13 +60,14 @@ static int run_check(Board *b, int n)
 		board_frame(b);
 		if (b->cur.stop == LIFT_STOP_IDLE)
 			idle2++;
-		if (stop[i] != b->cur.stop ||
-		    memcmp(h + (size_t)i * 5, b->cur.h, 5 * sizeof(uint64_t)) != 0) {
-			fprintf(stderr,
-				"lift-check: attract diverge at frame %d (stop %u vs %u, pc %04X)\n",
-				i, stop[i], b->cur.stop, Z80_PC(b->cpu));
-			free(h);
-			free(stop);
+		if (memcmp(recs + (size_t)i * LIFT_FRAME_BYTES, b->corpus.packed,
+			   LIFT_FRAME_BYTES) != 0) {
+			char detail[96];
+			corpus_diff_at(recs + (size_t)i * LIFT_FRAME_BYTES, b->corpus.packed,
+				       detail, sizeof detail);
+			fprintf(stderr, "lift-check: attract diverge at frame %d: %s\n",
+				i, detail);
+			free(recs);
 			return 1;
 		}
 	}
@@ -81,30 +78,25 @@ static int run_check(Board *b, int n)
 	board_reset(b);
 	if (corpus_open_record(b, dir) != 0) {
 		fprintf(stderr, "lift-check: cannot record %s\n", dir);
-		free(h);
-		free(stop);
+		free(recs);
 		return 1;
 	}
-	for (int i = 0; i < n; i++) {
+	for (int i = 0; i < n; i++)
 		board_frame(b);
-		corpus_note_frame(b);
-	}
 	corpus_close(b);
 
 	if (corpus_open_replay(b, dir) != 0) {
 		fprintf(stderr, "lift-check: cannot replay %s\n", dir);
-		free(h);
-		free(stop);
+		free(recs);
 		return 1;
 	}
 	for (int i = 0; i < n; i++) {
 		board_frame(b);
 		if (b->mismatch) {
-			fprintf(stderr, "lift-check: replay mismatch at frame %d pc %04X\n",
-				i, Z80_PC(b->cpu));
+			fprintf(stderr, "lift-check: replay mismatch: %s\n",
+				b->corpus.mismatch_msg);
 			corpus_close(b);
-			free(h);
-			free(stop);
+			free(recs);
 			return 1;
 		}
 	}
@@ -113,12 +105,10 @@ static int run_check(Board *b, int n)
 	printf("lift-check: %d frames, idle %d/%d, replay ok\n", n, idle, idle2);
 	if (idle == 0) {
 		fprintf(stderr, "lift-check: attract never reached the idle loop\n");
-		free(h);
-		free(stop);
+		free(recs);
 		return 1;
 	}
-	free(h);
-	free(stop);
+	free(recs);
 	return 0;
 }
 
@@ -127,8 +117,7 @@ static int replay_headless(Board *b)
 	while (b->frame_index < b->corpus.play_count && !b->mismatch)
 		board_frame(b);
 	if (b->mismatch) {
-		fprintf(stderr, "lift: replay mismatch at frame %u pc %04X\n",
-			b->frame_index ? b->frame_index - 1 : 0, Z80_PC(b->cpu));
+		fprintf(stderr, "lift: replay mismatch: %s\n", b->corpus.mismatch_msg);
 		return 1;
 	}
 	printf("lift: replay %u frames ok\n", b->corpus.play_count);
@@ -229,11 +218,9 @@ static int play(Board *b, int show_video)
 		if (!b->corpus.replaying)
 			input_poll(b);
 		board_frame(b);
-		if (b->corpus.recording)
-			corpus_note_frame(b);
 		if (b->corpus.replaying && b->mismatch) {
-			fprintf(stderr, "lift: replay mismatch at frame %u\n",
-				b->frame_index ? b->frame_index - 1 : 0);
+			fprintf(stderr, "lift: replay mismatch: %s\n",
+				b->corpus.mismatch_msg);
 			rc = 1;
 			break;
 		}

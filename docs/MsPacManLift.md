@@ -113,34 +113,53 @@ Coin and 1-player start, which the play corpus has to include, are keypad 0 and 
 
 **Video.** Each emulated frame, build the 224×288 cabinet picture from video RAM, color RAM, sprite RAM, sprite positions, `5e`/`5f`, and the color PROMs. Upload it to an SDL texture and present with nearest-neighbor integer scaling. While a session is being recorded, present once per frame and pace the loop to the arcade VBLANK (about 60.6 Hz). Unthrottled replay may skip presentation.
 
-**Audio.** Open an SDL3 playback stream and mix the three Namco WSG voices from the voice registers and the waveform PROM. That playback is for the person playing. The oracle stays the register and RAM hashes, not the samples.
+**Audio.** Open an SDL3 playback stream and mix the three Namco WSG voices from the voice registers and the waveform PROM. That playback is for the person playing. The frame record stores the voice registers. Samples are not compared.
 
 ### Checkpoint
 
-Capture once per frame, at a fixed point: the CPU has finished that frame's VBLANK work and is waiting for the next interrupt.
+Capture once per frame, at a fixed point: the CPU has finished that frame's VBLANK work and is waiting for the next interrupt. The capture is before the host bumps the watchdog and before a watchdog reset.
 
-Each frame records:
+The corpus is two files. `inputs` is the byte returned by each `IN0` / `IN1` read, in read order: what the program observed, not the host key event. Coin and start are those port reads. `frames` is one fixed 2660-byte little-endian record per frame. Replay compares that record byte for byte. The first differing offset names the field. A stored checksum is not part of the format. Frame length and frame number catch a truncated or skipped record.
 
-| Field | Contents |
-|-------|----------|
-| Frame index | Monotonic from reset |
-| Input | The byte returned by each `IN0` / `IN1` read, in read order. Record what the program observed, not the host key event |
-| Coins and starts | Frame-indexed edges, if they are not already fully described by those port reads |
-| Hashes | Separate digests of work RAM (`$4C00`–`$4FEF`), video RAM, color RAM, sprite RAM, and sprite position ports |
-| Ring buffer | Full images of those regions for the last few hundred frames, so a mismatch can be inspected |
+Each record:
 
-The stored corpus is the hash chain plus the input trace plus the header (reset RAM image, DIP settings, interrupt period). Full 64K dumps of every frame are not the corpus. A ten-minute session of raw RAM is gigabytes, and the hash chain is what replay compares.
+| Offset | Size | Field |
+|-------:|-----:|-------|
+| 0 | 4 | Frame length, always 2660 |
+| 4 | 4 | Frame number, from 0 at reset |
+| 8 | 26 | `PC SP AF BC DE HL AF' BC' DE' HL' IX IY WZ`, each `u16` |
+| 34 | 8 | `I R IFF1 IFF2 IM Q INT HALT`, each `u8` |
+| 42 | 8 | Latch bytes `$5000`–`$5007` |
+| 50 | 32 | Voice registers `$5040`–`$505F` |
+| 82 | 2 | Watchdog, frames since the last kick |
+| 84 | 1024 | Tile RAM `$4000`–`$43FF` |
+| 1108 | 1024 | Color RAM `$4400`–`$47FF` |
+| 2132 | 496 | Work RAM `$4C00`–`$4FEF` |
+| 2628 | 16 | Sprite RAM `$4FF0`–`$4FFF` |
+| 2644 | 16 | Sprite positions `$5060`–`$506F` |
+
+`INT` is the pin. The `$5000` latch is the mask. `WZ`, `Q`, and the two IFF flip-flops are real Z80 state. The waveform phase counters stay out; they are playback position.
+
+The file starts with 20 bytes: magic `MSPF`, version 1, frame size 2660, the 50688-cycle period, the DIP byte, and 3 zero pad bytes. Reset RAM is the pinned zero image applied at reset. It is not stored.
+
+That is about 9 MB per minute. A ten-minute session is about 90 MB. An hour is about 540 MB. The host streams the file. It does not hold the session in RAM.
 
 Regenerating a session means playing it again by hand. Get the capture format right before a long play.
 
 ### Determinism gate
 
+The phase 1 Z80 host is both the recorder and the checker. One process does one of those.
+
+Record with F9, or `--record DIR`. The machine resets, the keypad plays, and each frame appends to `inputs` and `frames`. Nothing is compared. Playback stays at the arcade frame rate.
+
+Verify with `--replay DIR`. That run is headless and has no frame delay: it goes as fast as emulation and reading the records allow. `--replay DIR --video` shows the same run, also unpaced. Logged port bytes drive the CPU. Each live record is compared with the stored one. The first mismatch stops the run and names the field. Nothing is written.
+
 Before any session is trusted:
 
-1. Pin reset RAM to a recorded image (not "whatever was in the array").
+1. Pin reset RAM to zeros, and pin the CPU registers to the power-on image (general registers `$FFFF`, the rest 0).
 2. Pin DIP switches, interrupt period, and the order of port reads.
-3. Replay the same input trace twice on the all-Z80 build.
-4. Require identical hash chains.
+3. Record a session on the Z80 host.
+4. Replay that session on the same host and require every frame record to match.
 
 If two all-Z80 runs diverge, the corpus cannot be an oracle. Find the unpinned input (an unread timer, an unlatched coin, a watchdog edge) and pin it.
 
@@ -166,7 +185,7 @@ Several sessions are fine. Each session is one trace with its own header. Replay
 ### Phase 1 exit
 
 - The game is playable on the host.
-- Two replays of a trace produce one hash chain.
+- A recorded session, replayed on the same Z80 host, matches every frame record.
 - The coverage list above exists as saved traces.
 - A short trace also matches MAME's work-RAM image at end of frame, as a sanity check that the core's callbacks and the hardware map are the real board.
 
@@ -225,7 +244,7 @@ Lift leaves first. A leaf has no callee to marshal, so the boundary is only regi
 
 ### What shadow mode does not replace
 
-Shadow mode keeps the Z80 answer, so it will not catch a routine that is right in isolation but moves the interrupt or the watchdog relative to the rest of the frame. Acceptance is still a full replay of each phase 1 trace, C-only, comparing the per-frame hash chain. One bug per replay: stop at the first mismatched frame, fix it, run again.
+Shadow mode keeps the Z80 answer, so it will not catch a routine that is right in isolation but moves the interrupt or the watchdog relative to the rest of the frame. Acceptance is still a full replay of each phase 1 trace, C-only, comparing the per-frame records. One bug per replay: stop at the first mismatched frame, fix it, run again.
 
 Lifted code costs no Z80 cycles, so the interrupt can land in a different place. The original main loop is VBLANK-gated, and finishing early then waiting is usually harmless. If a replay shows frame drift, charge the lifted routine an approximate cycle count. Default is to leave cycles uncharged until a trace says otherwise.
 
@@ -234,20 +253,20 @@ Default is also that a lifted C routine runs with the interrupt masked, matching
 ### Phase 2 exit
 
 - Every routine in the logic set is C-only. The Z80 core is no longer on the call path.
-- Every phase 1 trace replays to the same hash chain.
+- Every phase 1 trace replays to the same frame records.
 - The contract table covers the set, including the stack-surgery list.
 
 ---
 
 ## Phase 3 — C to 65816, one routine at a time
 
-Lower the C functions to 65816 until the logic is all 65816. The oracle does not change. Replay the phase 1 traces and compare the same per-frame hashes.
+Lower the C functions to 65816 until the logic is all 65816. The oracle does not change. Replay the phase 1 traces and compare the same per-frame records.
 
 ### Mixed execution, again
 
 The workstation host stays the test harness. A routine under conversion runs as 65816; its callees and callers stay C until they are lowered. Both use the same `mem[]`.
 
-At each call, snapshot, run the C function, save the result, restore, run the 65816, compare, commit the C result. The trajectory stays on the phase 1 path, and one replay lists every lowered routine that diverged. Acceptance, after the routine is flipped to 65816-only, is a full unthrottled replay of the phase 1 hash chain.
+At each call, snapshot, run the C function, save the result, restore, run the 65816, compare, commit the C result. The trajectory stays on the phase 1 path, and one replay lists every lowered routine that diverged. Acceptance, after the routine is flipped to 65816-only, is a full unthrottled replay of the phase 1 frame records.
 
 The 65816 execution vehicle for this phase is in-process on the workstation (a small 65816 core, or an equivalent that runs the assembled bytes against `mem[]`). Per-routine comparison does not depend on GSSquared frame timing. GSSquared is for the integrated IIgs build, where the existing SHR renderer draws and the lowered logic is what advances `$4D00`–`$4E3F` and the rest of the work RAM.
 
@@ -255,7 +274,7 @@ The 65816 execution vehicle for this phase is in-process on the workstation (a s
 
 The C function and its contract row are the source. The 65816 routine must produce the same `mem[]` writes and the same explicit results. Match 8-bit wrap. Match BCD. Keep little-endian 16-bit stores so a work-RAM image from the IIgs is comparable byte for byte with phase 1.
 
-Do not restructure a function in the same pass that lowers it. A mismatch would have two causes. Ugly 65816 that matches the hashes is the input to a later cleanup.
+Do not restructure a function in the same pass that lowers it. A mismatch would have two causes. Ugly 65816 that matches the frame records is the input to a later cleanup.
 
 The stack-surgery list from phase 2 is lowered by hand. `JSL` / `RTL` get a normal frame. The return-code convention from the C side is the one that carries over.
 
@@ -264,25 +283,21 @@ Rendering, palette, sprite blit, HUD chrome, and keyboard latch stay the IIgs co
 ### Phase 3 exit
 
 - Every lifted routine is 65816, running in the integrated IIgs build.
-- Every phase 1 trace, applied to that build's input latch, produces the same work-RAM, video-RAM, color-RAM, and sprite-state hashes.
+- Every phase 1 trace, applied to that build's input latch, produces the same frame records.
 - Attract, death, energizer, fruit, 10,000-point life, intermissions, and later-level speed changes all pass on those traces.
 
 ---
 
 ## Corpus format
 
-One directory per session under a single tree (location to be chosen when phase 1 is built). A session contains:
+One directory per session under `corpus/`. A session contains:
 
 | File | Role |
 |------|------|
-| `header` | Reset RAM image, DIP byte, interrupt period, capture-point description, emulator build id |
-| `inputs` | Frame-indexed `IN0` / `IN1` read values, plus coin and start edges |
-| `hashes` | Per-frame digests, one row per frame, regions in a fixed column order |
-| `ring` | Optional tail of full region images for the last N frames |
+| `frames` | `MSPF` header, then one 2660-byte record per frame |
+| `inputs` | `INPT` header, then per frame a `u16` count and the `IN0` / `IN1` bytes in read order |
 
-Replay is a pure function of `header` + `inputs`. Host key timing is not an input.
-
-Hash columns, fixed order: work RAM, video RAM, color RAM, sprite RAM, sprite positions. A mismatch names the region before anyone opens a dump.
+Replay is a pure function of the `frames` header (DIP byte, interrupt period) and `inputs`. Host key timing is not an input. Comparison is `memcmp` of each live record against `frames`. The message names the first differing field and the two bytes.
 
 ---
 
@@ -291,5 +306,5 @@ Hash columns, fixed order: work RAM, video RAM, color RAM, sprite RAM, sprite po
 - Writing a Z80 CPU emulator. The CPU is the [Z80 library](https://github.com/redcode/Z80) submodule; this project emulates the board
 - Editing locked `mspac.asm`, `src/mspac.asm`, or `boot1`–`boot6`
 - Re-implementing the SHR renderer, palette, or sprite blit
-- Sample-exact WSG audio as an acceptance test. SDL3 plays the voices; the corpus hashes the registers
+- Sample-exact WSG audio as an acceptance test. SDL3 plays the voices; the frame record stores the voice registers
 - Encrypted original-hardware `mspacman` (`u5`/`u6`/`u7` and aux-board traps)

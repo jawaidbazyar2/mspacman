@@ -53,11 +53,16 @@ static void log_port(Board *b, uint8_t value)
 static uint8_t take_logged(Board *b)
 {
 	uint8_t v;
-	if (b->corpus.read_pos >= b->corpus.play[b->corpus.play_pos].nreads) {
+	if (b->corpus.read_pos >= b->corpus.replay_nreads) {
 		b->mismatch = 1;
+		if (b->corpus.mismatch_msg[0] == 0) {
+			snprintf(b->corpus.mismatch_msg, sizeof b->corpus.mismatch_msg,
+				 "frame %u input overrun (logged %u)",
+				 b->frame_index, b->corpus.replay_nreads);
+		}
 		v = 0xFF;
 	} else {
-		v = b->corpus.play[b->corpus.play_pos].reads[b->corpus.read_pos++];
+		v = b->corpus.replay_reads[b->corpus.read_pos++];
 	}
 	log_port(b, v);
 	return v;
@@ -193,16 +198,6 @@ static void cb_out(void *ctx, zuint16 addr, zuint8 data)
 	(void)data;
 }
 
-static uint64_t fnv(const uint8_t *p, size_t n)
-{
-	uint64_t h = 14695981039346656037ull;
-	for (size_t i = 0; i < n; i++) {
-		h ^= p[i];
-		h *= 1099511628211ull;
-	}
-	return h;
-}
-
 void board_init(Board *b)
 {
 	memset(b, 0, sizeof *b);
@@ -246,7 +241,11 @@ void board_reset(Board *b)
 	b->frames_since_kick = 0;
 	b->irq_seen = 0;
 	b->stop = 0;
-	z80_instant_reset(&b->cpu);
+	/* instant_reset leaves AF/SP/WZ/Q. Two runs must start from the same
+	 * power-on image or the frame records diverge. */
+	if (b->cpu.halt_line)
+		z80_instant_reset(&b->cpu);
+	z80_power(&b->cpu, Z_TRUE);
 	z80_int(&b->cpu, Z_FALSE);
 }
 
@@ -264,13 +263,18 @@ void board_frame(Board *b)
 	b->cur.nreads = 0;
 	b->cur.stop = LIFT_STOP_BUDGET;
 	b->cycles_left = LIFT_CYCLES_PER_FRAME;
+	b->corpus.mismatch_msg[0] = 0;
 	if (b->corpus.replaying) {
 		if (b->frame_index >= b->corpus.play_count) {
 			b->mismatch = 1;
+			snprintf(b->corpus.mismatch_msg, sizeof b->corpus.mismatch_msg,
+				 "frame %u past end of trace", b->frame_index);
 			return;
 		}
-		b->corpus.play_pos = b->frame_index;
-		b->corpus.read_pos = 0;
+		if (corpus_begin_frame(b) != 0) {
+			b->mismatch = 1;
+			return;
+		}
 	}
 
 	if (b->latch[0])
@@ -287,22 +291,7 @@ void board_frame(Board *b)
 			b->cycles_left -= ran;
 	}
 	b->cur.stop = b->stop ? LIFT_STOP_IDLE : LIFT_STOP_BUDGET;
-	b->cur.h[0] = fnv(b->mem + 0x4C00, 0x1F0);
-	b->cur.h[1] = fnv(b->mem + 0x4000, 0x400);
-	b->cur.h[2] = fnv(b->mem + 0x4400, 0x400);
-	b->cur.h[3] = fnv(b->mem + 0x4FF0, 0x10);
-	b->cur.h[4] = fnv(b->spr2, 16);
-
-	if (b->corpus.replaying && b->frame_index < b->corpus.play_count) {
-		LiftFrame *expect = &b->corpus.play[b->frame_index];
-		int bad = expect->nreads != b->cur.nreads || expect->stop != b->cur.stop;
-		for (int i = 0; i < 5; i++) {
-			if (expect->h[i] != b->cur.h[i])
-				bad = 1;
-		}
-		if (bad)
-			b->mismatch = 1;
-	}
+	corpus_note_frame(b);
 
 	if (b->frames_since_kick < 0xFFFFFFFFu)
 		b->frames_since_kick++;
