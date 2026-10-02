@@ -5,3 +5,4 @@ boot[1-6]
 mspac.s16*.txt
 game.bin*.txt
 harness.bin*.txt
+testplay1/*
