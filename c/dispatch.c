@@ -93,6 +93,34 @@ extern void j_2865(Board *b);
 extern void j_288f(Board *b);
 extern void j_28b9(Board *b);
 extern void j_32ed(Board *b);
+extern void j_24c9(Board *b);
+extern void j_240d(Board *b);
+extern void j_23ed(Board *b);
+extern void j_2698(Board *b);
+extern void j_26a2(Board *b);
+extern void j_058e(Board *b);
+extern void j_2419(Board *b);
+extern void j_26b2(Board *b);
+extern void j_26d0(Board *b);
+extern void j_0506(Board *b);
+extern void j_05bf(Board *b);
+extern void j_3ed0(Board *b);
+extern void j_045f(Board *b);
+extern void j_0585(Board *b);
+extern void j_3e8b(Board *b);
+extern void j_3e96(Board *b);
+extern void j_3e9c(Board *b);
+extern void j_3ea2(Board *b);
+extern void j_3eab(Board *b);
+extern void j_3eb1(Board *b);
+extern void j_3eb7(Board *b);
+extern void j_3ebd(Board *b);
+extern void j_3ec3(Board *b);
+extern void j_9642(Board *b);
+extern void j_2c5e(Board *b);
+extern void j_2ae0(Board *b);
+extern void j_2ba1(Board *b);
+extern void j_05e5(Board *b);
 extern void j_083a(Board *b);
 extern void j_2b0b(Board *b);
 extern void j_0369(Board *b);
@@ -312,6 +340,34 @@ void c_register_leaves(Board *b)
 	c_add_lift(0x32F5, j_32ed, "j_32ed");
 	c_add_lift(0x32F6, j_32ed, "j_32ed");
 	c_add_lift(0x32F8, j_32ed, "j_32ed");
+	c_add_lift(0x24C9, j_24c9, "j_24c9");
+	c_add_lift(0x240D, j_240d, "j_240d");
+	c_add_lift(0x23ED, j_23ed, "j_23ed");
+	c_add_lift(0x2698, j_2698, "j_2698");
+	c_add_lift(0x26A2, j_26a2, "j_26a2");
+	c_add_lift(0x058E, j_058e, "j_058e");
+	c_add_lift(0x2419, j_2419, "j_2419");
+	c_add_lift(0x26B2, j_26b2, "j_26b2");
+	c_add_lift(0x26D0, j_26d0, "j_26d0");
+	c_add_lift(0x0506, j_0506, "j_0506");
+	c_add_lift(0x05BF, j_05bf, "j_05bf");
+	c_add_lift(0x2C5E, j_2c5e, "j_2c5e");
+	c_add_lift(0x2AE0, j_2ae0, "j_2ae0");
+	c_add_lift(0x2BA1, j_2ba1, "j_2ba1");
+	c_add_lift(0x05E5, j_05e5, "j_05e5");
+	c_add_lift(0x3ED0, j_3ed0, "j_3ed0");
+	c_add_lift(0x045F, j_045f, "j_045f");
+	c_add_lift(0x0585, j_0585, "j_0585");
+	c_add_lift(0x3E8B, j_3e8b, "j_3e8b");
+	c_add_lift(0x3E96, j_3e96, "j_3e96");
+	c_add_lift(0x3E9C, j_3e9c, "j_3e9c");
+	c_add_lift(0x3EA2, j_3ea2, "j_3ea2");
+	c_add_lift(0x3EAB, j_3eab, "j_3eab");
+	c_add_lift(0x3EB1, j_3eb1, "j_3eb1");
+	c_add_lift(0x3EB7, j_3eb7, "j_3eb7");
+	c_add_lift(0x3EBD, j_3ebd, "j_3ebd");
+	c_add_lift(0x3EC3, j_3ec3, "j_3ec3");
+	c_add_lift(0x9642, j_9642, "j_9642");
 }
 
 void lift_call_z80(Board *b, uint16_t target)
@@ -556,14 +612,44 @@ static int delay_pc(uint16_t pc)
 	       pc == 0x32F5 || pc == 0x32F6 || pc == 0x32F8;
 }
 
-static void run_delay_budget(Board *b)
+/* j_240d plus the rst $08 it runs. A call that starts late in the frame
+ * stops inside the fill. The next frame resumes in Z80 at that opcode,
+ * which is not itself a lifted entry. */
+static int color_pc(uint16_t pc)
+{
+	return pc == 0x240D || pc == 0x240E || pc == 0x2411 || pc == 0x2414 ||
+	       pc == 0x2415 || pc == 0x2416 || pc == 0x2418 || pc == 0x0008 ||
+	       pc == 0x0009 || pc == 0x000A || pc == 0x000C;
+}
+
+/* Set around a call that may still be running when the frame ends.
+ * The slice stops on the return address with the caller's SP restored. */
+static uint16_t span_ret;
+static uint16_t span_sp_back;
+
+static int delay_inside(Board *b)
+{
+	return delay_pc(Z80_PC(b->cpu));
+}
+
+static int color_inside(Board *b)
+{
+	return color_pc(Z80_PC(b->cpu));
+}
+
+static int span_inside(Board *b)
+{
+	return !(Z80_PC(b->cpu) == span_ret && Z80_SP(b->cpu) == span_sp_back);
+}
+
+static void run_pc_budget(Board *b, int (*inside)(Board *))
 {
 	int guard = 0;
 
 	while (b->cycles_left > 0 && guard++ < 2000000) {
 		zusize ran;
 
-		if (!delay_pc(Z80_PC(b->cpu)))
+		if (!inside(b))
 			return;
 		ran = z80_run(&b->cpu, 1);
 		board_apply_draw(b);
@@ -576,7 +662,7 @@ static void run_delay_budget(Board *b)
 	}
 }
 
-static void shadow_delay(Board *b, LiftEnt *ent)
+static void shadow_delay(Board *b, LiftEnt *ent, int (*inside)(Board *))
 {
 	const char *name = ent && ent->name ? ent->name : "j_32ed";
 	uint8_t *mem_entry;
@@ -617,7 +703,7 @@ static void shadow_delay(Board *b, LiftEnt *ent)
 	rand0 = b->rand_state;
 	prev_suspend = b->lift_suspend;
 	b->lift_suspend = 1;
-	run_delay_budget(b);
+	run_pc_budget(b, inside);
 	b->lift_suspend = prev_suspend;
 	rand1 = b->rand_state;
 	cycles1 = b->cycles_left;
@@ -708,7 +794,21 @@ static void c_dispatch(Board *b, uint16_t entry)
 	}
 
 	if (delay_pc(entry)) {
-		shadow_delay(b, ent);
+		shadow_delay(b, ent, delay_inside);
+		return;
+	}
+	if (entry == 0x240D) {
+		shadow_delay(b, ent, color_inside);
+		return;
+	}
+	if (entry == 0x2419) {
+		uint16_t sp0 = Z80_SP(b->cpu);
+
+		span_ret = (uint16_t)board_mem_read(b, sp0);
+		span_ret = (uint16_t)(span_ret |
+			(uint16_t)((uint16_t)board_mem_read(b, (uint16_t)(sp0 + 1u)) << 8));
+		span_sp_back = (uint16_t)(sp0 + 2u);
+		shadow_delay(b, ent, span_inside);
 		return;
 	}
 

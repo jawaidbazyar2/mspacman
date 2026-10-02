@@ -44,6 +44,22 @@ static uint8_t and_flags(uint8_t result)
 			 (result == 0 ? 0x40u : 0u));
 }
 
+/* `add a, n`. N is clear. Y and X come from the sum. */
+static uint8_t add_a(uint8_t a, uint8_t rhs, uint8_t *flags)
+{
+	uint16_t sum = (uint16_t)((uint16_t)a + rhs);
+	uint8_t result = (uint8_t)sum;
+	uint8_t inv = (uint8_t)~rhs;
+	uint8_t ov = (uint8_t)(((uint8_t)((a ^ inv) & (a ^ result)) & 0x80u) >> 5);
+
+	*flags = (uint8_t)((sum > 255u ? 1u : 0u) |
+			   ov |
+			   ((a ^ rhs ^ result) & 0x10u) |
+			   (result & 0xA8u) |
+			   (result == 0 ? 0x40u : 0u));
+	return result;
+}
+
 /* j_2ace  draw one score digit and step left
  * Entry:    A = a score byte or its swapped nibbles. HL = screen cell.
  *           C is the leading-blank count ($04 or $06 at the first digit).
@@ -543,4 +559,626 @@ void j_2b6a(Board *b)
 	Z80_HL(b->cpu) = 0x4E15;
 	Z80_B(b->cpu) = board_mem_read(b, 0x4E15);
 	draw_lives(b);
+}
+
+/* j_26b2  draw the bonus-life digits
+ * Entry:    task $1F. ($4E71) is the bonus threshold, $10, $15, $20, or $FF.
+ * Exit:     IX = $4136. The low digit is at $4136.
+ *           A non-zero high nibble is also at $4156, and A and F are
+ *           `add a, #$30` of that nibble. A zero high nibble returns
+ *           with A = 0 and F from `and #$0F`.
+ *           Host finishes the RET.
+ * Clobbers: A, F, IX
+ * Flags live-out: Z when there is no tens digit.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: normal RET. No callee.
+ */
+void j_26b2(Board *b)
+{
+	uint8_t bonus = board_mem_read(b, 0x4E71);
+	uint8_t low = (uint8_t)(bonus & 0x0Fu);
+	uint8_t high = (uint8_t)(bonus >> 4);
+	uint8_t flags = 0;
+
+	Z80_IX(b->cpu) = 0x4136;
+	low = add_a(low, 0x30, &flags);
+	board_mem_write(b, 0x4136, low);
+	if (high == 0) {
+		Z80_A(b->cpu) = 0;
+		Z80_F(b->cpu) = and_flags(0);
+		return;
+	}
+	high = add_a(high, 0x30, &flags);
+	board_mem_write(b, 0x4156, high);
+	Z80_A(b->cpu) = high;
+	Z80_F(b->cpu) = flags;
+}
+
+static uint8_t rol8(uint8_t value)
+{
+	return (uint8_t)((uint8_t)(value << 1) | (uint8_t)(value >> 7));
+}
+
+static uint8_t ror8(uint8_t value)
+{
+	return (uint8_t)((value >> 1) | (uint8_t)((value & 1u) << 7));
+}
+
+/* j_26d0  read the DIP switches into the game settings
+ * Entry:    task $14. DSW1 is $5080. IN1 is $5040.
+ * Exit:     ($4E6E) = $FF when bits 0-1 are both off (free play).
+ *           ($4E6B) is coins per credit. ($4E6D) is credits per coin.
+ *           ($4E6F) is lives: bits 2-3 plus one, and 3 becomes 5.
+ *           ($4E71) is the bonus byte from $2728 indexed by bits 4-5.
+ *           ($4E75) is the inverse of bit 7. ($4E72) is the inverse of
+ *           IN1 bit 7. ($4E73) is $0068 or $007D from the inverse of bit 6.
+ *           A is the cocktail bit. F is `and #01` of it.
+ *           B is the difficulty index. C is DSW1 bits 0-1.
+ *           HL is the difficulty word. DE points at its high byte.
+ *           The bytes under SP are the rst $18 return $271A and, under
+ *           that, the rst $10 return $001B.
+ *           Host finishes the RET.
+ * Clobbers: A, F, BC, DE, HL
+ * Flags live-out: Z when the cabinet is upright.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: two rsts, both returned. No callee.
+ */
+void j_26d0(Board *b)
+{
+	uint8_t dip = board_mem_read(b, 0x5080);
+	uint8_t breg = dip;
+	uint8_t a = (uint8_t)(dip & 0x03u);
+	uint8_t creg = a;
+	uint8_t flags = and_flags(a);
+	uint8_t carry;
+	uint16_t diff;
+	int n;
+
+	if (a == 0) {
+		Z80_HL(b->cpu) = 0x4E6E;
+		board_mem_write(b, 0x4E6E, 0xFF);
+	}
+	carry = (uint8_t)(a & 1u);
+	a = (uint8_t)(a >> 1);
+	flags = (uint8_t)((flags & 0xC4u) | (a & 0x28u) | carry);
+	a = add_carry(a, 0, &flags, 1);
+	board_mem_write(b, 0x4E6B, a);
+	a = (uint8_t)(a & 0x02u);
+	a = (uint8_t)(a ^ creg);
+	board_mem_write(b, 0x4E6D, a);
+
+	a = ror8(ror8(breg));
+	a = (uint8_t)(a & 0x03u);
+	a = (uint8_t)(a + 1u);
+	if (a == 4)
+		a = (uint8_t)(a + 1u);
+	board_mem_write(b, 0x4E6F, a);
+
+	a = breg;
+	for (n = 0; n < 4; n++)
+		a = ror8(a);
+	a = (uint8_t)(a & 0x03u);
+	board_mem_write(b, 0x4E71, board_mem_read(b, (uint16_t)(0x2728u + a)));
+
+	a = (uint8_t)((uint8_t)~rol8(breg) & 0x01u);
+	board_mem_write(b, 0x4E75, a);
+
+	a = rol8(rol8(breg));
+	breg = (uint8_t)((uint8_t)~a & 0x01u);
+	diff = rst18(b, 0x272C, 0x271A, breg);
+	board_mem_write(b, 0x4E73, (uint8_t)diff);
+	board_mem_write(b, 0x4E74, (uint8_t)(diff >> 8));
+
+	a = rol8(board_mem_read(b, 0x5040));
+	a = (uint8_t)((uint8_t)~a & 0x01u);
+	board_mem_write(b, 0x4E72, a);
+	Z80_A(b->cpu) = a;
+	Z80_F(b->cpu) = and_flags(a);
+	Z80_B(b->cpu) = breg;
+	Z80_C(b->cpu) = creg;
+	Z80_HL(b->cpu) = diff;
+}
+
+/* `add ix,de`. S, Z, and P/V stay. Y and X come from the high byte. */
+static uint8_t add16_flags(uint16_t lhs, uint16_t rhs, uint8_t flags,
+			   uint16_t *out)
+{
+	uint32_t sum = (uint32_t)lhs + rhs;
+
+	*out = (uint16_t)sum;
+	return (uint8_t)((flags & 0xC4u) |
+			 (((uint16_t)sum >> 8) & 0x28u) |
+			 ((((lhs ^ rhs ^ sum) >> 8) & 0x10u)) |
+			 ((sum >> 16) & 1u));
+}
+
+/* Plant a word below SP. The return address at SP stays put. */
+static void plant_word(Board *b, uint16_t addr, uint16_t value)
+{
+	board_mem_write(b, addr, (uint8_t)value);
+	board_mem_write(b, (uint16_t)(addr + 1u), (uint8_t)(value >> 8));
+}
+
+/* j_2c5e  draw or erase one message from the text table
+ * Entry:    B = message number. Bit 7 selects erase (tile $40).
+ * Exit:     Characters and colors are written. The step is -1 when
+ *           the offset's high bit is set, otherwise -$20.
+ *           A is the last color stored. F is the last `add ix,de`
+ *           in the color loop; its S, Z, and P/V are the `and a` of
+ *           the first color byte.
+ *           IX is the color pointer after that loop. DE is the step.
+ *           HL points at the single color byte, or just past the last
+ *           multi-color byte. B is 0. C is 0 on a draw.
+ *           The erase path's CPIR can leave C nonzero; the color
+ *           loop does not change C.
+ *           Host finishes the RET.
+ * Clobbers: A, F, BC, DE, HL, IX
+ * Flags live-out: the last color-step add.
+ * Interrupt: returns inside the frame budget. No frame ends inside it.
+ * Stack: `rst $18` leaves $001B at SP-4. The saved color IX replaces
+ *        the rst return at SP-2. SP itself is unchanged.
+ */
+void j_2c5e(Board *b)
+{
+	uint8_t index = Z80_B(b->cpu);
+	uint16_t slot = (uint16_t)(0x36A5u + (uint8_t)(index << 1));
+	uint16_t rec = (uint16_t)(board_mem_read(b, slot) |
+				  (uint16_t)(board_mem_read(b, (uint16_t)(slot + 1u)) << 8));
+	uint8_t off_lo = board_mem_read(b, rec);
+	uint8_t off_hi = board_mem_read(b, (uint16_t)(rec + 1u));
+	uint16_t color_ix = (uint16_t)(0x4400u +
+				       (uint16_t)(off_lo | (uint16_t)(off_hi << 8)));
+	uint16_t video = (uint16_t)(color_ix + 0xFC00u);
+	uint16_t step = (off_hi & 0x80u) != 0 ? 0xFFFFu : 0xFFE0u;
+	uint16_t hl = (uint16_t)(rec + 2u);
+	uint16_t sp = Z80_SP(b->cpu);
+	uint8_t count = 0;
+	uint8_t creg = 0;
+	uint8_t color0;
+	uint8_t flags;
+	uint8_t a;
+	unsigned left;
+
+	plant_word(b, (uint16_t)(sp - 2u), color_ix);
+	plant_word(b, (uint16_t)(sp - 4u), 0x001Bu);
+
+	if ((index & 0x80u) != 0) {
+		for (;;) {
+			a = board_mem_read(b, hl);
+			if (a == 0x2Fu)
+				break;
+			board_mem_write(b, video, 0x40);
+			hl = (uint16_t)(hl + 1u);
+			video = (uint16_t)(video + step);
+			count = (uint8_t)(count + 1u);
+		}
+		hl = (uint16_t)(hl + 1u);
+		count = (uint8_t)(count + 1u);
+		{
+			uint16_t bc = (uint16_t)(count << 8);
+
+			a = 0x2F;
+			for (;;) {
+				uint8_t n = board_mem_read(b, hl);
+				uint8_t diff = (uint8_t)(a - n);
+
+				hl = (uint16_t)(hl + 1u);
+				bc = (uint16_t)(bc - 1u);
+				if (diff == 0 || bc == 0)
+					break;
+			}
+			count = (uint8_t)(bc >> 8);
+			creg = (uint8_t)bc;
+		}
+	} else {
+		for (;;) {
+			a = board_mem_read(b, hl);
+			if (a == 0x2Fu)
+				break;
+			board_mem_write(b, video, a);
+			hl = (uint16_t)(hl + 1u);
+			video = (uint16_t)(video + step);
+			count = (uint8_t)(count + 1u);
+		}
+		hl = (uint16_t)(hl + 1u);
+	}
+
+	color0 = board_mem_read(b, hl);
+	flags = and_flags(color0);
+	a = color0;
+	left = count == 0 ? 256u : count;
+	if ((color0 & 0x80u) != 0) {
+		while (left != 0) {
+			board_mem_write(b, color_ix, a);
+			flags = add16_flags(color_ix, step, flags, &color_ix);
+			left--;
+		}
+	} else {
+		while (left != 0) {
+			a = board_mem_read(b, hl);
+			board_mem_write(b, color_ix, a);
+			hl = (uint16_t)(hl + 1u);
+			flags = add16_flags(color_ix, step, flags, &color_ix);
+			left--;
+		}
+	}
+	Z80_A(b->cpu) = a;
+	Z80_F(b->cpu) = flags;
+	Z80_B(b->cpu) = 0;
+	Z80_C(b->cpu) = creg;
+	Z80_DE(b->cpu) = step;
+	Z80_HL(b->cpu) = hl;
+	Z80_IX(b->cpu) = color_ix;
+}
+
+/* j_2ae0  print HIGH SCORE and both score fields
+ * Entry:    Task $18. Scores may hold a previous game.
+ * Exit:     Message 0 is drawn. Eight bytes at $4E80 are zero.
+ *           Player 1's score is drawn at $43FC with blank count 4.
+ *           Player 2's score is drawn at $43E9. A 1-player game
+ *           uses blank count 6; a 2-player game uses 4.
+ *           Registers match the tail jump into j_2abe.
+ *           Host finishes the RET.
+ * Clobbers: A, F, BC, DE, HL, IX
+ * Flags live-out: j_2abe's last digit.
+ * Interrupt: returns inside the frame budget.
+ * Stack: the j_2c5e call, then `rst $08`, then one CALL of j_2abe.
+ *        The second j_2abe is a jump, so it shares this frame.
+ */
+void j_2ae0(Board *b)
+{
+	uint8_t players;
+	uint16_t i;
+
+	Z80_B(b->cpu) = 0;
+	call_lifted(b, 0x2AE5, j_2c5e);
+	Z80_A(b->cpu) = 0;
+	Z80_F(b->cpu) = 0x44;
+	for (i = 0; i < 8; i++)
+		board_mem_write(b, (uint16_t)(0x4E80u + i), 0);
+	Z80_BC(b->cpu) = 0x0304;
+	Z80_DE(b->cpu) = 0x4E82;
+	Z80_HL(b->cpu) = 0x43FC;
+	call_lifted(b, 0x2AF8, j_2abe);
+	Z80_BC(b->cpu) = 0x0304;
+	Z80_DE(b->cpu) = 0x4E86;
+	Z80_HL(b->cpu) = 0x43E9;
+	players = board_mem_read(b, 0x4E70);
+	Z80_A(b->cpu) = players;
+	Z80_F(b->cpu) = and_flags(players);
+	if (players == 0)
+		Z80_C(b->cpu) = 6;
+	j_2abe(b);
+}
+
+/* j_2ba1  draw the credit counter or FREE PLAY
+ * Entry:    Credits at $4E6E. $FF means free play.
+ * Exit:     Free play tails into message 2. Otherwise message 1 is
+ *           drawn, the ones digit is at $4033, and a tens digit is at
+ *           $4034 when the credit count is 10 or more.
+ *           A and F are the ones-digit `add $30`, or j_2c5e's result
+ *           on the free-play tail. The other registers are j_2c5e's.
+ *           Host finishes the RET.
+ * Clobbers: A, F, BC, DE, HL, IX
+ * Flags live-out: the ones add, or the text routine on free play.
+ * Interrupt: returns inside the frame budget.
+ * Stack: one CALL of j_2c5e, unless free play jumps there.
+ */
+void j_2ba1(Board *b)
+{
+	uint8_t credits = board_mem_read(b, 0x4E6E);
+	uint8_t flags;
+	uint8_t a;
+
+	if (credits == 0xFF) {
+		Z80_B(b->cpu) = 2;
+		j_2c5e(b);
+		return;
+	}
+	Z80_B(b->cpu) = 1;
+	call_lifted(b, 0x2BB2, j_2c5e);
+	credits = board_mem_read(b, 0x4E6E);
+	if ((credits & 0xF0u) != 0) {
+		a = add_a((uint8_t)(credits >> 4), 0x30, &flags);
+		board_mem_write(b, 0x4034, a);
+	}
+	credits = board_mem_read(b, 0x4E6E);
+	a = add_a((uint8_t)(credits & 0x0Fu), 0x30, &flags);
+	board_mem_write(b, 0x4033, a);
+	Z80_A(b->cpu) = a;
+	Z80_F(b->cpu) = flags;
+}
+
+extern void j_0042(Board *b);
+
+/* `bit n,r`. H is set. N is clear. C stays. Z and P/V are set together
+ * when the bit is clear. S is set only when the tested bit is bit 7. */
+static uint8_t bit_reg(uint8_t value, unsigned bit, uint8_t flags)
+{
+	uint8_t t = (uint8_t)(value & (uint8_t)(1u << bit));
+
+	return (uint8_t)((t != 0 ? (uint8_t)(t & 0x80u) : 0x44u) |
+			 (value & 0x28u) |
+			 0x10u |
+			 (flags & 0x01u));
+}
+
+/* `inc r`. N is clear. C stays. P/V is set only when the old value is $7F. */
+static uint8_t inc8(uint8_t value, uint8_t flags, uint8_t *next)
+{
+	uint8_t result = (uint8_t)(value + 1u);
+
+	*next = result;
+	return (uint8_t)((result & 0xA8u) |
+			 (result == 0 ? 0x40u : 0u) |
+			 ((value ^ result) & 0x10u) |
+			 (value == 0x7Fu ? 0x04u : 0u) |
+			 (flags & 0x01u));
+}
+
+/* `rst $20` at $05E8. A selects a word in the table. SP is unchanged.
+ * The inner `rst $10` leaves $0023 just below SP. */
+static uint16_t rst20_table(Board *b, uint16_t table)
+{
+	uint16_t sp = Z80_SP(b->cpu);
+	uint8_t flags;
+	uint8_t a = add_a(Z80_A(b->cpu), Z80_A(b->cpu), &flags);
+	uint8_t l = (uint8_t)table;
+	uint8_t h = (uint8_t)(table >> 8);
+	uint8_t byte;
+	uint16_t hl;
+	uint16_t de;
+
+	push_word(b, &sp, table);
+	sp = (uint16_t)(sp + 2u);
+	push_word(b, &sp, 0x0023);
+	a = add_a(a, l, &flags);
+	l = a;
+	a = add_carry(0, h, &flags, 1);
+	h = a;
+	hl = (uint16_t)(((uint16_t)h << 8) | l);
+	byte = board_mem_read(b, hl);
+	sp = (uint16_t)(sp + 2u);
+	hl = (uint16_t)(hl + 1u);
+	Z80_E(b->cpu) = byte;
+	Z80_D(b->cpu) = board_mem_read(b, hl);
+	de = Z80_DE(b->cpu);
+	Z80_A(b->cpu) = byte;
+	Z80_F(b->cpu) = flags;
+	Z80_DE(b->cpu) = hl;
+	Z80_HL(b->cpu) = de;
+	Z80_SP(b->cpu) = sp;
+	return de;
+}
+
+/* `rst $28`: B and C are the two data bytes. j_0042 returns after them. */
+static void rst28_task(Board *b, uint8_t task, uint8_t param, uint16_t ret)
+{
+	Z80_B(b->cpu) = task;
+	Z80_C(b->cpu) = param;
+	call_lifted(b, ret, j_0042);
+}
+
+/* `rst $30`: copy the 3 bytes at `data` into the first free timed-task
+ * slot. Returns 0 when all 16 slots are busy. */
+static int rst30_task(Board *b, uint16_t data)
+{
+	uint16_t de = 0x4C90;
+	uint16_t sp = Z80_SP(b->cpu);
+	uint8_t left = 0x10;
+	uint8_t a;
+	uint8_t i;
+	uint8_t e;
+
+	for (;;) {
+		a = board_mem_read(b, de);
+		Z80_A(b->cpu) = a;
+		Z80_F(b->cpu) = and_flags(a);
+		if (a == 0)
+			break;
+		for (i = 0; i < 3; i++)
+			de = (uint16_t)((de & 0xFF00u) | (uint8_t)(de + 1u));
+		left--;
+		Z80_B(b->cpu) = left;
+		Z80_DE(b->cpu) = de;
+		if (left == 0)
+			return 0;
+	}
+	push_word(b, &sp, data);
+	sp = (uint16_t)(sp + 2u);
+	e = (uint8_t)de;
+	for (i = 0; i < 3; i++) {
+		uint8_t flags = Z80_F(b->cpu);
+
+		a = board_mem_read(b, data);
+		board_mem_write(b, de, a);
+		data = (uint16_t)(data + 1u);
+		flags = inc8(e, flags, &e);
+		de = (uint16_t)((de & 0xFF00u) | e);
+		Z80_F(b->cpu) = flags;
+	}
+	Z80_A(b->cpu) = a;
+	Z80_B(b->cpu) = 0;
+	Z80_DE(b->cpu) = de;
+	Z80_HL(b->cpu) = data;
+	Z80_SP(b->cpu) = sp;
+	return 1;
+}
+
+/* Subtract one credit in BCD. `add $99` then `daa`. */
+static uint8_t bcd_dec(uint8_t a)
+{
+	uint8_t flags;
+
+	a = add_a(a, 0x99, &flags);
+	return daa(a, &flags);
+}
+
+/* Shared tail of a start-button press. Charges credits unless the
+ * coin setting is free play, redraws the counter, then arms the intro. */
+static void press_begin(Board *b)
+{
+	uint8_t coins = board_mem_read(b, 0x4E6B);
+	uint8_t a = 1;
+
+	Z80_A(b->cpu) = coins;
+	Z80_F(b->cpu) = and_flags(coins);
+	if (coins != 0) {
+		uint8_t players = board_mem_read(b, 0x4E70);
+
+		a = board_mem_read(b, 0x4E6E);
+		if (players != 0)
+			a = bcd_dec(a);
+		a = bcd_dec(a);
+		board_mem_write(b, 0x4E6E, a);
+		Z80_A(b->cpu) = a;
+		call_lifted(b, 0x0664, j_2ba1);
+	}
+	Z80_HL(b->cpu) = 0x4E03;
+	(void)inc_mem(b, 0x4E03, Z80_F(b->cpu));
+	Z80_A(b->cpu) = 0;
+	Z80_F(b->cpu) = 0x44;
+	board_mem_write(b, 0x4DD6, 0);
+	Z80_F(b->cpu) = inc8(0, 0x44, &a);
+	Z80_A(b->cpu) = a;
+	board_mem_write(b, 0x4ECC, a);
+	board_mem_write(b, 0x4EDC, a);
+}
+
+/* First press-start frame: credits, the maze tasks, and the prompt. */
+static void press_draw(Board *b)
+{
+	uint8_t bonus;
+	uint8_t flags;
+
+	call_lifted(b, 0x05F6, j_2ba1);
+	rst28_task(b, 0x00, 0x01, 0x05F9);
+	rst28_task(b, 0x01, 0x00, 0x05FC);
+	rst28_task(b, 0x1C, 0x07, 0x05FF);
+	rst28_task(b, 0x1C, 0x0B, 0x0602);
+	rst28_task(b, 0x1E, 0x00, 0x0605);
+	Z80_HL(b->cpu) = 0x4E03;
+	(void)inc_mem(b, 0x4E03, Z80_F(b->cpu));
+	Z80_A(b->cpu) = 1;
+	board_mem_write(b, 0x4DD6, 1);
+	bonus = board_mem_read(b, 0x4E71);
+	flags = cp_flags(bonus, 0xFF);
+	Z80_A(b->cpu) = bonus;
+	Z80_F(b->cpu) = flags;
+	if ((flags & 0x40u) != 0)
+		return;
+	rst28_task(b, 0x1C, 0x0A, 0x0617);
+	rst28_task(b, 0x1F, 0x00, 0x061A);
+}
+
+/* Wait for a start button. One credit offers player 1 only. */
+static void press_wait(Board *b)
+{
+	uint8_t credits;
+	uint8_t flags;
+	uint8_t in1;
+
+	call_lifted(b, 0x061E, j_2ba1);
+	credits = board_mem_read(b, 0x4E6E);
+	Z80_B(b->cpu) = credits == 1 ? 8 : 9;
+	call_lifted(b, 0x062C, j_2c5e);
+	credits = board_mem_read(b, 0x4E6E);
+	flags = cp_flags(credits, 1);
+	in1 = board_mem_read(b, 0x5040);
+	Z80_A(b->cpu) = in1;
+	if (credits != 1) {
+		uint8_t bit6 = bit_reg(in1, 6, flags);
+
+		Z80_F(b->cpu) = bit6;
+		if ((bit6 & 0x40u) != 0) {
+			Z80_A(b->cpu) = 1;
+			board_mem_write(b, 0x4E70, 1);
+			press_begin(b);
+			return;
+		}
+	}
+	flags = bit_reg(in1, 5, flags);
+	Z80_A(b->cpu) = in1;
+	Z80_F(b->cpu) = flags;
+	if ((flags & 0x40u) == 0)
+		return;
+	Z80_A(b->cpu) = 0;
+	Z80_F(b->cpu) = 0x44;
+	board_mem_write(b, 0x4E70, 0);
+	press_begin(b);
+}
+
+/* Start was pressed. Queue the board, zero the level, and arm a timer. */
+static void press_go(Board *b)
+{
+	uint8_t lives;
+
+	rst28_task(b, 0x00, 0x01, 0x0677);
+	rst28_task(b, 0x01, 0x01, 0x067A);
+	rst28_task(b, 0x02, 0x00, 0x067D);
+	rst28_task(b, 0x12, 0x00, 0x0680);
+	rst28_task(b, 0x03, 0x00, 0x0683);
+	rst28_task(b, 0x1C, 0x03, 0x0686);
+	rst28_task(b, 0x1C, 0x06, 0x0689);
+	rst28_task(b, 0x18, 0x00, 0x068C);
+	rst28_task(b, 0x1B, 0x00, 0x068F);
+	Z80_A(b->cpu) = 0;
+	Z80_F(b->cpu) = 0x44;
+	board_mem_write(b, 0x4E13, 0);
+	lives = board_mem_read(b, 0x4E6F);
+	Z80_A(b->cpu) = lives;
+	board_mem_write(b, 0x4E14, lives);
+	board_mem_write(b, 0x4E15, lives);
+	rst28_task(b, 0x1A, 0x00, 0x069F);
+	if (rst30_task(b, 0x06A0) == 0)
+		return;
+	Z80_HL(b->cpu) = 0x4E03;
+	Z80_F(b->cpu) = inc_mem(b, 0x4E03, Z80_F(b->cpu));
+}
+
+/* Draw the life icons and leave press-start for the play loop. */
+static void press_lives(Board *b)
+{
+	uint8_t shown = board_mem_read(b, 0x4E15);
+
+	board_mem_write(b, 0x4E15, (uint8_t)(shown - 1u));
+	Z80_HL(b->cpu) = 0x4E15;
+	call_lifted(b, 0x06AF, j_2b6a);
+	Z80_A(b->cpu) = 0;
+	Z80_F(b->cpu) = 0x44;
+	board_mem_write(b, 0x4E03, 0);
+	board_mem_write(b, 0x4E02, 0);
+	board_mem_write(b, 0x4E04, 0);
+	Z80_HL(b->cpu) = 0x4E00;
+	Z80_F(b->cpu) = inc_mem(b, 0x4E00, 0x44);
+}
+
+/* j_05e5  press-start dispatcher
+ * Entry:    Game mode 2. ($4E03) selects the step.
+ * Exit:     Step 0 draws the prompt and queues the board tasks.
+ *           Step 1 watches the start buttons and, on a press, charges
+ *           a credit and starts the intro tune.
+ *           Step 2 queues the playfield and a timer.
+ *           Step 3 is the bare return at $000C. Registers are `rst $20`.
+ *           Step 4 draws the lives and advances the game mode to 3.
+ *           Host finishes the RET.
+ * Clobbers: whichever step runs
+ * Flags live-out: the step's last flag write.
+ * Interrupt: returns inside the frame budget.
+ * Stack: `rst $20` leaves $0023. Each step's calls overwrite it.
+ */
+void j_05e5(Board *b)
+{
+	uint16_t target;
+
+	Z80_A(b->cpu) = board_mem_read(b, 0x4E03);
+	target = rst20_table(b, 0x05E9);
+	if (target == 0x05F3)
+		press_draw(b);
+	else if (target == 0x061B)
+		press_wait(b);
+	else if (target == 0x0674)
+		press_go(b);
+	else if (target == 0x06A8)
+		press_lives(b);
 }
