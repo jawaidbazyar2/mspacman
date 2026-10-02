@@ -5,11 +5,11 @@
 #include <string.h>
 #include <sys/stat.h>
 
-/* Frame record, little-endian, no padding. 2660 bytes.
+/* Frame record, little-endian, no padding. 2664 bytes.
  *  0 u32 length
  *  4 u32 frame number
  *  8 13*u16  PC SP AF BC DE HL AF' BC' DE' HL' IX IY WZ
- * 34 8*u8    I R IFF1 IFF2 IM Q INT HALT
+ * 34 8*u8    I, R slot (zero), IFF1 IFF2 IM Q INT HALT
  * 42 8       latch $5000-$5007
  * 50 32      voice $5040-$505F
  * 82 u16     watchdog, before the end-of-frame increment
@@ -18,6 +18,7 @@
  * 2132 496   work RAM $4C00
  * 2628 16    sprite RAM $4FF0
  * 2644 16    sprite positions $5060
+ * 2660 u32   generator state after this frame
  */
 
 static int write_all(FILE *f, const void *p, size_t n)
@@ -116,8 +117,10 @@ static void field_name(int off, char *name, size_t cap)
 		snprintf(name, cap, "work+$%04X", 0x4C00 + (off - 2132));
 	} else if (off < 2644) {
 		snprintf(name, cap, "sprite+$%04X", 0x4FF0 + (off - 2628));
-	} else {
+	} else if (off < LIFT_FRAME_BYTES - 4) {
 		snprintf(name, cap, "sprpos+$%04X", 0x5060 + (off - 2644));
+	} else {
+		snprintf(name, cap, "rand+%d", off - (LIFT_FRAME_BYTES - 4));
 	}
 }
 
@@ -155,7 +158,7 @@ static void pack_frame(Board *b, uint8_t *out)
 		p += 2;
 	}
 	*p++ = b->cpu.i;
-	*p++ = b->cpu.r;
+	*p++ = 0;
 	*p++ = b->cpu.iff1;
 	*p++ = b->cpu.iff2;
 	*p++ = b->cpu.im;
@@ -178,19 +181,22 @@ static void pack_frame(Board *b, uint8_t *out)
 	p += 16;
 	memcpy(p, b->spr2, 16);
 	p += 16;
+	put_u32(p, b->rand_state);
+	p += 4;
 	if (p - out != LIFT_FRAME_BYTES)
 		fprintf(stderr, "lift: frame pack is %td bytes\n", p - out);
 }
 
-static int write_file_header(FILE *f, uint8_t dsw1)
+static int write_file_header(FILE *f, uint8_t dsw1, uint32_t seed)
 {
 	uint8_t pad[3] = {0, 0, 0};
 	return write_all(f, "MSPF", 4) &&
-	       write_u32(f, 1) &&
+	       write_u32(f, LIFT_FRAME_VER) &&
 	       write_u32(f, LIFT_FRAME_BYTES) &&
 	       write_u32(f, LIFT_CYCLES_PER_FRAME) &&
 	       write_all(f, &dsw1, 1) &&
-	       write_all(f, pad, 3);
+	       write_all(f, pad, 3) &&
+	       write_u32(f, seed);
 }
 
 int corpus_open_record(Board *b, const char *dir)
@@ -203,7 +209,10 @@ int corpus_open_record(Board *b, const char *dir)
 	char path[640];
 	snprintf(path, sizeof path, "%s/frames", dir);
 	b->corpus.frames = fopen(path, "wb");
-	if (!b->corpus.frames || !write_file_header(b->corpus.frames, b->corpus.dsw1)) {
+	b->rand_seed = LIFT_RAND_SEED;
+	b->rand_state = LIFT_RAND_SEED;
+	if (!b->corpus.frames ||
+	    !write_file_header(b->corpus.frames, b->corpus.dsw1, b->rand_seed)) {
 		if (b->corpus.frames)
 			fclose(b->corpus.frames);
 		b->corpus.frames = NULL;
@@ -300,15 +309,17 @@ int corpus_open_replay(Board *b, const char *dir)
 		return -1;
 	}
 	char magic[4];
-	uint32_t ver = 0, bytes = 0, cycles = 0;
+	uint32_t ver = 0, bytes = 0, cycles = 0, seed = 0;
 	uint8_t dsw = 0, pad[3];
 	if (!read_all(fr, magic, 4) || memcmp(magic, "MSPF", 4) != 0 ||
-	    !read_u32(fr, &ver) || ver != 1 ||
+	    !read_u32(fr, &ver) || ver != LIFT_FRAME_VER ||
 	    !read_u32(fr, &bytes) || bytes != LIFT_FRAME_BYTES ||
 	    !read_u32(fr, &cycles) || cycles != LIFT_CYCLES_PER_FRAME ||
-	    !read_all(fr, &dsw, 1) || !read_all(fr, pad, 3)) {
+	    !read_all(fr, &dsw, 1) || !read_all(fr, pad, 3) ||
+	    !read_u32(fr, &seed)) {
 		fclose(fr);
-		fprintf(stderr, "lift: bad frames header in %s\n", dir);
+		fprintf(stderr, "lift: bad frames header in %s (need MSPF version %u)\n",
+			dir, LIFT_FRAME_VER);
 		return -1;
 	}
 	if (fseek(fr, 0, SEEK_END) != 0) {
@@ -343,6 +354,7 @@ int corpus_open_replay(Board *b, const char *dir)
 	}
 
 	b->corpus.dsw1 = dsw;
+	b->rand_seed = seed;
 	b->corpus.frames = fr;
 	b->corpus.inputs = in;
 	b->corpus.play_count = (uint32_t)((sz - LIFT_FRAME_HDR) / LIFT_FRAME_BYTES);

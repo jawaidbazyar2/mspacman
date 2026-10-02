@@ -172,9 +172,32 @@ static uint8_t steal_nop(Board *b, uint16_t addr)
 	return 0x00;
 }
 
+static int rand_pc(uint16_t pc)
+{
+	return pc == 0x8768 || pc == 0x87D2 || pc == 0x956C;
+}
+
+uint8_t lift_random_byte(Board *b)
+{
+	b->rand_state = b->rand_state * LIFT_RAND_MUL + LIFT_RAND_ADD;
+	return (uint8_t)(b->rand_state >> 24);
+}
+
+void board_apply_draw(Board *b)
+{
+	if (!b->rand_draw)
+		return;
+	b->rand_draw = 0;
+	Z80_A(b->cpu) = lift_random_byte(b);
+}
+
 static zuint8 cb_fetch_opcode(void *ctx, zuint16 addr)
 {
 	Board *b = ctx;
+	if (rand_pc(addr)) {
+		b->rand_draw = 1;
+		z80_break(&b->cpu);
+	}
 	if (b->lift_watch)
 		b->lift_watch(b, addr);
 	if (!b->lift_suspend && b->c_depth > 0 && addr == LIFT_SENTINEL) {
@@ -234,6 +257,8 @@ void board_init(Board *b)
 	b->cpu.in = cb_in;
 	b->cpu.out = cb_out;
 	b->cpu.options = Z80_MODEL_ZILOG_NMOS;
+	b->rand_seed = LIFT_RAND_SEED;
+	b->rand_state = LIFT_RAND_SEED;
 	z80_power(&b->cpu, Z_TRUE);
 }
 
@@ -265,6 +290,8 @@ void board_reset(Board *b)
 	b->frames_since_kick = 0;
 	b->irq_seen = 0;
 	b->stop = 0;
+	b->rand_state = b->rand_seed;
+	b->rand_draw = 0;
 	/* instant_reset leaves AF/SP/WZ/Q. Two runs must start from the same
 	 * power-on image or the frame records diverge. */
 	if (b->cpu.halt_line)
@@ -322,6 +349,7 @@ static void run_lifted(Board *b)
 		b->lift_hit = 0;
 		b->lift_sentinel = 0;
 		ran = z80_run(&b->cpu, b->cycles_left);
+		board_apply_draw(b);
 		if (b->lift_nop) {
 			undo_nop(b);
 			if (ran >= 4)
@@ -382,6 +410,7 @@ void board_frame(Board *b)
 		int guard = 0;
 		while (b->cycles_left > 0 && !b->stop && guard++ < 2000000) {
 			zusize ran = z80_run(&b->cpu, b->cycles_left);
+			board_apply_draw(b);
 			if (ran == 0)
 				break;
 			if (ran >= b->cycles_left)

@@ -90,7 +90,7 @@ $(C_BIN): $(wildcard c/*.c) $(wildcard c/*.h) c/fiber_arm64.S $(BIN) | $(BUILD_D
 		-o $@ $(C_SRCS) $(SDL_LIBS)
 
 c-check: $(C_BIN)
-	$(C_BIN) --replay testplay1
+	$(C_BIN) --replay testplay2
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)

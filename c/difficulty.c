@@ -38,3 +38,170 @@ void j_083a(Board *b)
 				  (uint8_t)((sum & 0x02u) << 4) |
 				  (sum & 0x08u));
 }
+
+/* One `ldir`. S, Z, and C stay as they were when the block started. */
+static void ldir_block(Board *b, uint16_t *hl, uint16_t *de, uint16_t count,
+			uint8_t *flags)
+{
+	uint8_t a = Z80_A(b->cpu);
+	uint8_t kept = (uint8_t)(*flags & 0xC1u);
+	uint8_t byte = 0;
+	uint8_t sum;
+
+	while (count != 0) {
+		byte = board_mem_read(b, *hl);
+		*hl = (uint16_t)(*hl + 1u);
+		board_mem_write(b, *de, byte);
+		*de = (uint16_t)(*de + 1u);
+		count = (uint16_t)(count - 1u);
+	}
+	sum = (uint8_t)(byte + a);
+	*flags = (uint8_t)(kept |
+			   (uint8_t)((sum & 0x02u) << 4) |
+			   (sum & 0x08u));
+}
+
+/* `sbc hl, bc` with carry already clear. */
+static void sbc_hl_bc(uint16_t *hl, uint16_t bc, uint8_t *flags)
+{
+	uint32_t total = (uint32_t)*hl - bc;
+	uint16_t result = (uint16_t)total;
+	uint16_t mix = (uint16_t)((*hl ^ bc) & (*hl ^ result));
+	uint8_t high = (uint8_t)(total >> 8);
+
+	*flags = (uint8_t)((high & 0xA8u) |
+			   (result == 0 ? 0x40u : 0u) |
+			   (uint8_t)(((*hl ^ bc ^ result) >> 8) & 0x10u) |
+			   ((mix & 0x8000u) != 0 ? 0x04u : 0u) |
+			   ((total >> 16) & 1u) |
+			   0x02u);
+	*hl = result;
+}
+
+/* j_0814  copy the speed-pattern rows into work RAM
+ * Entry:    HL = source row. A is live-in (it tints the final `ldir` flags).
+ * Exit:     0x1C bytes, then three rewound 0x0C copies, then 0x0E more,
+ *           land at $4D46 onward. HL = source + $2A. DE = $4D94. BC = 0.
+ *           F is the last `ldir`. Its S, Z, and C come from the last
+ *           `sbc hl, bc`. Y and X come from (A + the last byte).
+ *           Host finishes the RET.
+ * Clobbers: BC, DE, HL, F
+ * Flags live-out: none. The caller loads A from the table next.
+ * Interrupt: returns inside the frame budget on every testplay1 call.
+ * Stack: normal RET. No callee.
+ */
+void j_0814(Board *b)
+{
+	uint16_t hl = Z80_HL(b->cpu);
+	uint16_t de = 0x4D46;
+	uint8_t flags = Z80_F(b->cpu);
+
+	ldir_block(b, &hl, &de, 0x001C, &flags);
+	sbc_hl_bc(&hl, 0x000C, &flags);
+	ldir_block(b, &hl, &de, 0x000C, &flags);
+	sbc_hl_bc(&hl, 0x000C, &flags);
+	ldir_block(b, &hl, &de, 0x000C, &flags);
+	sbc_hl_bc(&hl, 0x000C, &flags);
+	ldir_block(b, &hl, &de, 0x000C, &flags);
+	ldir_block(b, &hl, &de, 0x000E, &flags);
+	Z80_HL(b->cpu) = hl;
+	Z80_DE(b->cpu) = de;
+	Z80_BC(b->cpu) = 0;
+	Z80_F(b->cpu) = flags;
+}
+
+/* Even parity sets P/V. */
+static uint8_t parity_pv(uint8_t value)
+{
+	uint8_t x = value;
+
+	x = (uint8_t)(x ^ (uint8_t)(x >> 4));
+	x = (uint8_t)(x ^ (uint8_t)(x >> 2));
+	x = (uint8_t)(x ^ (uint8_t)(x >> 1));
+	return (uint8_t)(((x ^ 1u) & 1u) << 2);
+}
+
+/* `and a`. H is set. N and C are clear. */
+static uint8_t and_a_flags(uint8_t a)
+{
+	return (uint8_t)(0x10u | parity_pv(a) | (a & 0xA8u) |
+			 (a == 0 ? 0x40u : 0u));
+}
+
+/* `sub n`. The difference replaces A. */
+static uint8_t sub_a(uint8_t a, uint8_t rhs, uint8_t *flags)
+{
+	uint8_t diff = (uint8_t)(a - rhs);
+	uint8_t ov = (uint8_t)(((uint8_t)((a ^ rhs) & (a ^ diff)) & 0x80u) >> 5);
+	uint8_t partial = (uint8_t)((a < rhs ? 1u : 0u) |
+				    0x02u |
+				    ov |
+				    ((a ^ rhs ^ diff) & 0x10u));
+
+	*flags = (uint8_t)(partial | (diff & 0xA8u) | (diff == 0 ? 0x40u : 0u));
+	return diff;
+}
+
+/* $F4 minus dots eaten, then the threshold minus that remainder.
+ * Carry means the flag stays off. A successful subtract leaves its flags. */
+static int elroy_due(Board *b, uint16_t threshold, uint8_t *a, uint8_t *flags)
+{
+	uint8_t remain = sub_a(0xF4, board_mem_read(b, 0x4E0E), flags);
+
+	Z80_B(b->cpu) = remain;
+	*a = sub_a(board_mem_read(b, threshold), remain, flags);
+	return (*flags & 0x01u) == 0;
+}
+
+/* j_20d7  raise the cruise-elroy flags once enough dots are gone
+ * Entry:    ($4DA3) = orange substate. ($4E0E) = dots eaten.
+ *           ($4DB6) and ($4DB7) are the two elroy flags.
+ *           ($4DBB) and ($4DBC) are their thresholds.
+ * Exit:     If orange is home: A = 0, F is `and a`.
+ *           Otherwise HL = $4E0E.
+ *           Each unset flag is tested as threshold - ($F4 - dots).
+ *           Carry returns with that `sub` in A and F, and B = $F4 - dots.
+ *           A passing test stores 1 and keeps that `sub`'s flags. `ld a,#01`
+ *           does not change them. The first flag falls through into the second.
+ *           If the second flag is already set: A = that byte, F is `and a`.
+ *           Host finishes the RET.
+ * Clobbers: A, F, and B and HL once orange is out
+ * Flags live-out: none. The caller continues the ghost update.
+ * Interrupt: returns inside the frame budget on every testplay1 call.
+ * Stack: normal RET. No callee. The `jp` at $2108 is the next routine.
+ */
+void j_20d7(Board *b)
+{
+	uint8_t a = board_mem_read(b, 0x4DA3);
+	uint8_t flags = and_a_flags(a);
+
+	Z80_A(b->cpu) = a;
+	Z80_F(b->cpu) = flags;
+	if (a == 0)
+		return;
+	Z80_HL(b->cpu) = 0x4E0E;
+	a = board_mem_read(b, 0x4DB6);
+	flags = and_a_flags(a);
+	if (a == 0) {
+		if (!elroy_due(b, 0x4DBB, &a, &flags)) {
+			Z80_A(b->cpu) = a;
+			Z80_F(b->cpu) = flags;
+			return;
+		}
+		board_mem_write(b, 0x4DB6, 0x01);
+	}
+	a = board_mem_read(b, 0x4DB7);
+	flags = and_a_flags(a);
+	Z80_A(b->cpu) = a;
+	Z80_F(b->cpu) = flags;
+	if (a != 0)
+		return;
+	if (!elroy_due(b, 0x4DBC, &a, &flags)) {
+		Z80_A(b->cpu) = a;
+		Z80_F(b->cpu) = flags;
+		return;
+	}
+	board_mem_write(b, 0x4DB7, 0x01);
+	Z80_A(b->cpu) = 0x01;
+	Z80_F(b->cpu) = flags;
+}

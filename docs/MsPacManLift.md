@@ -52,6 +52,8 @@ All three phases share one logical machine image:
 
 Phase 1 data is the only acceptance oracle. Later phases do not invent a second corpus.
 
+Original arcade bugs that show up in every phase are not lift failures. The first-maze color glitch is [Blue-Maze-Bug.md](Blue-Maze-Bug.md).
+
 ---
 
 ## Phase 1 — Z80 and hardware, with per-frame checkpoints
@@ -119,16 +121,16 @@ Coin and 1-player start, which the play corpus has to include, are keypad 0 and 
 
 Capture once per frame, at a fixed point: the CPU has finished that frame's VBLANK work and is waiting for the next interrupt. The capture is before the host bumps the watchdog and before a watchdog reset.
 
-The corpus is two files. `inputs` is the byte returned by each `IN0` / `IN1` read, in read order: what the program observed, not the host key event. Coin and start are those port reads. `frames` is one fixed 2660-byte little-endian record per frame. Replay compares that record byte for byte. The first differing offset names the field. A stored checksum is not part of the format. Frame length and frame number catch a truncated or skipped record.
+The corpus is two files. `inputs` is the byte returned by each `IN0` / `IN1` read, in read order: what the program observed, not the host key event. Coin and start are those port reads. `frames` is one fixed 2664-byte little-endian record per frame. Replay compares that record byte for byte. The first differing offset names the field. A stored checksum is not part of the format. Frame length and frame number catch a truncated or skipped record.
 
 Each record:
 
 | Offset | Size | Field |
 |-------:|-----:|-------|
-| 0 | 4 | Frame length, always 2660 |
+| 0 | 4 | Frame length, always 2664 |
 | 4 | 4 | Frame number, from 0 at reset |
 | 8 | 26 | `PC SP AF BC DE HL AF' BC' DE' HL' IX IY WZ`, each `u16` |
-| 34 | 8 | `I R IFF1 IFF2 IM Q INT HALT`, each `u8` |
+| 34 | 8 | `I`, a zero `R` slot, `IFF1 IFF2 IM Q INT HALT`, each `u8` |
 | 42 | 8 | Latch bytes `$5000`–`$5007` |
 | 50 | 32 | Voice registers `$5040`–`$505F` |
 | 82 | 2 | Watchdog, frames since the last kick |
@@ -137,10 +139,11 @@ Each record:
 | 2132 | 496 | Work RAM `$4C00`–`$4FEF` |
 | 2628 | 16 | Sprite RAM `$4FF0`–`$4FFF` |
 | 2644 | 16 | Sprite positions `$5060`–`$506F` |
+| 2660 | 4 | Generator state after this frame, `u32` little-endian |
 
 `INT` is the pin. The `$5000` latch is the mask. `WZ`, `Q`, and the two IFF flip-flops are real Z80 state. The waveform phase counters stay out; they are playback position.
 
-The file starts with 20 bytes: magic `MSPF`, version 1, frame size 2660, the 50688-cycle period, the DIP byte, and 3 zero pad bytes. Reset RAM is the pinned zero image applied at reset. It is not stored.
+The file starts with 24 bytes: magic `MSPF`, version 2, frame size 2664, the 50688-cycle period, the DIP byte, 3 zero pad bytes, and the generator seed as a `u32`. Reset RAM is the pinned zero image applied at reset. It is not stored. A recording before version 2 has to be played again.
 
 That is about 9 MB per minute. A ten-minute session is about 90 MB. An hour is about 540 MB. The host streams the file. It does not hold the session in RAM.
 
@@ -238,6 +241,10 @@ Until a routine is flipped to C-only, the process is a mix. Emulated Z80 and C c
 
 Compare registers, `mem[]` deltas, and flags. Flags first: a `CALL` followed by `JR NZ` is normal. Shadow mode says which flags ever differ. The contract row records which of those the caller actually tests. When a routine has survived extended play in shadow mode, flip it to C-only.
 
+`ld a,r` is a draw from a generator. The ROM reads it at `$8768` (fruit type from level 7), `$87D2` (fruit path), and `$956C` (a ghost target). Both hosts substitute the next generator byte for `A` after each of those instructions. The generator is a 32-bit linear congruential step, `state = state * 1664525 + 1013904223`, and the draw is the high byte. It advances once per read. The instruction still runs, so the cycle count stays the same. The following `and` replaces the flags.
+
+The session seed lives in the `frames` header. Recording and free play both start from that seed. A CPU reset restores the generator to the seed. Replay loads the seed before the first frame. Shadow mode rewinds the generator for the C half the same way it rewinds the joystick log, then commits the Z80 half. The frame record stores the generator state. The `R` slot in that record is zero. C calls the same generator.
+
 **C calls Z80.** Push a sentinel return address that cannot be a real PC, set PC, and return to the host loop. The loop runs the Z80 core until SP is back and PC is the sentinel. The same loop already handles the other direction, so a Z80 callee may itself hit a lifted PC, run C, and that C may ask for Z80 again, without nesting `z80_execute`.
 
 Locals that are pure scratch may live on the host stack. Anything the Z80 stored at a fixed address stays at that address.
@@ -296,10 +303,10 @@ One directory per session under `corpus/`. A session contains:
 
 | File | Role |
 |------|------|
-| `frames` | `MSPF` header, then one 2660-byte record per frame |
+| `frames` | `MSPF` version 2 header, then one 2664-byte record per frame |
 | `inputs` | `INPT` header, then per frame a `u16` count and the `IN0` / `IN1` bytes in read order |
 
-Replay is a pure function of the `frames` header (DIP byte, interrupt period) and `inputs`. Host key timing is not an input. Comparison is `memcmp` of each live record against `frames`. The message names the first differing field and the two bytes.
+Replay is a pure function of the `frames` header (DIP byte, interrupt period, generator seed) and `inputs`. Host key timing is not an input. Comparison is `memcmp` of each live record against `frames`. The message names the first differing field and the two bytes. The `R` slot in a frame record is zero. The last four bytes are the generator state after that frame.
 
 ---
 

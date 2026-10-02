@@ -68,8 +68,10 @@ static uint32_t shadow_misses;
 
 void c_add_lift(uint16_t pc, LiftFn fn, const char *name)
 {
-	if (k_n >= LIFT_MAX_LIFTS)
+	if (k_n >= LIFT_MAX_LIFTS) {
+		fprintf(stderr, "lift: routine table full (%s)\n", name);
 		return;
+	}
 	k_lifts[k_n].pc = pc;
 	k_lifts[k_n].fn = fn;
 	k_lifts[k_n].name = name;
@@ -77,8 +79,117 @@ void c_add_lift(uint16_t pc, LiftFn fn, const char *name)
 }
 
 extern void j_1000(Board *b);
+extern void j_0ead(Board *b);
+extern void j_08eb(Board *b);
+extern void j_9561(Board *b);
+extern void j_9559(Board *b);
+extern void j_955e(Board *b);
+extern void j_2730(Board *b);
+extern void j_276c(Board *b);
+extern void j_27a9(Board *b);
+extern void j_27f1(Board *b);
+extern void j_283b(Board *b);
+extern void j_2865(Board *b);
+extern void j_288f(Board *b);
+extern void j_28b9(Board *b);
+extern void j_32ed(Board *b);
 extern void j_083a(Board *b);
 extern void j_2b0b(Board *b);
+extern void j_0369(Board *b);
+extern void j_0376(Board *b);
+extern void j_0383(Board *b);
+extern void j_0390(Board *b);
+extern void j_02fd(Board *b);
+extern void j_94bd(Board *b);
+extern void j_946a(Board *b);
+extern void j_0c0d(Board *b);
+extern void j_2487(Board *b);
+extern void j_267e(Board *b);
+extern void j_3641(Board *b);
+extern void j_0042(Board *b);
+extern void j_2000(Board *b);
+extern void j_2b80(Board *b);
+extern void j_2a12(Board *b);
+extern void j_29ea(Board *b);
+extern void j_291e(Board *b);
+extern void j_2966(Board *b);
+extern void j_2086(Board *b);
+extern void j_20a9(Board *b);
+extern void j_20d1(Board *b);
+extern void j_13dd(Board *b);
+extern void j_1f2e(Board *b);
+extern void j_1f55(Board *b);
+extern void j_1f7c(Board *b);
+extern void j_0c42(Board *b);
+extern void j_2b7e(Board *b);
+extern void j_2a23(Board *b);
+extern void j_2ace(Board *b);
+extern void j_2abe(Board *b);
+extern void j_2aaf(Board *b);
+extern void j_2b8f(Board *b);
+extern void j_2b33(Board *b);
+extern void j_2a5a(Board *b);
+extern void j_171d(Board *b);
+extern void j_1789(Board *b);
+extern void j_2b6a(Board *b);
+extern void j_10d2(Board *b);
+extern void j_112a(Board *b);
+extern void j_116e(Board *b);
+extern void j_118f(Board *b);
+extern void j_11db(Board *b);
+extern void j_11fc(Board *b);
+extern void j_1efe(Board *b);
+extern void j_1f25(Board *b);
+extern void j_1f4c(Board *b);
+extern void j_1f73(Board *b);
+extern void j_1bd8(Board *b);
+extern void j_1caf(Board *b);
+extern void j_1d86(Board *b);
+extern void j_1e5d(Board *b);
+extern void j_1b36(Board *b);
+extern void j_1c4b(Board *b);
+extern void j_1d22(Board *b);
+extern void j_1df9(Board *b);
+extern void j_1094(Board *b);
+extern void j_109e(Board *b);
+extern void j_10a8(Board *b);
+extern void j_10b4(Board *b);
+extern void j_1235(Board *b);
+extern void j_1291(Board *b);
+extern void j_1806(Board *b);
+extern void j_1017(Board *b);
+extern void j_2bea(Board *b);
+extern void j_0e23(Board *b);
+extern void j_2018(Board *b);
+extern void j_3556(Board *b);
+extern void j_9627(Board *b);
+extern void j_2675(Board *b);
+extern void j_02df(Board *b);
+extern void j_02ad(Board *b);
+extern void j_0267(Board *b);
+extern void j_2069(Board *b);
+extern void j_208c(Board *b);
+extern void j_162d(Board *b);
+extern void j_0814(Board *b);
+extern void j_0065(Board *b);
+extern void j_20af(Board *b);
+extern void j_039d(Board *b);
+extern void j_1066(Board *b);
+extern void j_1b08(Board *b);
+extern void j_1ed0(Board *b);
+extern void j_20d7(Board *b);
+extern void j_0e36(Board *b);
+extern void j_0bd6(Board *b);
+extern void j_1652(Board *b);
+extern void j_01dc(Board *b);
+extern void j_0e6c(Board *b);
+extern void j_15e6(Board *b);
+extern void j_1a6a(Board *b);
+extern void j_1376(Board *b);
+extern void j_0ac3(Board *b);
+extern void j_2052(Board *b);
+extern void j_200f(Board *b);
+extern void j_205a(Board *b);
 
 void c_register_leaves(Board *b)
 {
@@ -86,6 +197,121 @@ void c_register_leaves(Board *b)
 	c_add_lift(0x1000, j_1000, "j_1000");
 	c_add_lift(0x083A, j_083a, "j_083a");
 	c_add_lift(0x2B0B, j_2b0b, "j_2b0b");
+	c_add_lift(0x0369, j_0369, "j_0369");
+	c_add_lift(0x0376, j_0376, "j_0376");
+	c_add_lift(0x267E, j_267e, "j_267e");
+	c_add_lift(0x3641, j_3641, "j_3641");
+	c_add_lift(0x0042, j_0042, "j_0042");
+	c_add_lift(0x2000, j_2000, "j_2000");
+	c_add_lift(0x2B80, j_2b80, "j_2b80");
+	c_add_lift(0x2A12, j_2a12, "j_2a12");
+	c_add_lift(0x2B7E, j_2b7e, "j_2b7e");
+	c_add_lift(0x2A23, j_2a23, "j_2a23");
+	c_add_lift(0x2ACE, j_2ace, "j_2ace");
+	c_add_lift(0x2B8F, j_2b8f, "j_2b8f");
+	c_add_lift(0x0E23, j_0e23, "j_0e23");
+	c_add_lift(0x2018, j_2018, "j_2018");
+	c_add_lift(0x3556, j_3556, "j_3556");
+	c_add_lift(0x9627, j_9627, "j_9627");
+	c_add_lift(0x2675, j_2675, "j_2675");
+	c_add_lift(0x02DF, j_02df, "j_02df");
+	c_add_lift(0x2069, j_2069, "j_2069");
+	c_add_lift(0x208C, j_208c, "j_208c");
+	c_add_lift(0x162D, j_162d, "j_162d");
+	c_add_lift(0x0814, j_0814, "j_0814");
+	c_add_lift(0x0065, j_0065, "j_0065");
+	c_add_lift(0x20AF, j_20af, "j_20af");
+	c_add_lift(0x039D, j_039d, "j_039d");
+	c_add_lift(0x1066, j_1066, "j_1066");
+	c_add_lift(0x1B08, j_1b08, "j_1b08");
+	c_add_lift(0x1ED0, j_1ed0, "j_1ed0");
+	c_add_lift(0x20D7, j_20d7, "j_20d7");
+	c_add_lift(0x0E36, j_0e36, "j_0e36");
+	c_add_lift(0x0BD6, j_0bd6, "j_0bd6");
+	c_add_lift(0x1652, j_1652, "j_1652");
+	c_add_lift(0x01DC, j_01dc, "j_01dc");
+	c_add_lift(0x0E6C, j_0e6c, "j_0e6c");
+	c_add_lift(0x15E6, j_15e6, "j_15e6");
+	c_add_lift(0x1A6A, j_1a6a, "j_1a6a");
+	c_add_lift(0x1376, j_1376, "j_1376");
+	c_add_lift(0x0AC3, j_0ac3, "j_0ac3");
+	c_add_lift(0x2052, j_2052, "j_2052");
+	c_add_lift(0x200F, j_200f, "j_200f");
+	c_add_lift(0x2ABE, j_2abe, "j_2abe");
+	c_add_lift(0x2AAF, j_2aaf, "j_2aaf");
+	c_add_lift(0x205A, j_205a, "j_205a");
+	c_add_lift(0x29EA, j_29ea, "j_29ea");
+	c_add_lift(0x02AD, j_02ad, "j_02ad");
+	c_add_lift(0x0267, j_0267, "j_0267");
+	c_add_lift(0x2BEA, j_2bea, "j_2bea");
+	c_add_lift(0x291E, j_291e, "j_291e");
+	c_add_lift(0x2966, j_2966, "j_2966");
+	c_add_lift(0x0383, j_0383, "j_0383");
+	c_add_lift(0x0390, j_0390, "j_0390");
+	c_add_lift(0x02FD, j_02fd, "j_02fd");
+	c_add_lift(0x94BD, j_94bd, "j_94bd");
+	c_add_lift(0x946A, j_946a, "j_946a");
+	c_add_lift(0x0C0D, j_0c0d, "j_0c0d");
+	c_add_lift(0x2487, j_2487, "j_2487");
+	c_add_lift(0x2086, j_2086, "j_2086");
+	c_add_lift(0x20A9, j_20a9, "j_20a9");
+	c_add_lift(0x20D1, j_20d1, "j_20d1");
+	c_add_lift(0x13DD, j_13dd, "j_13dd");
+	c_add_lift(0x1F2E, j_1f2e, "j_1f2e");
+	c_add_lift(0x1F55, j_1f55, "j_1f55");
+	c_add_lift(0x1F7C, j_1f7c, "j_1f7c");
+	c_add_lift(0x0C42, j_0c42, "j_0c42");
+	c_add_lift(0x2B33, j_2b33, "j_2b33");
+	c_add_lift(0x2A5A, j_2a5a, "j_2a5a");
+	c_add_lift(0x171D, j_171d, "j_171d");
+	c_add_lift(0x1789, j_1789, "j_1789");
+	c_add_lift(0x2B6A, j_2b6a, "j_2b6a");
+	c_add_lift(0x10D2, j_10d2, "j_10d2");
+	c_add_lift(0x112A, j_112a, "j_112a");
+	c_add_lift(0x116E, j_116e, "j_116e");
+	c_add_lift(0x118F, j_118f, "j_118f");
+	c_add_lift(0x11DB, j_11db, "j_11db");
+	c_add_lift(0x11FC, j_11fc, "j_11fc");
+	c_add_lift(0x1EFE, j_1efe, "j_1efe");
+	c_add_lift(0x1F25, j_1f25, "j_1f25");
+	c_add_lift(0x1F4C, j_1f4c, "j_1f4c");
+	c_add_lift(0x1F73, j_1f73, "j_1f73");
+	c_add_lift(0x1BD8, j_1bd8, "j_1bd8");
+	c_add_lift(0x1CAF, j_1caf, "j_1caf");
+	c_add_lift(0x1D86, j_1d86, "j_1d86");
+	c_add_lift(0x1E5D, j_1e5d, "j_1e5d");
+	c_add_lift(0x1B36, j_1b36, "j_1b36");
+	c_add_lift(0x1C4B, j_1c4b, "j_1c4b");
+	c_add_lift(0x1D22, j_1d22, "j_1d22");
+	c_add_lift(0x1DF9, j_1df9, "j_1df9");
+	c_add_lift(0x1094, j_1094, "j_1094");
+	c_add_lift(0x109E, j_109e, "j_109e");
+	c_add_lift(0x10A8, j_10a8, "j_10a8");
+	c_add_lift(0x10B4, j_10b4, "j_10b4");
+	c_add_lift(0x1235, j_1235, "j_1235");
+	c_add_lift(0x1291, j_1291, "j_1291");
+	c_add_lift(0x1806, j_1806, "j_1806");
+	c_add_lift(0x1017, j_1017, "j_1017");
+	c_add_lift(0x0EAD, j_0ead, "j_0ead");
+	c_add_lift(0x08EB, j_08eb, "j_08eb");
+	c_add_lift(0x9561, j_9561, "j_9561");
+	c_add_lift(0x9559, j_9559, "j_9559");
+	c_add_lift(0x955E, j_955e, "j_955e");
+	c_add_lift(0x2730, j_2730, "j_2730");
+	c_add_lift(0x276C, j_276c, "j_276c");
+	c_add_lift(0x27A9, j_27a9, "j_27a9");
+	c_add_lift(0x27F1, j_27f1, "j_27f1");
+	c_add_lift(0x283B, j_283b, "j_283b");
+	c_add_lift(0x2865, j_2865, "j_2865");
+	c_add_lift(0x288F, j_288f, "j_288f");
+	c_add_lift(0x28B9, j_28b9, "j_28b9");
+	c_add_lift(0x32ED, j_32ed, "j_32ed");
+	c_add_lift(0x32F0, j_32ed, "j_32ed");
+	c_add_lift(0x32F3, j_32ed, "j_32ed");
+	c_add_lift(0x32F4, j_32ed, "j_32ed");
+	c_add_lift(0x32F5, j_32ed, "j_32ed");
+	c_add_lift(0x32F6, j_32ed, "j_32ed");
+	c_add_lift(0x32F8, j_32ed, "j_32ed");
 }
 
 void lift_call_z80(Board *b, uint16_t target)
@@ -197,6 +423,7 @@ static int run_until_ret(Board *b, uint16_t ret, uint16_t sp0)
 		if (Z80_PC(b->cpu) == ret && Z80_SP(b->cpu) == sp_back)
 			return 1;
 		ran = z80_run(&b->cpu, 1);
+		board_apply_draw(b);
 		if (ran == 0)
 			return 0;
 		if (ran >= b->cycles_left)
@@ -225,8 +452,8 @@ static int diff_u8(const char *name, uint8_t expect, uint8_t got,
 	return 1;
 }
 
-/* R counts M1 cycles. The C body is not an M1 counter; the committed Z80
- * result keeps the real R for the frame record. */
+/* The refresh counter stays out of this compare. Draws go through the
+ * generator, and the caller checks that state separately. */
 static int diff_cpu(const Z80 *z, const Z80 *c, char *msg, size_t cap)
 {
 	if (diff_u8("F", Z80_F(*z), Z80_F(*c), msg, cap))
@@ -321,6 +548,135 @@ static int diff_machine(Board *b, const Z80 *cpu, const uint8_t *mem,
 	return 0;
 }
 
+/* Opcode addresses of j_32ed. The countdown does not finish in one frame,
+ * so the next frame resumes at whichever of these the budget left PC on. */
+static int delay_pc(uint16_t pc)
+{
+	return pc == 0x32ED || pc == 0x32F0 || pc == 0x32F3 || pc == 0x32F4 ||
+	       pc == 0x32F5 || pc == 0x32F6 || pc == 0x32F8;
+}
+
+static void run_delay_budget(Board *b)
+{
+	int guard = 0;
+
+	while (b->cycles_left > 0 && guard++ < 2000000) {
+		zusize ran;
+
+		if (!delay_pc(Z80_PC(b->cpu)))
+			return;
+		ran = z80_run(&b->cpu, 1);
+		board_apply_draw(b);
+		if (ran == 0)
+			return;
+		if (ran >= b->cycles_left)
+			b->cycles_left = 0;
+		else
+			b->cycles_left -= ran;
+	}
+}
+
+static void shadow_delay(Board *b, LiftEnt *ent)
+{
+	const char *name = ent && ent->name ? ent->name : "j_32ed";
+	uint8_t *mem_entry;
+	uint8_t *mem_result;
+	Z80 cpu_entry;
+	Z80 cpu_result;
+	uint8_t spr_entry[16], spr_result[16];
+	uint8_t latch_entry[8], latch_result[8];
+	uint8_t voice_entry[32], voice_result[32];
+	uint32_t kick_entry, kick_result;
+	uint16_t pos0, pos1, n0, n1;
+	uint32_t rand0, rand1;
+	uint8_t reads0[LIFT_MAX_READS], reads1[LIFT_MAX_READS];
+	zusize cycles0, cycles1;
+	int mismatch;
+	char msg_saved[160];
+	int prev_suspend;
+
+	mem_entry = malloc(65536u);
+	mem_result = malloc(65536u);
+	if (!mem_entry || !mem_result) {
+		fprintf(stderr, "lift: shadow out of memory\n");
+		free(mem_entry);
+		free(mem_result);
+		b->mismatch = 1;
+		return;
+	}
+
+	pos0 = b->corpus.read_pos;
+	n0 = b->cur.nreads;
+	memcpy(reads0, b->cur.reads, sizeof reads0);
+	cycles0 = b->cycles_left;
+	mismatch = b->mismatch;
+	memcpy(msg_saved, b->corpus.mismatch_msg, sizeof msg_saved);
+	save_board(b, &cpu_entry, mem_entry, spr_entry, latch_entry, voice_entry,
+		   &kick_entry);
+
+	rand0 = b->rand_state;
+	prev_suspend = b->lift_suspend;
+	b->lift_suspend = 1;
+	run_delay_budget(b);
+	b->lift_suspend = prev_suspend;
+	rand1 = b->rand_state;
+	cycles1 = b->cycles_left;
+
+	pos1 = b->corpus.read_pos;
+	n1 = b->cur.nreads;
+	memcpy(reads1, b->cur.reads, sizeof reads1);
+	mismatch = b->mismatch;
+	memcpy(msg_saved, b->corpus.mismatch_msg, sizeof msg_saved);
+	save_board(b, &cpu_result, mem_result, spr_result, latch_result,
+		   voice_result, &kick_result);
+
+	load_board(b, &cpu_entry, mem_entry, spr_entry, latch_entry, voice_entry,
+		   kick_entry);
+	b->corpus.read_pos = pos0;
+	b->cur.nreads = n0;
+	memcpy(b->cur.reads, reads0, sizeof reads0);
+	b->rand_state = rand0;
+	b->cycles_left = cycles0;
+
+	if (ent && ent->fn) {
+		char detail[120];
+
+		ent->fn(b);
+		if (b->cycles_left != cycles1) {
+			snprintf(detail, sizeof detail,
+				 "cycles expected %u got %u",
+				 (unsigned)cycles1, (unsigned)b->cycles_left);
+			fprintf(stderr, "shadow %s frame %u %s\n", name,
+				b->frame_index, detail);
+			shadow_misses++;
+		} else if (b->rand_state != rand1) {
+			snprintf(detail, sizeof detail, "rand expected %08X got %08X",
+				 (unsigned)rand1, (unsigned)b->rand_state);
+			fprintf(stderr, "shadow %s frame %u %s\n", name,
+				b->frame_index, detail);
+			shadow_misses++;
+		} else if (diff_machine(b, &cpu_result, mem_result, spr_result,
+					 latch_result, voice_result, kick_result,
+					 detail, sizeof detail)) {
+			fprintf(stderr, "shadow %s frame %u %s\n", name,
+				b->frame_index, detail);
+			shadow_misses++;
+		}
+	}
+
+	load_board(b, &cpu_result, mem_result, spr_result, latch_result,
+		   voice_result, kick_result);
+	b->corpus.read_pos = pos1;
+	b->cur.nreads = n1;
+	memcpy(b->cur.reads, reads1, sizeof reads1);
+	b->rand_state = rand1;
+	b->cycles_left = cycles1;
+	b->mismatch = mismatch;
+	memcpy(b->corpus.mismatch_msg, msg_saved, sizeof msg_saved);
+	free(mem_entry);
+	free(mem_result);
+}
+
 static void c_dispatch(Board *b, uint16_t entry)
 {
 	LiftEnt *ent = NULL;
@@ -335,6 +691,7 @@ static void c_dispatch(Board *b, uint16_t entry)
 	uint32_t kick_entry, kick_result;
 	uint16_t sp0, ret;
 	uint16_t pos0, pos1, n0, n1;
+	uint32_t rand0, rand1;
 	uint8_t reads0[LIFT_MAX_READS], reads1[LIFT_MAX_READS];
 	int mismatch;
 	char msg_saved[160];
@@ -348,6 +705,11 @@ static void c_dispatch(Board *b, uint16_t entry)
 			name = ent->name;
 			break;
 		}
+	}
+
+	if (delay_pc(entry)) {
+		shadow_delay(b, ent);
+		return;
 	}
 
 	sp0 = Z80_SP(b->cpu);
@@ -372,10 +734,12 @@ static void c_dispatch(Board *b, uint16_t entry)
 	save_board(b, &cpu_entry, mem_entry, spr_entry, latch_entry, voice_entry,
 		   &kick_entry);
 
+	rand0 = b->rand_state;
 	prev_suspend = b->lift_suspend;
 	b->lift_suspend = 1;
 	returned = run_until_ret(b, ret, sp0);
 	b->lift_suspend = prev_suspend;
+	rand1 = b->rand_state;
 
 	if (!returned) {
 		fprintf(stderr,
@@ -400,14 +764,21 @@ static void c_dispatch(Board *b, uint16_t entry)
 	b->corpus.read_pos = pos0;
 	b->cur.nreads = n0;
 	memcpy(b->cur.reads, reads0, sizeof reads0);
+	b->rand_state = rand0;
 
 	if (ent && ent->fn) {
 		char detail[120];
 		ent->fn(b);
 		apply_ret(b);
-		if (diff_machine(b, &cpu_result, mem_result, spr_result,
-				 latch_result, voice_result, kick_result,
-				 detail, sizeof detail)) {
+		if (b->rand_state != rand1) {
+			snprintf(detail, sizeof detail, "rand expected %08X got %08X",
+				 (unsigned)rand1, (unsigned)b->rand_state);
+			fprintf(stderr, "shadow %s frame %u %s\n", name,
+				b->frame_index, detail);
+			shadow_misses++;
+		} else if (diff_machine(b, &cpu_result, mem_result, spr_result,
+					 latch_result, voice_result, kick_result,
+					 detail, sizeof detail)) {
 			fprintf(stderr, "shadow %s frame %u %s\n", name,
 				b->frame_index, detail);
 			shadow_misses++;
@@ -419,6 +790,7 @@ static void c_dispatch(Board *b, uint16_t entry)
 	b->corpus.read_pos = pos1;
 	b->cur.nreads = n1;
 	memcpy(b->cur.reads, reads1, sizeof reads1);
+	b->rand_state = rand1;
 	b->mismatch = mismatch;
 	memcpy(b->corpus.mismatch_msg, msg_saved, sizeof msg_saved);
 	free(mem_entry);

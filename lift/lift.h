@@ -17,8 +17,13 @@
 #define LIFT_MAX_READS        256
 #define LIFT_MAX_LIFTS        64
 #define LIFT_DSW1_DEFAULT     0xC9
-#define LIFT_FRAME_HDR        20
-#define LIFT_FRAME_BYTES      2660
+#define LIFT_FRAME_VER        2
+#define LIFT_FRAME_HDR        24
+#define LIFT_FRAME_BYTES      2664
+/* Session seed. A draw is one step of state = state * MUL + ADD. */
+#define LIFT_RAND_SEED        1u
+#define LIFT_RAND_MUL         1664525u
+#define LIFT_RAND_ADD         1013904223u
 
 enum {
 	LIFT_STOP_BUDGET = 0,
@@ -90,6 +95,9 @@ typedef struct Board {
 	LiftCorpus corpus;
 	uint32_t frame_index;
 	int mismatch;
+	uint32_t rand_seed;
+	uint32_t rand_state;
+	int rand_draw;
 } Board;
 
 void board_init(Board *b);
@@ -97,6 +105,10 @@ void board_load_cpu(Board *b, const char *path);
 void board_reset(Board *b);
 void board_frame(Board *b);
 void board_lift_add(Board *b, uint16_t pc);
+/* Next draw. One step per `ld a,r` at $8768, $87D2, or $956C. */
+uint8_t lift_random_byte(Board *b);
+/* If the instruction just executed was one of those draws, replace A. */
+void board_apply_draw(Board *b);
 
 void video_load(Board *b, const char *tile_path, const char *sprite_path,
 		const char *color_path, const char *pal_path);
