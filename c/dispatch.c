@@ -77,11 +77,15 @@ void c_add_lift(uint16_t pc, LiftFn fn, const char *name)
 }
 
 extern void j_1000(Board *b);
+extern void j_083a(Board *b);
+extern void j_2b0b(Board *b);
 
 void c_register_leaves(Board *b)
 {
 	(void)b;
 	c_add_lift(0x1000, j_1000, "j_1000");
+	c_add_lift(0x083A, j_083a, "j_083a");
+	c_add_lift(0x2B0B, j_2b0b, "j_2b0b");
 }
 
 void lift_call_z80(Board *b, uint16_t target)

@@ -209,6 +209,8 @@ Write the body the way the Z80 wrote it:
 - Keep the Z80 label as the function name (`sub_8e3f`, `j_2966`) until traces confirm a better one.
 - Do not delete stores that look redundant.
 
+One Z80 routine is one C function. Group those functions into files by the job they do (score, difficulty, fruit). Do not make a source file per label. The contract comment stays on the function.
+
 Types: `uint8_t` for bytes, `uint16_t` for pairs and pointers, `int8_t` for a value the code actually treats as signed. No `int`, no bare `char`. C promotes `uint8_t` arithmetic to `int`, so a comparison or a shift on a sum can keep bits the Z80 never had. Assign back through a `uint8_t` when the Z80 would have wrapped, and build with `-Wconversion`. Compile overlays with `-fno-strict-aliasing`.
 
 Scores are BCD. The lift needs a `DAA` helper or an explicit BCD add. That shows up at 10,000.
