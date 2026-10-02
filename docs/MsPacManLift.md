@@ -46,7 +46,7 @@ All three phases share one logical machine image:
 
 | Phase | Machine | Done when |
 |-------|---------|-----------|
-| 1 | Vendored Z80 core + arcade hardware | A playable build records a deterministic per-frame corpus, and bazyar has played the coverage set |
+| 1 | Z80 core submodule + arcade hardware | A playable build records a deterministic per-frame corpus, and bazyar has played the coverage set |
 | 2 | C, one Z80 routine at a time | Every lifted routine is C, and replay of the phase 1 corpus matches per frame |
 | 3 | 65816, one C routine at a time | Every lifted routine is 65816, and replay of the same corpus matches per frame |
 
@@ -56,11 +56,11 @@ Phase 1 data is the only acceptance oracle. Later phases do not invent a second 
 
 ## Phase 1 — Z80 and hardware, with per-frame checkpoints
 
-A host program runs the `mspacmab` image on a vendored Z80 core and a model of the hardware the game actually touches.
+A host program runs the `mspacmab` image on a Z80 core submodule and a model of the hardware the game actually touches.
 
 ### CPU
 
-The CPU is the existing [Z80 library](https://github.com/redcode/Z80) (Manuel Sainz de Baranda y Goñi, LGPL-3.0-or-later), vendored and built with `Z80_WITH_EXECUTE`. It emulates documented and undocumented behavior, including `DAA` and the flag results a later lift has to match. This project emulates the board around that core.
+The CPU is the existing [Z80 library](https://github.com/redcode/Z80) (Manuel Sainz de Baranda y Goñi, LGPL-3.0-or-later), checked out as a submodule and built with `Z80_WITH_EXECUTE`. It emulates documented and undocumented behavior, including `DAA` and the flag results a later lift has to match. This project emulates the board around that core.
 
 The host supplies the callbacks: opcode fetch, memory read, memory write, port in, port out. Those callbacks are the hardware model below. The library keeps the programmer's model in one struct; a shadow snapshot is a copy of that struct plus `mem[]`.
 
@@ -288,7 +288,7 @@ Hash columns, fixed order: work RAM, video RAM, color RAM, sprite RAM, sprite po
 
 ## Out of scope for this spec
 
-- Writing a Z80 CPU emulator. The CPU is the vendored [Z80 library](https://github.com/redcode/Z80); this project emulates the board
+- Writing a Z80 CPU emulator. The CPU is the [Z80 library](https://github.com/redcode/Z80) submodule; this project emulates the board
 - Editing locked `mspac.asm`, `src/mspac.asm`, or `boot1`–`boot6`
 - Re-implementing the SHR renderer, palette, or sprite blit
 - Sample-exact WSG audio as an acceptance test. SDL3 plays the voices; the corpus hashes the registers

@@ -1,0 +1,6 @@
+[submodule "lift/third_party/Z80"]
+	path = lift/third_party/Z80
+	url = https://github.com/redcode/Z80.git
+[submodule "lift/third_party/Zeta"]
+	path = lift/third_party/Zeta
+	url = https://github.com/redcode/Zeta.git
