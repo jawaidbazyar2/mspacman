@@ -295,3 +295,66 @@ void j_15e6(Board *b)
 	Z80_D(b->cpu) = 0x16;
 	Z80_F(b->cpu) = flags;
 }
+
+/* j_212b  advance the first cutscene
+ * Entry:    timed task 7.
+ * Exit:     ($4E06) increases by one. HL = $4E06.
+ *           F is that `inc (hl)`. A, BC, and DE are unchanged.
+ *           Host finishes the RET.
+ * Clobbers: F, HL
+ * Flags live-out: Z when the state wraps to 0.
+ * Interrupt: not reached on testplay2.
+ * Stack: normal RET. No callee.
+ */
+void j_212b(Board *b)
+{
+	uint8_t cur = board_mem_read(b, 0x4E06);
+	uint8_t next;
+	uint8_t flags = inc_a_flags(cur, Z80_F(b->cpu), &next);
+
+	board_mem_write(b, 0x4E06, next);
+	Z80_HL(b->cpu) = 0x4E06;
+	Z80_F(b->cpu) = flags;
+}
+
+/* j_21f0  advance the second cutscene
+ * Entry:    timed task 8.
+ * Exit:     ($4E07) increases by one. HL = $4E07.
+ *           F is that `inc (hl)`. A, BC, and DE are unchanged.
+ *           Host finishes the RET.
+ * Clobbers: F, HL
+ * Flags live-out: Z when the state wraps to 0.
+ * Interrupt: not reached on testplay2.
+ * Stack: normal RET. No callee.
+ */
+void j_21f0(Board *b)
+{
+	uint8_t cur = board_mem_read(b, 0x4E07);
+	uint8_t next;
+	uint8_t flags = inc_a_flags(cur, Z80_F(b->cpu), &next);
+
+	board_mem_write(b, 0x4E07, next);
+	Z80_HL(b->cpu) = 0x4E07;
+	Z80_F(b->cpu) = flags;
+}
+
+/* j_22b9  advance the third cutscene
+ * Entry:    timed task 9.
+ * Exit:     ($4E08) increases by one. HL = $4E08.
+ *           F is that `inc (hl)`. A, BC, and DE are unchanged.
+ *           Host finishes the RET.
+ * Clobbers: F, HL
+ * Flags live-out: Z when the state wraps to 0.
+ * Interrupt: not reached on testplay2.
+ * Stack: normal RET. No callee.
+ */
+void j_22b9(Board *b)
+{
+	uint8_t cur = board_mem_read(b, 0x4E08);
+	uint8_t next;
+	uint8_t flags = inc_a_flags(cur, Z80_F(b->cpu), &next);
+
+	board_mem_write(b, 0x4E08, next);
+	Z80_HL(b->cpu) = 0x4E08;
+	Z80_F(b->cpu) = flags;
+}

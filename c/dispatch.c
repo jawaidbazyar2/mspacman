@@ -100,6 +100,16 @@ extern void j_2698(Board *b);
 extern void j_26a2(Board *b);
 extern void j_058e(Board *b);
 extern void j_2419(Board *b);
+extern void j_24d7(Board *b);
+extern void j_2448(Board *b);
+extern void j_253d(Board *b);
+extern void j_268b(Board *b);
+extern void j_2a35(Board *b);
+extern void j_070e(Board *b);
+extern void j_95e3(Board *b);
+extern void j_960b(Board *b);
+extern void j_95f6(Board *b);
+extern void j_963c(Board *b);
 extern void j_26b2(Board *b);
 extern void j_26d0(Board *b);
 extern void j_0506(Board *b);
@@ -210,6 +220,16 @@ extern void j_0e36(Board *b);
 extern void j_0bd6(Board *b);
 extern void j_1652(Board *b);
 extern void j_01dc(Board *b);
+extern void j_0221(Board *b);
+extern void j_0263(Board *b);
+extern void j_06a3(Board *b);
+extern void j_0894(Board *b);
+extern void j_100b(Board *b);
+extern void j_1272(Board *b);
+extern void j_212b(Board *b);
+extern void j_21f0(Board *b);
+extern void j_22b9(Board *b);
+extern void j_3678(Board *b);
 extern void j_0e6c(Board *b);
 extern void j_15e6(Board *b);
 extern void j_1a6a(Board *b);
@@ -368,6 +388,26 @@ void c_register_leaves(Board *b)
 	c_add_lift(0x3EBD, j_3ebd, "j_3ebd");
 	c_add_lift(0x3EC3, j_3ec3, "j_3ec3");
 	c_add_lift(0x9642, j_9642, "j_9642");
+	c_add_lift(0x24D7, j_24d7, "j_24d7");
+	c_add_lift(0x2448, j_2448, "j_2448");
+	c_add_lift(0x253D, j_253d, "j_253d");
+	c_add_lift(0x268B, j_268b, "j_268b");
+	c_add_lift(0x2A35, j_2a35, "j_2a35");
+	c_add_lift(0x070E, j_070e, "j_070e");
+	c_add_lift(0x95E3, j_95e3, "j_95e3");
+	c_add_lift(0x960B, j_960b, "j_960b");
+	c_add_lift(0x95F6, j_95f6, "j_95f6");
+	c_add_lift(0x963C, j_963c, "j_963c");
+	c_add_lift(0x0221, j_0221, "j_0221");
+	c_add_lift(0x0263, j_0263, "j_0263");
+	c_add_lift(0x06A3, j_06a3, "j_06a3");
+	c_add_lift(0x0894, j_0894, "j_0894");
+	c_add_lift(0x100B, j_100b, "j_100b");
+	c_add_lift(0x1272, j_1272, "j_1272");
+	c_add_lift(0x212B, j_212b, "j_212b");
+	c_add_lift(0x21F0, j_21f0, "j_21f0");
+	c_add_lift(0x22B9, j_22b9, "j_22b9");
+	c_add_lift(0x3678, j_3678, "j_3678");
 }
 
 void lift_call_z80(Board *b, uint16_t target)
@@ -801,7 +841,8 @@ static void c_dispatch(Board *b, uint16_t entry)
 		shadow_delay(b, ent, color_inside);
 		return;
 	}
-	if (entry == 0x2419) {
+	if (entry == 0x2419 || entry == 0x2448 || entry == 0x24D7 ||
+	    entry == 0x2A35) {
 		uint16_t sp0 = Z80_SP(b->cpu);
 
 		span_ret = (uint16_t)board_mem_read(b, sp0);

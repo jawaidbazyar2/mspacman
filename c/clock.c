@@ -239,3 +239,263 @@ void j_32ed(Board *b)
 			return;
 	}
 }
+
+/* `adc a, n`. The carry-in is added. Overflow ignores that carry. */
+static uint8_t adc8(uint8_t a, uint8_t rhs, uint8_t carry, uint8_t *flags)
+{
+	uint16_t sum = (uint16_t)((uint16_t)a + rhs + (carry & 1u));
+	uint8_t result = (uint8_t)sum;
+	uint8_t inv = (uint8_t)~rhs;
+	uint8_t ov = (uint8_t)(((uint8_t)((a ^ inv) & (a ^ result)) & 0x80u) >> 5);
+
+	*flags = (uint8_t)((sum > 255u ? 1u : 0u) |
+			   ov |
+			   ((a ^ rhs ^ result) & 0x10u) |
+			   (result & 0xA8u) |
+			   (result == 0 ? 0x40u : 0u));
+	return result;
+}
+
+static uint8_t and_flags(uint8_t result)
+{
+	return (uint8_t)(0x10u | parity_pv(result) | (result & 0xA8u) |
+			 (result == 0 ? 0x40u : 0u));
+}
+
+/* `cp n`. A is not modified. Y and X come from the operand. */
+static uint8_t cp_flags(uint8_t a, uint8_t n)
+{
+	uint8_t diff = (uint8_t)(a - n);
+	uint8_t ov = (uint8_t)(((uint8_t)((a ^ n) & (a ^ diff)) & 0x80u) >> 5);
+
+	return (uint8_t)((diff & 0x80u) |
+			 (diff == 0 ? 0x40u : 0u) |
+			 ((a ^ n ^ diff) & 0x10u) |
+			 ov |
+			 (a < n ? 1u : 0u) |
+			 (n & 0x28u) |
+			 0x02u);
+}
+
+static void push_word(Board *b, uint16_t *sp, uint16_t value)
+{
+	*sp = (uint16_t)(*sp - 2u);
+	board_mem_write(b, (uint16_t)(*sp + 1u), (uint8_t)(value >> 8));
+	board_mem_write(b, *sp, (uint8_t)value);
+}
+
+static uint16_t word_at(Board *b, uint16_t addr)
+{
+	uint16_t lo = board_mem_read(b, addr);
+	uint16_t hi = board_mem_read(b, (uint16_t)(addr + 1u));
+
+	return (uint16_t)(lo | (uint16_t)(hi << 8));
+}
+
+static uint16_t inc_l(uint16_t hl)
+{
+	return (uint16_t)((hl & 0xFF00u) | (uint8_t)(hl + 1u));
+}
+
+extern void j_0042(Board *b);
+
+static void call_lifted(Board *b, uint16_t ret, void (*fn)(Board *))
+{
+	uint16_t sp = Z80_SP(b->cpu);
+
+	push_word(b, &sp, ret);
+	Z80_SP(b->cpu) = sp;
+	fn(b);
+	Z80_SP(b->cpu) = (uint16_t)(sp + 2u);
+}
+
+/* j_0263  timed task 6, erase READY
+ * Entry:    F is the rst $20 result. SP points at $025B.
+ * Exit:     Task $1C, parameter $86, is queued through j_0042.
+ *           B = $1C. C = $86. HL and F are j_0042.
+ *           A and DE are unchanged. The word under SP is $0266.
+ *           SP is unchanged. Host finishes the RET at $0266.
+ * Clobbers: F, BC, HL
+ * Flags live-out: the second `inc l` inside j_0042. Carry is unchanged.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: rst $28 plants the continuation, then a normal RET.
+ */
+void j_0263(Board *b)
+{
+	Z80_B(b->cpu) = 0x1C;
+	Z80_C(b->cpu) = 0x86;
+	call_lifted(b, 0x0266, j_0042);
+}
+
+extern void j_0894(Board *b);
+extern void j_06a3(Board *b);
+extern void j_058e(Board *b);
+extern void j_1272(Board *b);
+extern void j_1000(Board *b);
+extern void j_100b(Board *b);
+extern void j_212b(Board *b);
+extern void j_21f0(Board *b);
+extern void j_22b9(Board *b);
+
+/* rst $20 at $0246. A is the task number. The table base is the RST
+ * return, $0247. Plants $0023 under the current SP and leaves SP put.
+ * A becomes the vector's low byte. DE is the address of its high byte.
+ * HL is the vector. F is the `adc` inside rst $10. */
+static void dispatch_task(Board *b, uint8_t task)
+{
+	uint8_t flags = 0;
+	uint8_t doubled = add_a(task, task, &flags);
+	uint8_t low = add_a(doubled, 0x47, &flags);
+	uint8_t high = adc8(0, 0x02, flags, &flags);
+	uint16_t slot = (uint16_t)(((uint16_t)high << 8) | low);
+	uint16_t sp = Z80_SP(b->cpu);
+	uint16_t under = (uint16_t)(sp - 2u);
+	uint8_t lo = board_mem_read(b, slot);
+	uint8_t hi = board_mem_read(b, (uint16_t)(slot + 1u));
+	uint16_t target = (uint16_t)(lo | (uint16_t)((uint16_t)hi << 8));
+
+	board_mem_write(b, under, 0x23);
+	board_mem_write(b, (uint16_t)(under + 1u), 0x00);
+	Z80_A(b->cpu) = lo;
+	Z80_F(b->cpu) = flags;
+	Z80_DE(b->cpu) = (uint16_t)(slot + 1u);
+	Z80_HL(b->cpu) = target;
+	switch (target) {
+	case 0x0894:
+		j_0894(b);
+		break;
+	case 0x06A3:
+		j_06a3(b);
+		break;
+	case 0x058E:
+		j_058e(b);
+		break;
+	case 0x1272:
+		j_1272(b);
+		break;
+	case 0x1000:
+		j_1000(b);
+		break;
+	case 0x100B:
+		j_100b(b);
+		break;
+	case 0x0263:
+		j_0263(b);
+		break;
+	case 0x212B:
+		j_212b(b);
+		break;
+	case 0x21F0:
+		j_21f0(b);
+		break;
+	case 0x22B9:
+		j_22b9(b);
+		break;
+	default:
+		break;
+	}
+}
+
+/* Run one expired slot. SP returns to where it started. A, F, DE, and
+ * HL in the CPU are the handler's, before the pops at $025B. */
+static void fire_slot(Board *b, uint16_t timer, uint16_t *sp,
+		      uint8_t *breg, uint8_t *creg)
+{
+	uint16_t cursor = inc_l(timer);
+	uint8_t task = board_mem_read(b, cursor);
+	uint16_t saved;
+
+	cursor = inc_l(cursor);
+	push_word(b, sp, (uint16_t)(((uint16_t)*breg << 8) | *creg));
+	push_word(b, sp, timer);
+	push_word(b, sp, 0x025B);
+	Z80_SP(b->cpu) = *sp;
+	Z80_B(b->cpu) = board_mem_read(b, cursor);
+	Z80_C(b->cpu) = *creg;
+	dispatch_task(b, task);
+	*sp = (uint16_t)(Z80_SP(b->cpu) + 2u);
+	*sp = (uint16_t)(*sp + 2u);
+	saved = word_at(b, *sp);
+	*breg = (uint8_t)(saved >> 8);
+	*creg = (uint8_t)saved;
+	*sp = (uint16_t)(*sp + 2u);
+	Z80_SP(b->cpu) = *sp;
+}
+
+/* j_0221  count down the timed tasks
+ * Entry:    ($4C8A) is how many clock nibbles wrapped this frame.
+ *           Sixteen slots at $4C90. Byte 0 is the timer: bits 7-6 are
+ *           the unit, bits 5-0 are the count, and 0 means empty.
+ *           Byte 1 is the task number. Byte 2 is the parameter in B.
+ * Exit:     Unit 0 counts down every frame. Units 1-3 count down only
+ *           when the unit is below ($4C8A). That byte starts at 1, so
+ *           unit 0 is a frame count and the coarser units count clock
+ *           wraps. A count that lands on 0 clears the slot and runs
+ *           the task. HL = $4CC0. B = 0. C is ($4C8A).
+ *           A comes from the last slot. F is the third trailing
+ *           `inc l`, whose carry is that slot's carry.
+ *           DE is unchanged when nothing fires; otherwise it is
+ *           the last rst $20's DE.
+ *           Host finishes the RET.
+ * Clobbers: A, F, BC, HL. DE when a task fires.
+ * Flags live-out: none. The caller does not test them.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: normal RET. A firing slot pushes BC, HL, and $025B.
+ */
+void j_0221(Board *b)
+{
+	uint16_t hl = 0x4C90;
+	uint16_t de = Z80_DE(b->cpu);
+	uint16_t sp = Z80_SP(b->cpu);
+	uint8_t creg = board_mem_read(b, 0x4C8A);
+	uint8_t breg = 0x10;
+	uint8_t a;
+	uint8_t flags;
+
+	for (;;) {
+		uint8_t timer = board_mem_read(b, hl);
+
+		a = timer;
+		flags = and_flags(a);
+		if (a != 0) {
+			a = (uint8_t)(a & 0xC0u);
+			a = (uint8_t)((uint8_t)(a << 1) | (a >> 7));
+			a = (uint8_t)((uint8_t)(a << 1) | (a >> 7));
+			flags = cp_flags(a, creg);
+			if (a < creg) {
+				uint8_t cur = (uint8_t)(timer - 1u);
+
+				board_mem_write(b, hl, cur);
+				a = (uint8_t)(cur & 0x3Fu);
+				flags = and_flags(a);
+				if (a == 0) {
+					board_mem_write(b, hl, 0);
+					fire_slot(b, hl, &sp, &breg, &creg);
+					a = Z80_A(b->cpu);
+					flags = Z80_F(b->cpu);
+					de = Z80_DE(b->cpu);
+				}
+			}
+		}
+		{
+			uint8_t lreg;
+
+			flags = inc_a_flags((uint8_t)hl, flags, &lreg);
+			hl = (uint16_t)((hl & 0xFF00u) | lreg);
+			flags = inc_a_flags(lreg, flags, &lreg);
+			hl = (uint16_t)((hl & 0xFF00u) | lreg);
+			flags = inc_a_flags(lreg, flags, &lreg);
+			hl = (uint16_t)((hl & 0xFF00u) | lreg);
+		}
+		breg = (uint8_t)(breg - 1u);
+		if (breg == 0)
+			break;
+	}
+	Z80_A(b->cpu) = a;
+	Z80_F(b->cpu) = flags;
+	Z80_B(b->cpu) = breg;
+	Z80_C(b->cpu) = creg;
+	Z80_DE(b->cpu) = de;
+	Z80_HL(b->cpu) = hl;
+	Z80_SP(b->cpu) = sp;
+}

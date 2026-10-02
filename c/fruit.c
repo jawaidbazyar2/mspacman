@@ -17,6 +17,36 @@ void j_1000(Board *b)
 	board_mem_write(b, 0x4DD4, 0);
 }
 
+/* j_3678  clear the fruit-score sprite
+ * Entry:    timed task 5, through the jump at $100B.
+ * Exit:     HL = 0. ($4DD2) and ($4DD3) = 0.
+ *           A, F, BC, and DE are unchanged.
+ *           Host finishes the RET.
+ * Clobbers: HL
+ * Flags live-out: none. Neither store changes flags.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: normal RET. No callee.
+ */
+void j_3678(Board *b)
+{
+	Z80_HL(b->cpu) = 0;
+	board_mem_write(b, 0x4DD2, 0);
+	board_mem_write(b, 0x4DD3, 0);
+}
+
+/* j_100b  timed task 5
+ * Entry:    the task vector is this jump. It does not push.
+ * Exit:     j_3678's result. Host finishes that RET.
+ * Clobbers: HL
+ * Flags live-out: none.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: normal RET. Tail jump, no callee push.
+ */
+void j_100b(Board *b)
+{
+	j_3678(b);
+}
+
 extern void j_94bd(Board *b);
 
 /* `add a, n`. The sum replaces A. */

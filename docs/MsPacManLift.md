@@ -317,3 +317,15 @@ Replay is a pure function of the `frames` header (DIP byte, interrupt period, ge
 - Re-implementing the SHR renderer, palette, or sprite blit
 - Sample-exact WSG audio as an acceptance test. SDL3 plays the voices; the frame record stores the voice registers
 - Encrypted original-hardware `mspacman` (`u5`/`u6`/`u7` and aux-board traps)
+
+--
+
+## Phase 2.5 - Conversion to Idiomatic C
+
+Proposed plan:
+
+1. Re-combine routines that were split because they crossed a frame boundary
+2. continue to use RAM locations for variable storage, but somehow give them human-readable and sensible names (perhaps through a union against the address space data structure).
+3. Conversion to Idiomatic C:
+4. from the leaves again, refactor away from "register gets set with a value" and towards "return logic values"
+5. 

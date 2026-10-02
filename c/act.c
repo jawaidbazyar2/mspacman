@@ -269,6 +269,69 @@ void j_058e(Board *b)
 	Z80_F(b->cpu) = flags;
 }
 
+/* j_0894  advance the level subroutine
+ * Entry:    timed task 0, or the fall-through after the difficulty copy.
+ * Exit:     ($4E04) increases by one. HL = $4E04.
+ *           F is that `inc (hl)`. A, BC, and DE are unchanged.
+ *           Host finishes the RET.
+ * Clobbers: F, HL
+ * Flags live-out: Z when the subroutine number wraps to 0.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: normal RET. No callee.
+ */
+void j_0894(Board *b)
+{
+	uint8_t cur = board_mem_read(b, 0x4E04);
+	uint8_t next;
+	uint8_t flags = inc_mem_flags(cur, Z80_F(b->cpu), &next);
+
+	board_mem_write(b, 0x4E04, next);
+	Z80_HL(b->cpu) = 0x4E04;
+	Z80_F(b->cpu) = flags;
+}
+
+/* j_06a3  advance the play subroutine
+ * Entry:    timed task 1, or the instruction after the rst $30 at $069F.
+ * Exit:     ($4E03) increases by one. HL = $4E03.
+ *           F is that `inc (hl)`. A, BC, and DE are unchanged.
+ *           Host finishes the RET.
+ * Clobbers: F, HL
+ * Flags live-out: Z when the subroutine number wraps to 0.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: normal RET. No callee.
+ */
+void j_06a3(Board *b)
+{
+	uint8_t cur = board_mem_read(b, 0x4E03);
+	uint8_t next;
+	uint8_t flags = inc_mem_flags(cur, Z80_F(b->cpu), &next);
+
+	board_mem_write(b, 0x4E03, next);
+	Z80_HL(b->cpu) = 0x4E03;
+	Z80_F(b->cpu) = flags;
+}
+
+/* j_1272  advance the eaten-ghost animation
+ * Entry:    timed task 3, or the instruction after the rst $30 at $126E.
+ * Exit:     ($4DD1) increases by one. HL = $4DD1.
+ *           F is that `inc (hl)`. A, BC, and DE are unchanged.
+ *           Host finishes the RET.
+ * Clobbers: F, HL
+ * Flags live-out: Z when the animation byte wraps to 0.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: normal RET. No callee.
+ */
+void j_1272(Board *b)
+{
+	uint8_t cur = board_mem_read(b, 0x4DD1);
+	uint8_t next;
+	uint8_t flags = inc_mem_flags(cur, Z80_F(b->cpu), &next);
+
+	board_mem_write(b, 0x4DD1, next);
+	Z80_HL(b->cpu) = 0x4DD1;
+	Z80_F(b->cpu) = flags;
+}
+
 /* `add ix, de`. S, Z, and P/V stay. N is clear. */
 static uint8_t add_ix_flags(uint16_t ix, uint16_t rhs, uint8_t flags, uint16_t *sum)
 {

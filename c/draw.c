@@ -312,3 +312,118 @@ void j_2bea(Board *b)
 	Z80_DE(b->cpu) = de;
 	Z80_HL(b->cpu) = hl;
 }
+
+extern void j_9642(Board *b);
+extern void j_2c5e(Board *b);
+
+/* j_963c  clear the intermission flag
+ * Entry:    called when the text parameter is $06. F is live-in.
+ * Exit:     ($4F00) = 0. A = 0. F is unchanged.
+ *           Host finishes the RET.
+ * Clobbers: A
+ * Flags live-out: the caller's.
+ * Interrupt: returns inside the frame budget.
+ * Stack: normal RET. No callee.
+ */
+void j_963c(Board *b)
+{
+	Z80_A(b->cpu) = 0;
+	board_mem_write(b, 0x4F00, 0);
+}
+
+/* j_960b  draw the Ms. Pac-Man mark in the bonus line
+ * Entry:    BC and HL are live-in.
+ * Exit:     Four mark tiles are drawn from the table at $9616.
+ *           A = $FF. F is `cp $FF`. DE is the last color address.
+ *           BC and HL are the values saved on entry.
+ *           Host finishes the RET.
+ * Clobbers: A, F, DE
+ * Flags live-out: the finishing compare inside j_9627.
+ * Interrupt: returns inside the frame budget.
+ * Stack: BC, HL, and the call of j_9627. Callee is already C.
+ */
+void j_960b(Board *b)
+{
+	uint16_t sp = Z80_SP(b->cpu);
+	uint16_t bc = Z80_BC(b->cpu);
+	uint16_t hl = Z80_HL(b->cpu);
+
+	push_word(b, &sp, bc);
+	push_word(b, &sp, hl);
+	Z80_SP(b->cpu) = sp;
+	Z80_HL(b->cpu) = 0x9616;
+	call_lifted(b, 0x9613, j_9627);
+	Z80_SP(b->cpu) = (uint16_t)(Z80_SP(b->cpu) + 4u);
+	Z80_HL(b->cpu) = hl;
+	Z80_BC(b->cpu) = bc;
+}
+
+/* j_95f6  draw the logo and honor the no-bonus dip
+ * Entry:    B is the text parameter. BC and HL are restored after the logo.
+ * Exit:     The Midway logo and its two text tasks are drawn.
+ *           When dip bits 4 and 5 are both set, A = $20 and B = $20.
+ *           Otherwise A = the saved B and B is unchanged.
+ *           F is `cp #30` of the masked dip byte. HL is restored.
+ *           DE = $001D from the logo.
+ *           Host finishes the RET.
+ * Clobbers: A, F, B, DE
+ * Flags live-out: Z when no bonus life is awarded.
+ * Interrupt: returns inside the frame budget.
+ * Stack: BC, HL, and the call of j_9642. Callee is already C.
+ */
+void j_95f6(Board *b)
+{
+	uint16_t sp = Z80_SP(b->cpu);
+	uint16_t bc = Z80_BC(b->cpu);
+	uint16_t hl = Z80_HL(b->cpu);
+	uint8_t masked;
+	uint8_t flags;
+
+	push_word(b, &sp, bc);
+	push_word(b, &sp, hl);
+	Z80_SP(b->cpu) = sp;
+	call_lifted(b, 0x95FB, j_9642);
+	Z80_SP(b->cpu) = (uint16_t)(Z80_SP(b->cpu) + 4u);
+	Z80_HL(b->cpu) = hl;
+	Z80_BC(b->cpu) = bc;
+	masked = (uint8_t)(board_mem_read(b, 0x5080) & 0x30u);
+	flags = cp_flags(masked, 0x30);
+	Z80_A(b->cpu) = Z80_B(b->cpu);
+	Z80_F(b->cpu) = flags;
+	if ((flags & 0x40u) == 0)
+		return;
+	Z80_A(b->cpu) = 0x20;
+	Z80_B(b->cpu) = 0x20;
+}
+
+/* j_95e3  text task
+ * Entry:    task $1C. B is the message number.
+ * Exit:     Parameter $0A draws the bonus-line mark first. $0B draws
+ *           the logo and may change B to $20. $06 clears the
+ *           intermission flag. The message itself is j_2c5e.
+ *           Registers match j_2c5e.
+ *           Host finishes the RET. This jump is not a call.
+ * Clobbers: A, F, BC, DE, HL, IX
+ * Flags live-out: j_2c5e.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: the one taken setup call, then j_2c5e's plants. Callees are C.
+ */
+void j_95e3(Board *b)
+{
+	uint8_t a = Z80_B(b->cpu);
+	uint8_t flags = cp_flags(a, 0x0A);
+
+	if ((flags & 0x40u) != 0) {
+		call_lifted(b, 0x95E9, j_960b);
+		a = Z80_A(b->cpu);
+	}
+	flags = cp_flags(a, 0x0B);
+	if ((flags & 0x40u) != 0) {
+		call_lifted(b, 0x95EE, j_95f6);
+		a = Z80_A(b->cpu);
+	}
+	flags = cp_flags(a, 0x06);
+	if ((flags & 0x40u) != 0)
+		call_lifted(b, 0x95F3, j_963c);
+	j_2c5e(b);
+}

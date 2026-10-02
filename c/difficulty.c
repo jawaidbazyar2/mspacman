@@ -205,3 +205,91 @@ void j_20d7(Board *b)
 	Z80_A(b->cpu) = 0x01;
 	Z80_F(b->cpu) = flags;
 }
+
+static void push_word(Board *b, uint16_t *sp, uint16_t value)
+{
+	*sp = (uint16_t)(*sp - 2u);
+	board_mem_write(b, (uint16_t)(*sp + 1u), (uint8_t)(value >> 8));
+	board_mem_write(b, *sp, (uint8_t)value);
+}
+
+static void call_lifted(Board *b, uint16_t ret, void (*fn)(Board *))
+{
+	uint16_t sp = Z80_SP(b->cpu);
+
+	push_word(b, &sp, ret);
+	Z80_SP(b->cpu) = sp;
+	fn(b);
+	Z80_SP(b->cpu) = (uint16_t)(sp + 2u);
+}
+
+static void put16(Board *b, uint16_t addr, uint16_t value)
+{
+	board_mem_write(b, addr, (uint8_t)value);
+	board_mem_write(b, (uint16_t)(addr + 1u), (uint8_t)(value >> 8));
+}
+
+static uint16_t word_at(Board *b, uint16_t addr)
+{
+	return (uint16_t)(board_mem_read(b, addr) |
+		(uint16_t)((uint16_t)board_mem_read(b, (uint16_t)(addr + 1u)) << 8));
+}
+
+extern void j_2bea(Board *b);
+
+/* j_070e  load this board's difficulty row
+ * Entry:    task $10, reached through the jump at $000D. B = 0 reads
+ *           the index through ($4E0A). Any other B is the index.
+ * Exit:     Speed patterns are copied from $330F. The ghost-leave
+ *           limits, elroy thresholds, frightened time, and leave-home
+ *           units are stored. The fruit row is redrawn by j_2bea.
+ *           IX points at the six-byte row in the table at $0796.
+ *           IY points at the leave-home word that was stored.
+ *           A, F, BC, DE, and HL match j_2bea.
+ *           Host finishes the RET.
+ * Clobbers: A, F, BC, DE, HL, IX, IY
+ * Flags live-out: j_2bea.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: the three calls. Callees are already C.
+ */
+void j_070e(Board *b)
+{
+	uint8_t index = Z80_B(b->cpu);
+	uint16_t ix;
+	uint8_t byte;
+	uint8_t scaled;
+	uint16_t iy;
+
+	if (index == 0)
+		index = board_mem_read(b, word_at(b, 0x4E0A));
+	ix = (uint16_t)(0x0796u + (uint8_t)(index * 6u));
+	byte = board_mem_read(b, ix);
+	scaled = (uint8_t)(byte * 42u);
+	Z80_A(b->cpu) = scaled;
+	Z80_HL(b->cpu) = (uint16_t)(0x330Fu + scaled);
+	Z80_IX(b->cpu) = ix;
+	call_lifted(b, 0x073A, j_0814);
+
+	board_mem_write(b, 0x4DB0, board_mem_read(b, (uint16_t)(ix + 1u)));
+	byte = board_mem_read(b, (uint16_t)(ix + 2u));
+	scaled = (uint8_t)(byte * 3u);
+	Z80_HL(b->cpu) = (uint16_t)(0x0843u + scaled);
+	call_lifted(b, 0x0750, j_083a);
+
+	byte = board_mem_read(b, (uint16_t)(ix + 3u));
+	iy = (uint16_t)(0x084Fu + (uint8_t)(byte * 2u));
+	put16(b, 0x4DBB, word_at(b, iy));
+	byte = board_mem_read(b, (uint16_t)(ix + 4u));
+	iy = (uint16_t)(0x0861u + (uint8_t)(byte * 2u));
+	put16(b, 0x4DBD, word_at(b, iy));
+	byte = board_mem_read(b, (uint16_t)(ix + 5u));
+	scaled = (uint8_t)(byte * 2u);
+	iy = (uint16_t)(0x0873u + scaled);
+	Z80_HL(b->cpu) = word_at(b, iy);
+	put16(b, 0x4D95, Z80_HL(b->cpu));
+	Z80_DE(b->cpu) = scaled;
+	Z80_A(b->cpu) = scaled;
+	Z80_IX(b->cpu) = ix;
+	Z80_IY(b->cpu) = iy;
+	call_lifted(b, 0x0795, j_2bea);
+}

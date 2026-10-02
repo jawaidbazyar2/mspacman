@@ -1045,3 +1045,1040 @@ void j_2419(Board *b)
 			return;
 	}
 }
+
+static void put16(Board *b, uint16_t addr, uint16_t value)
+{
+	board_mem_write(b, addr, (uint8_t)value);
+	board_mem_write(b, (uint16_t)(addr + 1u), (uint8_t)(value >> 8));
+}
+
+/* `rlca`. Carry is the old bit 7. S, Z, and P/V stay. */
+static uint8_t rlca_flags(uint8_t *a, uint8_t flags)
+{
+	uint8_t v = (uint8_t)((uint8_t)(*a << 1) | (*a >> 7));
+
+	*a = v;
+	return (uint8_t)((flags & 0xC4u) | (v & 0x29u));
+}
+
+/* j_94bd's body. Levels whose `cp 13` leaves the sign clear take the
+ * subtract loop. The call site adds the CALL's 17. */
+static zusize lookup_body(uint8_t level)
+{
+	uint8_t folded = (uint8_t)(level - 13u);
+	unsigned n = 0;
+
+	if ((folded & 0x80u) != 0)
+		return 168;
+	do {
+		folded = (uint8_t)(folded - 8u);
+		n++;
+	} while ((folded & 0x80u) == 0);
+	return (zusize)(194u + 17u * n);
+}
+
+/* j_24d7  color the maze
+ * Entry:    task $01. B = 0 paints the maze color, 1 also paints the
+ *           tunnel slowdown bits, 2 paints the maze white.
+ * Exit:     A finished call leaves $4440..$47BF in the maze color and
+ *           $47C0..$47FF as $0F. Parameter 1 also sets bit 6 of the
+ *           tunnel cells on levels 0..2 and paints the door cells $18.
+ *           A is the parameter, or $18 when the parameter is 1.
+ *           B = 0. C = 0 unless the tunnel list was walked.
+ *           E = the parameter. F is `cp #01` when the parameter is not 1.
+ *           A short budget stops inside rst $08. The next frame resumes
+ *           there in Z80. The slice that finishes performs the RET.
+ * Clobbers: A, F, B, C, E, HL
+ * Flags live-out: Z when the parameter is 1, once the call finishes.
+ * Interrupt: testplay2 stops at $0008, $0009, or $000A.
+ * Stack: the color rst is pushed and popped inside the slice that
+ *        contains it. Parameter 1 also leaves the maze lookup.
+ */
+void j_24d7(Board *b)
+{
+	int guard = 0;
+
+	while (b->cycles_left > 0 && guard++ < 2000000) {
+		uint16_t pc = Z80_PC(b->cpu);
+		zusize ran = 0;
+		int done = 0;
+		uint8_t a;
+		uint8_t flags;
+		uint16_t hl;
+		uint16_t sp;
+
+		switch (pc) {
+		case 0x24D7:
+			Z80_E(b->cpu) = Z80_B(b->cpu);
+			Z80_PC(b->cpu) = 0x24D8;
+			ran = 4;
+			break;
+		case 0x24D8:
+			Z80_A(b->cpu) = Z80_B(b->cpu);
+			Z80_PC(b->cpu) = 0x24D9;
+			ran = 4;
+			break;
+		case 0x24D9:
+			Z80_F(b->cpu) = cp_flags(Z80_A(b->cpu), 0x02);
+			Z80_PC(b->cpu) = 0x24DB;
+			ran = 7;
+			break;
+		case 0x24DB:
+			Z80_A(b->cpu) = 0x1F;
+			Z80_PC(b->cpu) = 0x24DD;
+			ran = 7;
+			break;
+		case 0x24DD:
+			Z80_MEMPTR(b->cpu) = 0x9580;
+			Z80_PC(b->cpu) = 0x9580;
+			ran = 10;
+			break;
+		case 0x9580:
+			Z80_MEMPTR(b->cpu) = 0x24E1;
+			Z80_PC(b->cpu) = (Z80_F(b->cpu) & 0x40u) != 0 ? 0x24E1 : 0x9583;
+			ran = 10;
+			break;
+		case 0x9583:
+			Z80_A(b->cpu) = board_mem_read(b, 0x4E02);
+			Z80_MEMPTR(b->cpu) = 0x4E03;
+			Z80_PC(b->cpu) = 0x9586;
+			ran = 13;
+			break;
+		case 0x9586:
+			Z80_F(b->cpu) = and_flags(Z80_A(b->cpu));
+			Z80_PC(b->cpu) = 0x9587;
+			ran = 4;
+			break;
+		case 0x9587:
+			if ((Z80_F(b->cpu) & 0x40u) != 0) {
+				Z80_MEMPTR(b->cpu) = 0x9590;
+				Z80_PC(b->cpu) = 0x9590;
+				ran = 12;
+			} else {
+				Z80_PC(b->cpu) = 0x9589;
+				ran = 7;
+			}
+			break;
+		case 0x9589:
+			Z80_F(b->cpu) = cp_flags(Z80_A(b->cpu), 0x10);
+			Z80_PC(b->cpu) = 0x958B;
+			ran = 7;
+			break;
+		case 0x958B:
+			Z80_A(b->cpu) = 0x01;
+			Z80_PC(b->cpu) = 0x958D;
+			ran = 7;
+			break;
+		case 0x958D:
+			Z80_MEMPTR(b->cpu) = 0x24E1;
+			Z80_PC(b->cpu) = (Z80_F(b->cpu) & 0x40u) == 0 ? 0x24E1 : 0x9590;
+			ran = 10;
+			break;
+		case 0x9590:
+			Z80_A(b->cpu) = board_mem_read(b, 0x4E13);
+			Z80_MEMPTR(b->cpu) = 0x4E14;
+			Z80_PC(b->cpu) = 0x9593;
+			ran = 13;
+			break;
+		case 0x9593:
+			Z80_F(b->cpu) = cp_flags(Z80_A(b->cpu), 0x15);
+			Z80_PC(b->cpu) = 0x9595;
+			ran = 7;
+			break;
+		case 0x9595:
+			Z80_MEMPTR(b->cpu) = 0x95A3;
+			Z80_PC(b->cpu) = (Z80_F(b->cpu) & 0x80u) == 0 ? 0x95A3 : 0x9598;
+			ran = 10;
+			break;
+		case 0x9598:
+			Z80_C(b->cpu) = Z80_A(b->cpu);
+			Z80_PC(b->cpu) = 0x9599;
+			ran = 4;
+			break;
+		case 0x9599:
+			Z80_B(b->cpu) = 0;
+			Z80_PC(b->cpu) = 0x959B;
+			ran = 7;
+			break;
+		case 0x959B:
+			Z80_HL(b->cpu) = 0x95AE;
+			Z80_PC(b->cpu) = 0x959E;
+			ran = 10;
+			break;
+		case 0x959E:
+			hl = Z80_HL(b->cpu);
+			flags = add_hl_flags(hl, Z80_BC(b->cpu), Z80_F(b->cpu), &hl);
+			Z80_MEMPTR(b->cpu) = (uint16_t)(Z80_HL(b->cpu) + 1u);
+			Z80_HL(b->cpu) = hl;
+			Z80_F(b->cpu) = flags;
+			Z80_PC(b->cpu) = 0x959F;
+			ran = 11;
+			break;
+		case 0x959F:
+			Z80_A(b->cpu) = board_mem_read(b, Z80_HL(b->cpu));
+			Z80_PC(b->cpu) = 0x95A0;
+			ran = 7;
+			break;
+		case 0x95A0:
+			Z80_MEMPTR(b->cpu) = 0x24E1;
+			Z80_PC(b->cpu) = 0x24E1;
+			ran = 10;
+			break;
+		case 0x95A3:
+			a = Z80_A(b->cpu);
+			Z80_A(b->cpu) = sub_a(a, 0x15, &flags);
+			Z80_F(b->cpu) = flags;
+			Z80_PC(b->cpu) = 0x95A5;
+			ran = 7;
+			break;
+		case 0x95A5:
+			a = Z80_A(b->cpu);
+			Z80_A(b->cpu) = sub_a(a, 0x10, &flags);
+			Z80_F(b->cpu) = flags;
+			Z80_PC(b->cpu) = 0x95A7;
+			ran = 7;
+			break;
+		case 0x95A7:
+			Z80_MEMPTR(b->cpu) = 0x95A5;
+			Z80_PC(b->cpu) = (Z80_F(b->cpu) & 0x80u) == 0 ? 0x95A5 : 0x95AA;
+			ran = 10;
+			break;
+		case 0x95AA:
+			a = Z80_A(b->cpu);
+			Z80_A(b->cpu) = add8(a, 0x15, &flags);
+			Z80_F(b->cpu) = flags;
+			Z80_PC(b->cpu) = 0x95AC;
+			ran = 7;
+			break;
+		case 0x95AC:
+			Z80_MEMPTR(b->cpu) = 0x9598;
+			Z80_PC(b->cpu) = 0x9598;
+			ran = 12;
+			break;
+		case 0x24E1:
+			Z80_HL(b->cpu) = 0x4440;
+			Z80_PC(b->cpu) = 0x24E4;
+			ran = 10;
+			break;
+		case 0x24E4:
+			Z80_BC(b->cpu) = 0x8004;
+			Z80_PC(b->cpu) = 0x24E7;
+			ran = 10;
+			break;
+		case 0x24E7:
+			sp = Z80_SP(b->cpu);
+			push_word(b, &sp, 0x24E8);
+			Z80_SP(b->cpu) = sp;
+			Z80_PC(b->cpu) = 0x0008;
+			Z80_MEMPTR(b->cpu) = 0x0008;
+			ran = 11;
+			break;
+		case 0x24E8:
+			a = Z80_C(b->cpu);
+			Z80_F(b->cpu) = dec_flags(a, Z80_F(b->cpu), &a);
+			Z80_C(b->cpu) = a;
+			Z80_PC(b->cpu) = 0x24E9;
+			ran = 4;
+			break;
+		case 0x24E9:
+			if ((Z80_F(b->cpu) & 0x40u) == 0) {
+				Z80_MEMPTR(b->cpu) = 0x24E7;
+				Z80_PC(b->cpu) = 0x24E7;
+				ran = 12;
+			} else {
+				Z80_PC(b->cpu) = 0x24EB;
+				ran = 7;
+			}
+			break;
+		case 0x24EB:
+			Z80_A(b->cpu) = 0x0F;
+			Z80_PC(b->cpu) = 0x24ED;
+			ran = 7;
+			break;
+		case 0x24ED:
+			Z80_B(b->cpu) = 0x40;
+			Z80_PC(b->cpu) = 0x24EF;
+			ran = 7;
+			break;
+		case 0x24EF:
+			Z80_HL(b->cpu) = 0x47C0;
+			Z80_PC(b->cpu) = 0x24F2;
+			ran = 10;
+			break;
+		case 0x24F2:
+			sp = Z80_SP(b->cpu);
+			push_word(b, &sp, 0x24F3);
+			Z80_SP(b->cpu) = sp;
+			Z80_PC(b->cpu) = 0x0008;
+			Z80_MEMPTR(b->cpu) = 0x0008;
+			ran = 11;
+			break;
+		case 0x24F3:
+			Z80_A(b->cpu) = Z80_E(b->cpu);
+			Z80_PC(b->cpu) = 0x24F4;
+			ran = 4;
+			break;
+		case 0x24F4:
+			Z80_F(b->cpu) = cp_flags(Z80_A(b->cpu), 0x01);
+			Z80_PC(b->cpu) = 0x24F6;
+			ran = 7;
+			break;
+		case 0x24F6:
+			if ((Z80_F(b->cpu) & 0x40u) == 0) {
+				fill_ret(b);
+				ran = 11;
+				done = 1;
+			} else {
+				Z80_PC(b->cpu) = 0x24F7;
+				ran = 5;
+			}
+			break;
+		case 0x24F7:
+			Z80_A(b->cpu) = 0x1A;
+			Z80_PC(b->cpu) = 0x24F9;
+			ran = 7;
+			break;
+		case 0x24F9:
+			Z80_MEMPTR(b->cpu) = 0x95C3;
+			Z80_PC(b->cpu) = 0x95C3;
+			ran = 10;
+			break;
+		case 0x95C3:
+			Z80_A(b->cpu) = board_mem_read(b, 0x4E13);
+			Z80_MEMPTR(b->cpu) = 0x4E14;
+			Z80_PC(b->cpu) = 0x95C6;
+			ran = 13;
+			break;
+		case 0x95C6:
+			Z80_F(b->cpu) = cp_flags(Z80_A(b->cpu), 0x03);
+			Z80_PC(b->cpu) = 0x95C8;
+			ran = 7;
+			break;
+		case 0x95C8:
+			Z80_MEMPTR(b->cpu) = 0x2534;
+			Z80_PC(b->cpu) = (Z80_F(b->cpu) & 0x80u) == 0 ? 0x2534 : 0x95CB;
+			ran = 10;
+			break;
+		case 0x95CB:
+			Z80_HL(b->cpu) = 0x95DF;
+			Z80_PC(b->cpu) = 0x95CE;
+			ran = 10;
+			break;
+		case 0x95CE:
+			a = board_mem_read(b, 0x4E13);
+			call_lifted(b, 0x95D1, j_94bd);
+			Z80_MEMPTR(b->cpu) = 0x95D1;
+			Z80_PC(b->cpu) = 0x95D1;
+			ran = (zusize)(17u + lookup_body(a));
+			break;
+		case 0x95D1:
+			Z80_HL(b->cpu) = 0x4400;
+			Z80_PC(b->cpu) = 0x95D4;
+			ran = 10;
+			break;
+		case 0x95D4:
+			Z80_A(b->cpu) = board_mem_read(b, Z80_BC(b->cpu));
+			Z80_MEMPTR(b->cpu) = (uint16_t)(Z80_BC(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x95D5;
+			ran = 7;
+			break;
+		case 0x95D5:
+			Z80_BC(b->cpu) = (uint16_t)(Z80_BC(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x95D6;
+			ran = 6;
+			break;
+		case 0x95D6:
+			Z80_F(b->cpu) = and_flags(Z80_A(b->cpu));
+			Z80_PC(b->cpu) = 0x95D7;
+			ran = 4;
+			break;
+		case 0x95D7:
+			Z80_MEMPTR(b->cpu) = 0x2534;
+			Z80_PC(b->cpu) = (Z80_F(b->cpu) & 0x40u) != 0 ? 0x2534 : 0x95DA;
+			ran = 10;
+			break;
+		case 0x95DA:
+			sp = Z80_SP(b->cpu);
+			push_word(b, &sp, 0x95DB);
+			Z80_SP(b->cpu) = sp;
+			Z80_PC(b->cpu) = 0x0010;
+			Z80_MEMPTR(b->cpu) = 0x0010;
+			ran = 11;
+			break;
+		case 0x0010:
+			a = Z80_A(b->cpu);
+			flags = Z80_F(b->cpu);
+			Z80_A(b->cpu) = add_a(a, Z80_L(b->cpu), &flags);
+			Z80_F(b->cpu) = flags;
+			Z80_PC(b->cpu) = 0x0011;
+			ran = 4;
+			break;
+		case 0x0011:
+			Z80_L(b->cpu) = Z80_A(b->cpu);
+			Z80_PC(b->cpu) = 0x0012;
+			ran = 4;
+			break;
+		case 0x0012:
+			Z80_A(b->cpu) = 0;
+			Z80_PC(b->cpu) = 0x0014;
+			ran = 7;
+			break;
+		case 0x0014:
+			flags = Z80_F(b->cpu);
+			Z80_A(b->cpu) = adc8(0, Z80_H(b->cpu), flags, &flags);
+			Z80_F(b->cpu) = flags;
+			Z80_PC(b->cpu) = 0x0015;
+			ran = 4;
+			break;
+		case 0x0015:
+			Z80_H(b->cpu) = Z80_A(b->cpu);
+			Z80_PC(b->cpu) = 0x0016;
+			ran = 4;
+			break;
+		case 0x0016:
+			Z80_A(b->cpu) = board_mem_read(b, Z80_HL(b->cpu));
+			Z80_PC(b->cpu) = 0x0017;
+			ran = 7;
+			break;
+		case 0x0017:
+			fill_ret(b);
+			ran = 10;
+			break;
+		case 0x95DB:
+			hl = Z80_HL(b->cpu);
+			board_mem_write(b, hl,
+					(uint8_t)(board_mem_read(b, hl) | 0x40u));
+			Z80_PC(b->cpu) = 0x95DD;
+			ran = 15;
+			break;
+		case 0x95DD:
+			Z80_MEMPTR(b->cpu) = 0x95D4;
+			Z80_PC(b->cpu) = 0x95D4;
+			ran = 12;
+			break;
+		case 0x2534:
+			Z80_A(b->cpu) = 0x18;
+			Z80_PC(b->cpu) = 0x2536;
+			ran = 7;
+			break;
+		case 0x2536:
+			store_a_nn(b, 0x45ED, Z80_A(b->cpu));
+			Z80_PC(b->cpu) = 0x2539;
+			ran = 13;
+			break;
+		case 0x2539:
+			store_a_nn(b, 0x460D, Z80_A(b->cpu));
+			Z80_PC(b->cpu) = 0x253C;
+			ran = 13;
+			break;
+		case 0x253C:
+			fill_ret(b);
+			ran = 10;
+			done = 1;
+			break;
+		case 0x0008:
+			board_mem_write(b, Z80_HL(b->cpu), Z80_A(b->cpu));
+			Z80_PC(b->cpu) = 0x0009;
+			ran = 7;
+			break;
+		case 0x0009:
+			Z80_HL(b->cpu) = (uint16_t)(Z80_HL(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x000A;
+			ran = 6;
+			break;
+		case 0x000A:
+			a = (uint8_t)(Z80_B(b->cpu) - 1u);
+			Z80_B(b->cpu) = a;
+			if (a != 0) {
+				Z80_PC(b->cpu) = 0x0008;
+				Z80_MEMPTR(b->cpu) = 0x0008;
+				ran = 13;
+			} else {
+				Z80_PC(b->cpu) = 0x000C;
+				ran = 8;
+			}
+			break;
+		case 0x000C:
+			fill_ret(b);
+			ran = 10;
+			break;
+		default:
+			return;
+		}
+		charge_fill(b, ran);
+		if (done)
+			return;
+	}
+}
+
+/* j_253d  place Ms. Pac-Man and the ghosts for a board
+ * Entry:    task $04. B = 0 uses the play positions. Any other value
+ *           uses the introduction positions.
+ * Exit:     Sprite numbers and colors are stored at $4C02..$4C0D.
+ *           Positions, tiles, and directions are stored from $4D00.
+ *           IX = $4C00. A = 2. B = 0. F is `and a` of the parameter.
+ *           Host finishes the RET.
+ * Clobbers: A, F, B, HL
+ * Flags live-out: Z when the parameter is 0.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: the introduction path's rst. The play path has no call.
+ */
+void j_253d(Board *b)
+{
+	static const uint8_t sprite[] = {
+		0x02, 0x20, 0x04, 0x20, 0x06, 0x20, 0x08, 0x20,
+		0x0A, 0x2C, 0x0C, 0x3F, 0x03, 0x01, 0x05, 0x03,
+		0x07, 0x05, 0x09, 0x07, 0x0B, 0x09, 0x0D, 0x00
+	};
+	uint8_t param = Z80_B(b->cpu);
+	uint8_t flags = and_flags(param);
+	unsigned i;
+
+	Z80_IX(b->cpu) = 0x4C00;
+	for (i = 0; i < sizeof sprite; i += 2u)
+		board_mem_write(b, (uint16_t)(0x4C00u + sprite[i]), sprite[i + 1u]);
+	if (param != 0) {
+		put16(b, 0x4D00, 0x0094);
+		put16(b, 0x4D02, 0x0094);
+		put16(b, 0x4D04, 0x0094);
+		put16(b, 0x4D06, 0x0094);
+		put16(b, 0x4D0A, 0x1E32);
+		put16(b, 0x4D0C, 0x1E32);
+		put16(b, 0x4D0E, 0x1E32);
+		put16(b, 0x4D10, 0x1E32);
+		put16(b, 0x4D31, 0x1E32);
+		put16(b, 0x4D33, 0x1E32);
+		put16(b, 0x4D35, 0x1E32);
+		put16(b, 0x4D37, 0x1E32);
+		put16(b, 0x4D14, 0x0100);
+		put16(b, 0x4D16, 0x0100);
+		put16(b, 0x4D18, 0x0100);
+		put16(b, 0x4D1A, 0x0100);
+		put16(b, 0x4D1E, 0x0100);
+		put16(b, 0x4D20, 0x0100);
+		put16(b, 0x4D22, 0x0100);
+		put16(b, 0x4D24, 0x0100);
+		put16(b, 0x4D1C, 0x0100);
+		put16(b, 0x4D26, 0x0100);
+		Z80_HL(b->cpu) = 0x4D28;
+		Z80_A(b->cpu) = 0x02;
+		Z80_B(b->cpu) = 0x09;
+		rst08(b, 0x2662);
+		board_mem_write(b, 0x4D3C, 0x02);
+		put16(b, 0x4D08, 0x0894);
+		put16(b, 0x4D12, 0x1F32);
+		put16(b, 0x4D39, 0x1F32);
+		Z80_HL(b->cpu) = 0x1F32;
+		Z80_A(b->cpu) = 0x02;
+		Z80_F(b->cpu) = flags;
+		return;
+	}
+	put16(b, 0x4D00, 0x8064);
+	put16(b, 0x4D02, 0x807C);
+	put16(b, 0x4D04, 0x907C);
+	put16(b, 0x4D06, 0x707C);
+	put16(b, 0x4D08, 0x80C4);
+	put16(b, 0x4D0A, 0x2E2C);
+	put16(b, 0x4D31, 0x2E2C);
+	put16(b, 0x4D0C, 0x2E2F);
+	put16(b, 0x4D33, 0x2E2F);
+	put16(b, 0x4D0E, 0x302F);
+	put16(b, 0x4D35, 0x302F);
+	put16(b, 0x4D10, 0x2C2F);
+	put16(b, 0x4D37, 0x2C2F);
+	put16(b, 0x4D12, 0x2E38);
+	put16(b, 0x4D39, 0x2E38);
+	put16(b, 0x4D14, 0x0100);
+	put16(b, 0x4D1E, 0x0100);
+	put16(b, 0x4D16, 0x0001);
+	put16(b, 0x4D20, 0x0001);
+	put16(b, 0x4D18, 0x00FF);
+	put16(b, 0x4D22, 0x00FF);
+	put16(b, 0x4D1A, 0x00FF);
+	put16(b, 0x4D24, 0x00FF);
+	put16(b, 0x4D1C, 0x0100);
+	put16(b, 0x4D26, 0x0100);
+	put16(b, 0x4D28, 0x0102);
+	put16(b, 0x4D2C, 0x0102);
+	put16(b, 0x4D2A, 0x0303);
+	put16(b, 0x4D2E, 0x0303);
+	board_mem_write(b, 0x4D30, 0x02);
+	board_mem_write(b, 0x4D3C, 0x02);
+	put16(b, 0x4DD2, 0x0000);
+	Z80_A(b->cpu) = 0x02;
+	Z80_F(b->cpu) = flags;
+	Z80_B(b->cpu) = 0;
+	Z80_HL(b->cpu) = 0;
+}
+
+/* j_268b  reset the ghost-house timer
+ * Entry:    task $05. B is the parameter. Carry is live-in.
+ * Exit:     ($4D94) = $55. B is the parameter minus 1.
+ *           When that result is 0, A = $55 and F is the decrement.
+ *           Otherwise ($4DA0) = 1, A = 1, and F is still the decrement.
+ *           Host finishes the RET.
+ * Clobbers: A, F, B
+ * Flags live-out: Z when the parameter was 1.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: normal RET. No callee.
+ */
+void j_268b(Board *b)
+{
+	uint8_t breg = Z80_B(b->cpu);
+	uint8_t flags;
+
+	store_a_nn(b, 0x4D94, 0x55);
+	flags = dec_flags(breg, Z80_F(b->cpu), &breg);
+	Z80_A(b->cpu) = 0x55;
+	Z80_B(b->cpu) = breg;
+	Z80_F(b->cpu) = flags;
+	if ((flags & 0x40u) != 0)
+		return;
+	store_a_nn(b, 0x4DA0, 0x01);
+	Z80_A(b->cpu) = 0x01;
+}
+
+/* j_2448  draw this maze's pellets
+ * Entry:    task $03.
+ * Exit:     A finished call has drawn every dot and the four power
+ *           pellets. A slice that runs out of frame budget leaves PC
+ *           on the next opcode of the dot loop.
+ *           Host does not add a RET: the slice that finishes performs it.
+ * Clobbers: A, F, BC, DE, HL, IX, IY
+ * Flags live-out: `and` of 0, once the power pellets are drawn.
+ * Interrupt: one testplay2 call stops at $246D.
+ * Stack: the lookup calls. The outer RET is only on the finishing slice.
+ */
+void j_2448(Board *b)
+{
+	int guard = 0;
+
+	while (b->cycles_left > 0 && guard++ < 2000000) {
+		uint16_t pc = Z80_PC(b->cpu);
+		zusize ran = 0;
+		int done = 0;
+		uint8_t a;
+		uint8_t flags;
+		uint16_t hl;
+		uint16_t sp;
+
+		switch (pc) {
+		case 0x2448:
+			Z80_HL(b->cpu) = 0x4000;
+			Z80_PC(b->cpu) = 0x244B;
+			ran = 10;
+			break;
+		case 0x244B:
+			Z80_MEMPTR(b->cpu) = 0x947C;
+			Z80_PC(b->cpu) = 0x947C;
+			ran = 10;
+			break;
+		case 0x947C:
+			Z80_HL(b->cpu) = 0x2453;
+			Z80_PC(b->cpu) = 0x947F;
+			ran = 10;
+			break;
+		case 0x947F:
+			Z80_MEMPTR(b->cpu) = 0x9484;
+			Z80_PC(b->cpu) = 0x9484;
+			ran = 12;
+			break;
+		case 0x9484:
+			sp = Z80_SP(b->cpu);
+			push_word(b, &sp, Z80_HL(b->cpu));
+			Z80_SP(b->cpu) = sp;
+			Z80_PC(b->cpu) = 0x9485;
+			ran = 11;
+			break;
+		case 0x9485:
+			Z80_HL(b->cpu) = 0x9499;
+			Z80_PC(b->cpu) = 0x9488;
+			ran = 10;
+			break;
+		case 0x9488:
+			a = board_mem_read(b, 0x4E13);
+			call_lifted(b, 0x948B, j_94bd);
+			Z80_MEMPTR(b->cpu) = 0x948B;
+			Z80_PC(b->cpu) = 0x948B;
+			ran = (zusize)(17u + lookup_body(a));
+			break;
+		case 0x948B:
+			Z80_IY(b->cpu) = 0;
+			Z80_PC(b->cpu) = 0x948F;
+			ran = 14;
+			break;
+		case 0x948F:
+			hl = Z80_IY(b->cpu);
+			flags = add_hl_flags(hl, Z80_BC(b->cpu), Z80_F(b->cpu), &hl);
+			Z80_MEMPTR(b->cpu) = (uint16_t)(Z80_IY(b->cpu) + 1u);
+			Z80_IY(b->cpu) = hl;
+			Z80_F(b->cpu) = flags;
+			Z80_PC(b->cpu) = 0x9491;
+			ran = 15;
+			break;
+		case 0x9491:
+			Z80_HL(b->cpu) = 0x4000;
+			Z80_PC(b->cpu) = 0x9494;
+			ran = 10;
+			break;
+		case 0x9494:
+			Z80_IX(b->cpu) = 0x4E16;
+			Z80_PC(b->cpu) = 0x9498;
+			ran = 14;
+			break;
+		case 0x9498:
+			fill_ret(b);
+			ran = 10;
+			break;
+		case 0x2453:
+			Z80_D(b->cpu) = 0;
+			Z80_PC(b->cpu) = 0x2455;
+			ran = 7;
+			break;
+		case 0x2455:
+			Z80_B(b->cpu) = 0x1E;
+			Z80_PC(b->cpu) = 0x2457;
+			ran = 7;
+			break;
+		case 0x2457:
+			Z80_C(b->cpu) = 0x08;
+			Z80_PC(b->cpu) = 0x2459;
+			ran = 7;
+			break;
+		case 0x2459:
+			Z80_A(b->cpu) = board_mem_read(b, Z80_IX(b->cpu));
+			Z80_MEMPTR(b->cpu) = Z80_IX(b->cpu);
+			Z80_PC(b->cpu) = 0x245C;
+			ran = 19;
+			break;
+		case 0x245C:
+			Z80_E(b->cpu) = board_mem_read(b, Z80_IY(b->cpu));
+			Z80_MEMPTR(b->cpu) = Z80_IY(b->cpu);
+			Z80_PC(b->cpu) = 0x245F;
+			ran = 19;
+			break;
+		case 0x245F:
+			hl = Z80_HL(b->cpu);
+			flags = add_hl_flags(hl, Z80_DE(b->cpu), Z80_F(b->cpu), &hl);
+			Z80_MEMPTR(b->cpu) = (uint16_t)(Z80_HL(b->cpu) + 1u);
+			Z80_HL(b->cpu) = hl;
+			Z80_F(b->cpu) = flags;
+			Z80_PC(b->cpu) = 0x2460;
+			ran = 11;
+			break;
+		case 0x2460:
+			a = Z80_A(b->cpu);
+			Z80_F(b->cpu) = rlca_flags(&a, Z80_F(b->cpu));
+			Z80_A(b->cpu) = a;
+			Z80_PC(b->cpu) = 0x2461;
+			ran = 4;
+			break;
+		case 0x2461:
+			if ((Z80_F(b->cpu) & 0x01u) == 0) {
+				Z80_MEMPTR(b->cpu) = 0x2465;
+				Z80_PC(b->cpu) = 0x2465;
+				ran = 12;
+			} else {
+				Z80_PC(b->cpu) = 0x2463;
+				ran = 7;
+			}
+			break;
+		case 0x2463:
+			board_mem_write(b, Z80_HL(b->cpu), 0x10);
+			Z80_PC(b->cpu) = 0x2465;
+			ran = 10;
+			break;
+		case 0x2465:
+			Z80_IY(b->cpu) = (uint16_t)(Z80_IY(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x2467;
+			ran = 10;
+			break;
+		case 0x2467:
+			a = Z80_C(b->cpu);
+			Z80_F(b->cpu) = dec_flags(a, Z80_F(b->cpu), &a);
+			Z80_C(b->cpu) = a;
+			Z80_PC(b->cpu) = 0x2468;
+			ran = 4;
+			break;
+		case 0x2468:
+			if ((Z80_F(b->cpu) & 0x40u) == 0) {
+				Z80_MEMPTR(b->cpu) = 0x245C;
+				Z80_PC(b->cpu) = 0x245C;
+				ran = 12;
+			} else {
+				Z80_PC(b->cpu) = 0x246A;
+				ran = 7;
+			}
+			break;
+		case 0x246A:
+			Z80_IX(b->cpu) = (uint16_t)(Z80_IX(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x246C;
+			ran = 10;
+			break;
+		case 0x246C:
+			a = Z80_B(b->cpu);
+			Z80_F(b->cpu) = dec_flags(a, Z80_F(b->cpu), &a);
+			Z80_B(b->cpu) = a;
+			Z80_PC(b->cpu) = 0x246D;
+			ran = 4;
+			break;
+		case 0x246D:
+			if ((Z80_F(b->cpu) & 0x40u) == 0) {
+				Z80_MEMPTR(b->cpu) = 0x2457;
+				Z80_PC(b->cpu) = 0x2457;
+				ran = 12;
+			} else {
+				Z80_PC(b->cpu) = 0x246F;
+				ran = 7;
+			}
+			break;
+		case 0x246F:
+			Z80_HL(b->cpu) = 0x4E34;
+			Z80_PC(b->cpu) = 0x2472;
+			ran = 10;
+			break;
+		case 0x2472:
+			Z80_MEMPTR(b->cpu) = 0x94EC;
+			Z80_PC(b->cpu) = 0x94EC;
+			ran = 10;
+			break;
+		case 0x94EC:
+			Z80_HL(b->cpu) = 0x951C;
+			Z80_PC(b->cpu) = 0x94EF;
+			ran = 10;
+			break;
+		case 0x94EF:
+			a = board_mem_read(b, 0x4E13);
+			call_lifted(b, 0x94F2, j_94bd);
+			Z80_MEMPTR(b->cpu) = 0x94F2;
+			Z80_PC(b->cpu) = 0x94F2;
+			ran = (zusize)(17u + lookup_body(a));
+			break;
+		case 0x94F2:
+			Z80_DE(b->cpu) = 0x4E34;
+			Z80_PC(b->cpu) = 0x94F5;
+			ran = 10;
+			break;
+		case 0x94F5:
+			Z80_L(b->cpu) = Z80_C(b->cpu);
+			Z80_PC(b->cpu) = 0x94F6;
+			ran = 4;
+			break;
+		case 0x94F6:
+			Z80_H(b->cpu) = Z80_B(b->cpu);
+			Z80_PC(b->cpu) = 0x94F7;
+			ran = 4;
+			break;
+		case 0x94F7:
+			Z80_C(b->cpu) = board_mem_read(b, Z80_HL(b->cpu));
+			Z80_MEMPTR(b->cpu) = (uint16_t)(Z80_HL(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x94F8;
+			ran = 7;
+			break;
+		case 0x94F8:
+			Z80_HL(b->cpu) = (uint16_t)(Z80_HL(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x94F9;
+			ran = 6;
+			break;
+		case 0x94F9:
+			Z80_B(b->cpu) = board_mem_read(b, Z80_HL(b->cpu));
+			Z80_MEMPTR(b->cpu) = (uint16_t)(Z80_HL(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x94FA;
+			ran = 7;
+			break;
+		case 0x94FA:
+			Z80_HL(b->cpu) = (uint16_t)(Z80_HL(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x94FB;
+			ran = 6;
+			break;
+		case 0x94FB:
+			Z80_A(b->cpu) = board_mem_read(b, Z80_DE(b->cpu));
+			Z80_MEMPTR(b->cpu) = (uint16_t)(Z80_DE(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x94FC;
+			ran = 7;
+			break;
+		case 0x94FC:
+			a = Z80_A(b->cpu);
+			board_mem_write(b, Z80_BC(b->cpu), a);
+			Z80_MEMPTR(b->cpu) = (uint16_t)(((uint16_t)a << 8) |
+				(uint16_t)((uint8_t)(Z80_C(b->cpu) + 1u)));
+			Z80_PC(b->cpu) = 0x94FD;
+			ran = 7;
+			break;
+		case 0x94FD:
+			Z80_DE(b->cpu) = (uint16_t)(Z80_DE(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x94FE;
+			ran = 6;
+			break;
+		case 0x94FE:
+			Z80_A(b->cpu) = 0x03;
+			Z80_PC(b->cpu) = 0x9500;
+			ran = 7;
+			break;
+		case 0x9500:
+			a = (uint8_t)(0x03u & Z80_E(b->cpu));
+			Z80_A(b->cpu) = a;
+			Z80_F(b->cpu) = and_flags(a);
+			Z80_PC(b->cpu) = 0x9501;
+			ran = 4;
+			break;
+		case 0x9501:
+			if ((Z80_F(b->cpu) & 0x40u) == 0) {
+				Z80_MEMPTR(b->cpu) = 0x94F7;
+				Z80_PC(b->cpu) = 0x94F7;
+				ran = 12;
+			} else {
+				Z80_PC(b->cpu) = 0x9503;
+				ran = 7;
+			}
+			break;
+		case 0x9503:
+			fill_ret(b);
+			ran = 10;
+			done = 1;
+			break;
+		default:
+			return;
+		}
+		charge_fill(b, ran);
+		if (done)
+			return;
+	}
+}
+
+/* j_2a35  blank pellets out of the maze
+ * Entry:    task $13.
+ * Exit:     $10, $12, and $14 from $4040 up to $43C0 become $40.
+ *           A finished call leaves DE = $43C0, HL = 0, and F from
+ *           `sbc hl, de` of that equal pair. A short budget leaves PC
+ *           on the next opcode of the scan.
+ *           Host does not add a RET: the finishing slice performs it.
+ * Clobbers: A, F, DE, HL
+ * Flags live-out: Z, once the scan finishes.
+ * Interrupt: testplay2 stops inside the scan.
+ * Stack: the RET is only on the finishing slice.
+ */
+void j_2a35(Board *b)
+{
+	int guard = 0;
+
+	while (b->cycles_left > 0 && guard++ < 2000000) {
+		uint16_t pc = Z80_PC(b->cpu);
+		zusize ran = 0;
+		int done = 0;
+		uint8_t a;
+		uint8_t flags;
+		uint16_t hl;
+
+		switch (pc) {
+		case 0x2A35:
+			Z80_DE(b->cpu) = 0x4040;
+			Z80_PC(b->cpu) = 0x2A38;
+			ran = 10;
+			break;
+		case 0x2A38:
+			Z80_HL(b->cpu) = 0x43C0;
+			Z80_PC(b->cpu) = 0x2A3B;
+			ran = 10;
+			break;
+		case 0x2A3B:
+			Z80_F(b->cpu) = and_flags(Z80_A(b->cpu));
+			Z80_PC(b->cpu) = 0x2A3C;
+			ran = 4;
+			break;
+		case 0x2A3C:
+			hl = Z80_HL(b->cpu);
+			flags = sbc_hl(&hl, Z80_DE(b->cpu));
+			Z80_MEMPTR(b->cpu) = (uint16_t)(Z80_HL(b->cpu) + 1u);
+			Z80_HL(b->cpu) = hl;
+			Z80_F(b->cpu) = flags;
+			Z80_PC(b->cpu) = 0x2A3E;
+			ran = 15;
+			break;
+		case 0x2A3E:
+			if ((Z80_F(b->cpu) & 0x40u) != 0) {
+				fill_ret(b);
+				ran = 11;
+				done = 1;
+			} else {
+				Z80_PC(b->cpu) = 0x2A3F;
+				ran = 5;
+			}
+			break;
+		case 0x2A3F:
+			Z80_A(b->cpu) = board_mem_read(b, Z80_DE(b->cpu));
+			Z80_MEMPTR(b->cpu) = (uint16_t)(Z80_DE(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x2A40;
+			ran = 7;
+			break;
+		case 0x2A40:
+			Z80_F(b->cpu) = cp_flags(Z80_A(b->cpu), 0x10);
+			Z80_PC(b->cpu) = 0x2A42;
+			ran = 7;
+			break;
+		case 0x2A42:
+			Z80_MEMPTR(b->cpu) = 0x2A53;
+			Z80_PC(b->cpu) = (Z80_F(b->cpu) & 0x40u) != 0 ? 0x2A53 : 0x2A45;
+			ran = 10;
+			break;
+		case 0x2A45:
+			Z80_F(b->cpu) = cp_flags(Z80_A(b->cpu), 0x12);
+			Z80_PC(b->cpu) = 0x2A47;
+			ran = 7;
+			break;
+		case 0x2A47:
+			Z80_MEMPTR(b->cpu) = 0x2A53;
+			Z80_PC(b->cpu) = (Z80_F(b->cpu) & 0x40u) != 0 ? 0x2A53 : 0x2A4A;
+			ran = 10;
+			break;
+		case 0x2A4A:
+			Z80_F(b->cpu) = cp_flags(Z80_A(b->cpu), 0x14);
+			Z80_PC(b->cpu) = 0x2A4C;
+			ran = 7;
+			break;
+		case 0x2A4C:
+			Z80_MEMPTR(b->cpu) = 0x2A53;
+			Z80_PC(b->cpu) = (Z80_F(b->cpu) & 0x40u) != 0 ? 0x2A53 : 0x2A4F;
+			ran = 10;
+			break;
+		case 0x2A4F:
+			Z80_DE(b->cpu) = (uint16_t)(Z80_DE(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x2A50;
+			ran = 6;
+			break;
+		case 0x2A50:
+			Z80_MEMPTR(b->cpu) = 0x2A38;
+			Z80_PC(b->cpu) = 0x2A38;
+			ran = 10;
+			break;
+		case 0x2A53:
+			Z80_A(b->cpu) = 0x40;
+			Z80_PC(b->cpu) = 0x2A55;
+			ran = 7;
+			break;
+		case 0x2A55:
+			a = 0x40;
+			board_mem_write(b, Z80_DE(b->cpu), a);
+			Z80_MEMPTR(b->cpu) = (uint16_t)(((uint16_t)a << 8) |
+				(uint16_t)((uint8_t)(Z80_E(b->cpu) + 1u)));
+			Z80_PC(b->cpu) = 0x2A56;
+			ran = 7;
+			break;
+		case 0x2A56:
+			Z80_DE(b->cpu) = (uint16_t)(Z80_DE(b->cpu) + 1u);
+			Z80_PC(b->cpu) = 0x2A57;
+			ran = 6;
+			break;
+		case 0x2A57:
+			Z80_MEMPTR(b->cpu) = 0x2A38;
+			Z80_PC(b->cpu) = 0x2A38;
+			ran = 10;
+			break;
+		default:
+			return;
+		}
+		charge_fill(b, ran);
+		if (done)
+			return;
+	}
+}
