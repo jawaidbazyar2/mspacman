@@ -19,10 +19,10 @@ ERR       := $(BUILD_DIR)/mspac.err
 BOOTS     := boot1 boot2 boot3 boot4 boot5 boot6
 
 GFX_DIR   := $(BUILD_DIR)/gfx
-TILE_ROM  := mspacman-orig/5e
-SPRITE_ROM := mspacman-orig/5f
-COLOR_ROM := mspacman-orig/82s123.7f
-PALETTE_ROM := mspacman-orig/82s126.4a
+TILE_ROM  := mspacman/5e
+SPRITE_ROM := mspacman/5f
+COLOR_ROM := mspacman/82s123.7f
+PALETTE_ROM := mspacman/82s126.4a
 
 MERLIN32  ?= $(HOME)/src/Merlin32_v1.2_b2/MacOs/Merlin32
 MERLIN_LIB ?= $(HOME)/src/Merlin32_v1.2_b2/Library
@@ -39,10 +39,36 @@ GSSQUARED ?= $(HOME)/src/gssquared/build/GSSquared
 # Live debug is the gs2-debug MCP server (.cursor/mcp.json) — see AGENTS.md.
 GS2_PY    := $(HOME)/src/gssquared/clients/python/src
 
+LIFT_DIR := lift
+LIFT_BIN := $(BUILD_DIR)/lift/mspac-lift
+LIFT_SRCS := $(LIFT_DIR)/main.c $(LIFT_DIR)/board.c $(LIFT_DIR)/video.c \
+	$(LIFT_DIR)/audio.c $(LIFT_DIR)/input.c $(LIFT_DIR)/corpus.c \
+	$(LIFT_DIR)/third_party/Z80/sources/Z80.c
+SDL_CFLAGS := -I/usr/local/include
+SDL_LIBS := -L/usr/local/lib -lSDL3 -Wl,-rpath,/usr/local/lib
+
 .PHONY: all clean verify sjasmplus-check gfx gfx-ppm palette maze tiles-preview \
-	iigs iigs-test iigs-demo iigs-game iigs-game-test iigs-game-demo iigs-gsos
+	iigs iigs-test iigs-demo iigs-game iigs-game-test iigs-game-demo iigs-gsos \
+	lift lift-check
 
 all: $(BIN)
+
+$(BUILD_DIR)/lift:
+	mkdir -p $(BUILD_DIR)/lift
+
+# Phase-1 Z80 host. CPU image is the assembled working source.
+lift: $(LIFT_BIN)
+
+$(LIFT_BIN): $(LIFT_SRCS) $(LIFT_DIR)/lift.h $(BIN) | $(BUILD_DIR)/lift
+	cc -std=c11 -O2 -Wall -Wextra \
+		-I $(LIFT_DIR)/third_party/Z80/API \
+		-I $(LIFT_DIR)/third_party/Zeta/API \
+		$(SDL_CFLAGS) \
+		-DZ80_STATIC -DZ80_WITH_EXECUTE \
+		-o $@ $(LIFT_SRCS) $(SDL_LIBS)
+
+lift-check: $(LIFT_BIN)
+	$(LIFT_BIN) --check 600
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)

@@ -1,0 +1,377 @@
+
+             ________________   ________________ _________________
+            |               /\ |                ||                |
+            |_______       / / |      ____      ||      ____      |
+             \_____/      / /  |     |____|     ||     |___/|     |
+                  /      / /   |                ||     |  | |     |
+                 /      / /    |      ____      ||     |  | |     |
+                /      /_/_____|     |____|     ||     |__|_|     |
+               /              ||                ||                |
+              /_______________||________________||________________|
+              \________________\\______________//________________/
+
+ ______________________________________________________________________________
+|                                                                              |
+|                            Zilog Z80 CPU Emulator                            |
+|                                  version 0.2                                 |
+|                                                                              |
+|            Copyright (C) 1999-2026 Manuel Sainz de Baranda y Goñi            |
+|     Released under the terms of the GNU Lesser General Public License v3     |
+|                                                                              |
+|                          https://zxe.io/software/Z80                         |
+|                                                                              |
+'=============================================================================='
+
+
+1.  Introduction
+================
+
+The Z80 library implements a fast, small and accurate emulator of the Zilog Z80.
+It emulates all that is known to date about this CPU, including the undocumented
+behaviors, MEMPTR, Q and the special RESET. It also has the honor of having been
+the first open-source project to provide full emulation of the interrupt mode 0.
+
+The source code is written in ANSI C for maximum portability and is extensively
+commented. The aim has been to write a well-structured, easy-to-understand piece
+of software; something solid and elegant that can stand the test of time with no
+need for major changes.
+
+
+2.  Accuracy
+============
+
+This Z80 CPU emulator has a classic design with instruction-level granularity
+that delivers high performance, whilst offering reasonable flexibility to
+achieve precision down to the T-state level.
+
+Instruction-level granularity implies that, except in a few well-defined cases,
+the execution of a given instruction cannot stop until all its internal M-cycles
+have been processed (i.e., instructions are not divided into micro-operations).
+Moreover, registers are modified only once per instruction and the T-state
+counter is normally updated after a full instruction has been executed.
+
+That said, instructions, flags, memory accesses, interrupts, clock cycles, etc.,
+are accurately emulated according to the available technical documentation, the
+findings made after decades of research on the Z80 and electronic simulations.
+And, of course, the emulator passes the most exhaustive tests written to date,
+such as Frank D. Cringle's "Z80 Instruction Set Exerciser", Mark Woodmass' "Z80
+Test Suite", Patrik Rak's "Zilog Z80 CPU Test Suite" and Peter Helcmanovsky's
+"Z80 Block Flags Test", to name a few.
+
+
+3.  Installation from source code
+=================================
+
+3.1.  Prerequisites
+
+You will need CMake v3.14 or later to build the package and, optionally, recent
+versions of Doxygen, Sphinx and Breathe to compile the documentation. Also, make
+sure that you have LaTeX with PDF support installed on your system if you want
+to generate the documentation in PDF format.
+
+The Z80 library requires some types and macros included in Zeta, a header-only,
+dependency-free library used for portability reasons. Install Zeta or extract
+its source code tarball to the root directory of the Z80 project or its parent
+directory. Zeta is the sole dependency; the emulator does not depend on the C
+standard library.
+
+Lastly, the package includes two testing tools, which are optional to build.
+The first one runs various Z80-specific tests for CP/M and ZX Spectrum, and will
+use libzip and zlib if they are available on your system. The second tool is for
+unit tests in JSON format and requires the cJSON and Z80InsnClock libraries.
+
+3.2.  Configure
+
+Once the prerequisites are met, create a directory and run `cmake` from there to
+prepare the build system:
+
+    $ mkdir build
+    $ cd build
+    $ cmake [options] <Z80-project-directory>
+
+The resulting build files can be configured by passing options to `cmake`. To
+show a complete list of those available along with their current settings, type
+the following:
+
+    $ cmake -LAH -N -B .
+
+If in doubt, read the CMake documentation for more information on configuration
+options. The following are some of the most relevant standard options of CMake:
+
+    -DBUILD_SHARED_LIBS=(YES|NO)
+        Generate shared libraries rather than static libraries.
+        The default is `NO`.
+
+    -DCMAKE_BUILD_TYPE=(Debug|Release|RelWithDebInfo|MinSizeRel)
+        Choose the type of build (configuration) to generate.
+        The default is `Release`.
+
+    -DCMAKE_INSTALL_NAME_DIR="<path>"
+        Specify the directory portion of the dynamic library install name on
+        Apple platforms (for installed shared libraries).
+        Not defined by default.
+
+    -DCMAKE_INSTALL_PREFIX="<path>"
+        Specify the installation prefix.
+        The default is `/usr/local` (on UNIX and UNIX-like operating systems).
+
+Package-specific options are prefixed with `Z80_` and can be divided into two
+groups. The first one controls aspects not related to the source code of the
+library:
+
+    -DZ80_DEPOT_LOCATION="<location>"
+        Specify the directory or URL of the depot containing the test files
+        (i.e., the firmware and software required by the `test-Z80` tool).
+        The default is `http://zxe.io/depot`.
+
+    -DZ80_FETCH_TEST_FILES=(YES|NO)
+        If `Z80_WITH_TESTING_TOOL` is `YES`, copy or download the test files
+        from the depot to the build directory.
+        The default is `NO`.
+
+    -DZ80_INSTALL_CMAKEDIR="<path>"
+        Specify the directory in which to install the CMake config-file package.
+        The default is `"${CMAKE_INSTALL_LIBDIR}/cmake/Z80"`.
+
+    -DZ80_INSTALL_PKGCONFIGDIR="<path>"
+        Specify the directory in which to install the pkg-config file.
+        The default is `"${CMAKE_INSTALL_LIBDIR}/pkgconfig"`.
+
+    -DZ80_NOSTDLIB_FLAGS=(Auto|"[<flag>[;<flag>...]]")
+        Specify the linker flags used to avoid linking against system libraries.
+        The default is `Auto` (autoconfigure flags). If you get linker errors,
+        set this option to `""`.
+
+    -DZ80_OBJECT_LIBS=(YES|NO)
+        Build the emulator as an object library.
+        This option takes precedence over `BUILD_SHARED_LIBS` and
+        `Z80_SHARED_LIBS`. If enabled, the build system will ignore
+        `Z80_WITH_CMAKE_SUPPORT` and `Z80_WITH_PKGCONFIG_SUPPORT`, as no
+        libraries or support files will be installed.
+        The default is `NO`.
+
+    -DZ80_SHARED_LIBS=(YES|NO)
+        Build the emulator as a shared library, rather than static.
+        This option takes precedence over `BUILD_SHARED_LIBS`.
+        Not defined by default.
+
+    -DZ80_SPHINX_HTML_THEME="[<name>]"
+        Specify the Sphinx theme for the documentation in HTML format.
+        The default is `""` (use the default theme).
+
+    -DZ80_WITH_CMAKE_SUPPORT=(YES|NO)
+        Generate and install the CMake config-file package.
+        The default is `NO`.
+
+    -DZ80_WITH_HTML_DOCUMENTATION=(YES|NO)
+        Build and install the documentation in HTML format.
+        It requires Doxygen, Sphinx and Breathe.
+        The default is `NO`.
+
+    -DZ80_WITH_PDF_DOCUMENTATION=(YES|NO)
+        Build and install the documentation in PDF format.
+        It requires Doxygen, Sphinx, Breathe, and LaTeX with PDF support.
+        The default is `NO`.
+
+    -DZ80_WITH_PKGCONFIG_SUPPORT=(YES|NO)
+        Generate and install the pkg-config file.
+        The default is `NO`.
+
+    -DZ80_WITH_STANDARD_DOCUMENTS=(YES|NO)
+        Install the standard text documents distributed with the package:
+        AUTHORS, COPYING, COPYING.LESSER, HISTORY, README and THANKS.
+        The default is `NO`.
+
+    -DZ80_WITH_STEP_TESTING_TOOL=(YES|NO)
+        Build `step-test-Z80`, a tool for unit tests in JSON format.
+        It requires cJSON and Z80InsnClock.
+        The default is `NO`.
+
+    -DZ80_WITH_TESTING_TOOL=(YES|NO)
+        Build `test-Z80`, a tool that runs various Z80-specific tests for CP/M
+        and ZX Spectrum.
+        The default is `NO`.
+
+The second group of package-specific options configures the source code of the
+library by predefining macros that enable optional features:
+
+    -DZ80_WITH_EXECUTE=(YES|NO)
+        Build the implementation of the `z80_execute` function.
+        The default is `NO`.
+
+    -DZ80_WITH_FULL_IM0=(YES|NO)
+        Build the full implementation of the interrupt mode 0 rather than the
+        reduced one.
+        The default is `NO`.
+
+    -DZ80_WITH_IM0_RETX_NOTIFICATIONS=(YES|NO)
+        Enable optional notifications for any `reti` or `retn` instruction
+        executed during the interrupt mode 0 response.
+        The default is `NO`.
+
+    -DZ80_WITH_PARITY_COMPUTATION=(YES|NO)
+        Enable actual parity calculation for the P/V flag instead of using a
+        table of precomputed values (NOT RECOMMENDED for production builds).
+        The default is `NO`.
+
+    -DZ80_WITH_PRECOMPUTED_DAA=(YES|NO)
+        Use a table of precomputed values to emulate the `daa` instruction (NOT
+        RECOMMENDED for production builds).
+        The default is `NO`.
+
+    -DZ80_WITH_Q=(YES|NO)
+        Build the implementation of Q.
+        The default is `NO`.
+
+    -DZ80_WITH_SPECIAL_RESET=(YES|NO)
+        Build the implementation of the special RESET.
+        The default is `NO`.
+
+    -DZ80_WITH_UNOFFICIAL_RETI=(YES|NO)
+        Configure the undocumented instructions ED5Dh, ED6Dh and ED7Dh as `reti`
+        instead of `retn`.
+        The default is `NO`.
+
+    -DZ80_WITH_ZILOG_NMOS_LD_A_IR_BUG=(YES|NO)
+        Build the implementation of the bug affecting the Zilog Z80 NMOS, which
+        causes the P/V flag to be reset when a maskable interrupt is accepted
+        during the execution of the `ld a,{i|r}` instructions.
+        The default is `NO`.
+
+Package maintainers are encouraged to use at least the following options for the
+shared library:
+
+    -DZ80_WITH_EXECUTE=YES
+    -DZ80_WITH_FULL_IM0=YES
+    -DZ80_WITH_IM0_RETX_NOTIFICATIONS=YES
+    -DZ80_WITH_Q=YES
+    -DZ80_WITH_ZILOG_NMOS_LD_A_IR_BUG=YES
+
+3.3.  Build and install
+
+Finally, once the build system is configured according to your needs, build and
+install the package:
+
+    $ cmake --build . [--config (Debug|Release|RelWithDebInfo|MinSizeRel)]
+    # cmake --install . [--config <configuration>] [--strip]
+
+The `--config` option is only necessary for those CMake generators that ignore
+`CMAKE_BUILD_TYPE` (e.g., Xcode and Visual Studio). Use `--strip` to remove
+debugging information and non-public symbols when installing non-debug builds of
+the shared library.
+
+
+4.  Integration
+===============
+
+4.1.  As an external dependency in CMake-based projects
+
+The Z80 library includes a config-file package for integration into CMake-based
+projects that must be installed for development. Use `find_package` to find the
+`Z80` package. This creates the `Z80` imported library target, which carries the
+necessary transitive link dependencies. Optionally, the linking method can be
+selected by specifying either the `Shared` or `Static` component.
+
+Example:
+
+    find_package(Z80 REQUIRED Shared)
+    target_link_libraries(your-target Z80)
+
+When not specified as a component, the linking method is selected according to
+`Z80_SHARED_LIBS`. If this option is not defined, the config-file uses the type
+of library that is installed on the system and, if it finds both the shared and
+the static versions, `BUILD_SHARED_LIBS` determines which one to link against.
+
+4.2.  As a CMake subproject
+
+To embed the Z80 library as a CMake subproject, extract the source code tarballs
+of Zeta and Z80 (or clone their respective repositories) into a subdirectory of
+another project. Then use `add_subdirectory` in the parent project to add the
+Z80 source code tree to the build process (N.B., the Z80 subproject will
+automatically find Zeta and import it as an interface library).
+
+It is advisable to configure the Z80 library in the CMakeLists.txt of the parent
+project. This will eliminate the need for the user to specify configuration
+options for the Z80 subproject through the command line when building the main
+project. See section 3.2 of this document for a list of available configuration
+options.
+
+Example:
+
+    set(Z80_SHARED_LIBS                 NO  CACHE BOOL "")
+    set(Z80_WITH_Q                      YES CACHE BOOL "")
+    set(Z80_WITH_ZILOG_NMOS_LD_A_IR_BUG YES CACHE BOOL "")
+
+    add_subdirectory(dependencies/Z80)
+    target_link_libraries(your-target Z80)
+
+It is important to set the `Z80_SHARED_LIBS` option. Otherwise, CMake will build
+the library type indicated by `BUILD_SHARED_LIBS`, which may not be the desired
+one.
+
+4.3.  Non-CMake-based projects
+
+The source code of the emulator can be configured at compile time by predefining
+a series of macros. Both Z80.h and Z80.c obey the first two explained below. The
+rest of the macros are only relevant when compiling Z80.c:
+
+    #define Z80_EXTERNAL_HEADER "header-name.h"
+        Specifies the only external header to `#include`, replacing all others.
+        Predefine this macro to provide a header file that defines the external
+        types and macros used by the emulator, thus preventing your project from
+        depending on Zeta. You can use this when compiling Z80.c within your
+        project or (if your types do not break the binary compatibility) when
+        including `<Z80.h>` and linking against a pre-built Z80 library.
+
+    #define Z80_STATIC
+        Indicates that the emulator is a static library.
+        This macro must be predefined when building Z80.c as a static library.
+        Additionally, if you compile Z80.c directly within your project or link
+        your program against the static version of the Z80 library, ensure that
+        this macro is defined before including `"Z80.h"` or `<Z80.h>`.
+
+    #define Z80_WITH_LOCAL_HEADER
+        Tells Z80.c to `#include "Z80.h"` instead of `<Z80.h>`.
+
+The optional features of the emulator mentioned in section 3.2 of this document
+are disabled by default. If you compile Z80.c within your project, enable those
+features you need by predefining their respective activation macros. They have
+the same name as their CMake equivalents:
+
+    #define Z80_WITH_EXECUTE
+    #define Z80_WITH_FULL_IM0
+    #define Z80_WITH_IM0_RETX_NOTIFICATIONS
+    #define Z80_WITH_PARITY_COMPUTATION
+    #define Z80_WITH_PRECOMPUTED_DAA
+    #define Z80_WITH_Q
+    #define Z80_WITH_SPECIAL_RESET
+    #define Z80_WITH_UNOFFICIAL_RETI
+    #define Z80_WITH_VOLATILE_CYCLES
+    #define Z80_WITH_ZILOG_NMOS_LD_A_IR_BUG
+
+Except for `Z80_EXTERNAL_HEADER`, the above macros can be empty; the source code
+only checks whether they are defined.
+
+Please note that the activation of some of the optional features affects the
+speed of the emulator due to various factors (read the documentation for more
+details).
+
+
+5.  License
+===========
+
+This library is free software: you can redistribute it and/or modify it under
+the terms of the GNU Lesser General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version.
+
+This library is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License along
+with this library. If not, see <http://www.gnu.org/licenses/>.
+
+
+________________________________________________________________________________
+Last update: 2026-01-01                                               README EOF

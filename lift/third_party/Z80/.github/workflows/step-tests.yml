@@ -1,0 +1,116 @@
+name: Step tests
+
+on:
+  push:
+    paths:
+    - '.github/workflows/step-tests.yml'
+    - 'API/**'
+    - 'CMake/FindZeta.cmake'
+    - 'sources/step-test-Z80.c'
+    - 'sources/Z80.c'
+    - 'CMakeLists.txt'
+  pull_request:
+    paths:
+    - '.github/workflows/step-tests.yml'
+    - 'API/**'
+    - 'CMake/FindZeta.cmake'
+    - 'sources/step-test-Z80.c'
+    - 'sources/Z80.c'
+    - 'CMakeLists.txt'
+
+env:
+  TEST_FILES_QUERY_URL: 'https://api.github.com/repos/SingleStepTests/z80/releases/latest'
+  TEST_FILES_PATH: '*/v1'
+  BUILD_SHARED_LIBS: YES
+  CMAKE_BUILD_TYPE: Release
+  Z80_FETCH_TEST_FILES: NO
+  Z80_NOSTDLIB_FLAGS: Auto
+  Z80_OBJECT_LIBS: NO
+  Z80_WITH_CMAKE_SUPPORT: NO
+  Z80_WITH_CODE_GENERATION_TOOLS: NO
+  Z80_WITH_HTML_DOCUMENTATION: NO
+  Z80_WITH_PDF_DOCUMENTATION: NO
+  Z80_WITH_PKGCONFIG_SUPPORT: NO
+  Z80_WITH_STANDARD_DOCUMENTS: NO
+  Z80_WITH_STEP_TESTING_TOOL: YES
+  Z80_WITH_TESTING_TOOL: NO
+  Z80_WITH_EXECUTE: YES
+  Z80_WITH_FULL_IM0: YES
+  Z80_WITH_IM0_RETX_NOTIFICATIONS: YES
+  Z80_WITH_PARITY_COMPUTATION: NO
+  Z80_WITH_PRECOMPUTED_DAA: NO
+  Z80_WITH_Q: YES
+  Z80_WITH_SPECIAL_RESET: YES
+  Z80_WITH_UNOFFICIAL_RETI: NO
+  Z80_WITH_ZILOG_NMOS_LD_A_IR_BUG: YES
+
+jobs:
+  step-tests:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies (macOS)
+      if: startsWith(matrix.os, 'macos')
+      run: |
+        brew install cjson
+        brew install redcode/zxe/z80insnclock
+
+    - name: Install dependencies (Ubuntu)
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        curl -L https://zxe.io/scripts/add-zxe-apt-repo.sh | sudo sh
+        sudo apt-get update
+        sudo apt-get -y install libcjson-dev
+        sudo apt-get -y install libz80insnclock-dev
+
+    - name: Fetch test files
+      run: |
+        mkdir -p "${{ github.workspace }}/build/step-tests"
+        curl -L $(curl -sL "${{ env.TEST_FILES_QUERY_URL }}" | jq -r .tarball_url) |
+        gzip -cd |
+        tar -C "${{ github.workspace }}/build/step-tests" --strip-components=2 -xf - $([[ $(tar --version | head -n 1 | cut -d " " -f 1) = tar ]] && echo --wildcards) "${{ env.TEST_FILES_PATH }}"
+
+    - name: Configure CMake
+      run: >-
+        cmake
+        -DBUILD_SHARED_LIBS=${{ env.BUILD_SHARED_LIBS }}
+        -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }}
+        -DZ80_FETCH_TEST_FILES=${{ env.Z80_FETCH_TEST_FILES }}
+        -DZ80_NOSTDLIB_FLAGS=${{ env.Z80_NOSTDLIB_FLAGS }}
+        -DZ80_OBJECT_LIBS=${{ env.Z80_OBJECT_LIBS }}
+        -DZ80_WITH_CMAKE_SUPPORT=${{ env.Z80_WITH_CMAKE_SUPPORT }}
+        -DZ80_WITH_CODE_GENERATION_TOOLS=${{ env.Z80_WITH_CODE_GENERATION_TOOLS }}
+        -DZ80_WITH_HTML_DOCUMENTATION=${{ env.Z80_WITH_HTML_DOCUMENTATION }}
+        -DZ80_WITH_PDF_DOCUMENTATION=${{ env.Z80_WITH_PDF_DOCUMENTATION }}
+        -DZ80_WITH_PKGCONFIG_SUPPORT=${{ env.Z80_WITH_PKGCONFIG_SUPPORT }}
+        -DZ80_WITH_STANDARD_DOCUMENTS=${{ env.Z80_WITH_STANDARD_DOCUMENTS }}
+        -DZ80_WITH_STEP_TESTING_TOOL=${{ env.Z80_WITH_STEP_TESTING_TOOL }}
+        -DZ80_WITH_TESTING_TOOL=${{ env.Z80_WITH_TESTING_TOOL }}
+        -DZ80_WITH_EXECUTE=${{ env.Z80_WITH_EXECUTE }}
+        -DZ80_WITH_FULL_IM0=${{ env.Z80_WITH_FULL_IM0 }}
+        -DZ80_WITH_IM0_RETX_NOTIFICATIONS=${{ env.Z80_WITH_IM0_RETX_NOTIFICATIONS }}
+        -DZ80_WITH_PARITY_COMPUTATION=${{ env.Z80_WITH_PARITY_COMPUTATION }}
+        -DZ80_WITH_PRECOMPUTED_DAA=${{ env.Z80_WITH_PRECOMPUTED_DAA }}
+        -DZ80_WITH_Q=${{ env.Z80_WITH_Q }}
+        -DZ80_WITH_SPECIAL_RESET=${{ env.Z80_WITH_SPECIAL_RESET }}
+        -DZ80_WITH_UNOFFICIAL_RETI=${{ env.Z80_WITH_UNOFFICIAL_RETI }}
+        -DZ80_WITH_ZILOG_NMOS_LD_A_IR_BUG=${{ env.Z80_WITH_ZILOG_NMOS_LD_A_IR_BUG }}
+        -B "${{ github.workspace }}/build"
+        -S "${{ github.workspace }}"
+
+    - name: Build
+      run: cmake --build "${{ github.workspace }}/build" --config ${{ env.CMAKE_BUILD_TYPE }} --verbose
+
+    - name: Test
+      working-directory: ${{ github.workspace }}/build
+      run: ./step-test-Z80 step-tests/*.json
+
+    - name: Test with `--run`
+      working-directory: ${{ github.workspace }}/build
+      run: ./step-test-Z80 --run step-tests/*.json
