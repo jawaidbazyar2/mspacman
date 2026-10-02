@@ -230,6 +230,14 @@ extern void j_212b(Board *b);
 extern void j_21f0(Board *b);
 extern void j_22b9(Board *b);
 extern void j_3678(Board *b);
+extern void j_2195(Board *b);
+extern void j_3483(Board *b);
+extern void j_3488(Board *b);
+extern void j_348d(Board *b);
+extern void j_3492(Board *b);
+extern void j_3497(Board *b);
+extern void j_349c(Board *b);
+extern void j_3611(Board *b);
 extern void j_0e6c(Board *b);
 extern void j_15e6(Board *b);
 extern void j_1a6a(Board *b);
@@ -408,6 +416,14 @@ void c_register_leaves(Board *b)
 	c_add_lift(0x21F0, j_21f0, "j_21f0");
 	c_add_lift(0x22B9, j_22b9, "j_22b9");
 	c_add_lift(0x3678, j_3678, "j_3678");
+	c_add_lift(0x2195, j_2195, "j_2195");
+	c_add_lift(0x3483, j_3483, "j_3483");
+	c_add_lift(0x3488, j_3488, "j_3488");
+	c_add_lift(0x348D, j_348d, "j_348d");
+	c_add_lift(0x3492, j_3492, "j_3492");
+	c_add_lift(0x3497, j_3497, "j_3497");
+	c_add_lift(0x349C, j_349c, "j_349c");
+	c_add_lift(0x3611, j_3611, "j_3611");
 }
 
 void lift_call_z80(Board *b, uint16_t target)
