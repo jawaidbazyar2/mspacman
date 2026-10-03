@@ -5,7 +5,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-/* Frame record, little-endian, no padding. 2664 bytes.
+/* Frame record, version 3, little-endian, no padding. 3176 bytes.
  *  0 u32 length
  *  4 u32 frame number
  *  8 13*u16  PC SP AF BC DE HL AF' BC' DE' HL' IX IY WZ
@@ -15,11 +15,25 @@
  * 82 u16     watchdog, before the end-of-frame increment
  * 84 1024    tile RAM $4000
  * 1108 1024  color RAM $4400
- * 2132 496   work RAM $4C00
- * 2628 16    sprite RAM $4FF0
- * 2644 16    sprite positions $5060
- * 2660 u32   generator state after this frame
+ * 2132 1008  work RAM $4C00-$4FEF
+ * 3140 16    sprite RAM $4FF0
+ * 3156 16    sprite positions $5060
+ * 3172 u32   generator state after this frame
+ *
+ * Version 2 is the same with 496 bytes of work RAM ($4C00-$4DEF). It is
+ * read into the version 3 layout and the missing bytes are not compared.
  */
+
+#define OFF_WORK    2132
+#define WORK_BYTES  1008
+#define WORK_V2     496
+#define OFF_SPRITE  (OFF_WORK + WORK_BYTES)
+#define OFF_SPRPOS  (OFF_SPRITE + 16)
+#define OFF_RAND    (OFF_SPRPOS + 16)
+
+#define MASK_REGS   1
+#define MASK_STACK  2
+#define MASK_V2     4
 
 static int write_all(FILE *f, const void *p, size_t n)
 {
@@ -113,31 +127,37 @@ static void field_name(int off, char *name, size_t cap)
 		snprintf(name, cap, "tile+$%04X", 0x4000 + (off - 84));
 	} else if (off < 2132) {
 		snprintf(name, cap, "color+$%04X", 0x4400 + (off - 1108));
-	} else if (off < 2628) {
-		snprintf(name, cap, "work+$%04X", 0x4C00 + (off - 2132));
-	} else if (off < 2644) {
-		snprintf(name, cap, "sprite+$%04X", 0x4FF0 + (off - 2628));
-	} else if (off < LIFT_FRAME_BYTES - 4) {
-		snprintf(name, cap, "sprpos+$%04X", 0x5060 + (off - 2644));
+	} else if (off < OFF_SPRITE) {
+		snprintf(name, cap, "work+$%04X", 0x4C00 + (off - OFF_WORK));
+	} else if (off < OFF_SPRPOS) {
+		snprintf(name, cap, "sprite+$%04X", 0x4FF0 + (off - OFF_SPRITE));
+	} else if (off < OFF_RAND) {
+		snprintf(name, cap, "sprpos+$%04X", 0x5060 + (off - OFF_SPRPOS));
 	} else {
-		snprintf(name, cap, "rand+%d", off - (LIFT_FRAME_BYTES - 4));
+		snprintf(name, cap, "rand+%d", off - OFF_RAND);
 	}
 }
 
-/* C-only compare leaves out the register block. The CPU stack at
- * $4F01-$4FBF is past the 496 bytes of work RAM in the record. */
-static int c_only_masked(int off)
+/* C-only compare leaves out the register block and the CPU stack at
+ * $4F01-$4FBF. The C keeps neither the way the Z80 did. */
+static int masked_at(int off, int mask)
 {
-	return off >= 8 && off < 42;
+	if ((mask & MASK_REGS) && off >= 8 && off < 42)
+		return 1;
+	if ((mask & MASK_STACK) && off >= OFF_WORK + 0x301 && off <= OFF_WORK + 0x3BF)
+		return 1;
+	if ((mask & MASK_V2) && off >= OFF_WORK + WORK_V2 && off < OFF_SPRITE)
+		return 1;
+	return 0;
 }
 
-static int diff_from(const uint8_t *expect, const uint8_t *got, int masked,
+static int diff_from(const uint8_t *expect, const uint8_t *got, int mask,
 		     char *msg, size_t cap)
 {
 	for (int off = 0; off < LIFT_FRAME_BYTES; off++) {
 		if (expect[off] == got[off])
 			continue;
-		if (masked && c_only_masked(off))
+		if (masked_at(off, mask))
 			continue;
 		char name[32];
 		field_name(off, name, sizeof name);
@@ -207,13 +227,37 @@ static void unpack_frame(Board *b, const uint8_t *rec)
 	p += 1024;
 	memcpy(b->mem + 0x4400, p, 1024);
 	p += 1024;
-	memcpy(b->mem + 0x4C00, p, 496);
-	p += 496;
+	memcpy(b->mem + 0x4C00, p, WORK_BYTES);
+	p += WORK_BYTES;
 	memcpy(b->mem + 0x4FF0, p, 16);
 	p += 16;
 	memcpy(b->spr2, p, 16);
 	p += 16;
 	b->rand_state = get_u32(p);
+}
+
+/* One record from the frames file, in the version 3 layout. A version 2
+ * record reads as zeros at $4DF0-$4FEF. */
+static int read_record(Board *b, uint8_t *rec)
+{
+	if (b->corpus.file_ver == LIFT_FRAME_VER)
+		return read_all(b->corpus.frames, rec, LIFT_FRAME_BYTES);
+	if (!read_all(b->corpus.frames, rec, LIFT_FRAME_BYTES_V2))
+		return 0;
+	memmove(rec + OFF_SPRITE, rec + OFF_WORK + WORK_V2,
+		LIFT_FRAME_BYTES_V2 - (OFF_WORK + WORK_V2));
+	memset(rec + OFF_WORK + WORK_V2, 0, WORK_BYTES - WORK_V2);
+	put_u32(rec, LIFT_FRAME_BYTES);
+	return 1;
+}
+
+static int compare_mask(Board *b)
+{
+	int mask = b->c_only ? MASK_REGS | MASK_STACK : 0;
+
+	if (b->corpus.file_ver != LIFT_FRAME_VER)
+		mask |= MASK_V2;
+	return mask;
 }
 
 /* C-only replay does not run the self-test or boot. It loads the first
@@ -227,7 +271,7 @@ static int seek_idle(Board *b)
 		b->frame_index = i;
 		if (corpus_begin_frame(b) != 0)
 			return -1;
-		if (!read_all(b->corpus.frames, rec, LIFT_FRAME_BYTES))
+		if (!read_record(b, rec))
 			return -1;
 		if (idle_record(rec)) {
 			unpack_frame(b, rec);
@@ -275,8 +319,8 @@ static void pack_frame(Board *b, uint8_t *out)
 	p += 1024;
 	memcpy(p, b->mem + 0x4400, 1024);
 	p += 1024;
-	memcpy(p, b->mem + 0x4C00, 496);
-	p += 496;
+	memcpy(p, b->mem + 0x4C00, WORK_BYTES);
+	p += WORK_BYTES;
 	memcpy(p, b->mem + 0x4FF0, 16);
 	p += 16;
 	memcpy(p, b->spr2, 16);
@@ -299,38 +343,61 @@ static int write_file_header(FILE *f, uint8_t dsw1, uint32_t seed)
 	       write_u32(f, seed);
 }
 
-int corpus_open_record(Board *b, const char *dir)
+static int open_session(const char *dir, uint8_t dsw1, uint32_t seed,
+			FILE **frames, FILE **inputs)
 {
 	if (mkdir(dir, 0755) != 0 && errno != EEXIST) {
 		perror(dir);
 		return -1;
 	}
-	snprintf(b->corpus.dir, sizeof b->corpus.dir, "%s", dir);
 	char path[640];
 	snprintf(path, sizeof path, "%s/frames", dir);
-	b->corpus.frames = fopen(path, "wb");
+	*frames = fopen(path, "wb");
+	snprintf(path, sizeof path, "%s/inputs", dir);
+	*inputs = *frames ? fopen(path, "wb") : NULL;
+	if (*inputs && write_file_header(*frames, dsw1, seed) &&
+	    write_u32(*inputs, 0x54504E49u) && write_u32(*inputs, 1))
+		return 0;
+	if (*inputs)
+		fclose(*inputs);
+	if (*frames)
+		fclose(*frames);
+	*frames = NULL;
+	*inputs = NULL;
+	return -1;
+}
+
+int corpus_open_record(Board *b, const char *dir)
+{
+	snprintf(b->corpus.dir, sizeof b->corpus.dir, "%s", dir);
 	b->rand_seed = LIFT_RAND_SEED;
 	b->rand_state = LIFT_RAND_SEED;
-	if (!b->corpus.frames ||
-	    !write_file_header(b->corpus.frames, b->corpus.dsw1, b->rand_seed)) {
-		if (b->corpus.frames)
-			fclose(b->corpus.frames);
-		b->corpus.frames = NULL;
+	if (open_session(dir, b->corpus.dsw1, b->rand_seed, &b->corpus.frames,
+			 &b->corpus.inputs) != 0)
 		return -1;
-	}
-	snprintf(path, sizeof path, "%s/inputs", dir);
-	b->corpus.inputs = fopen(path, "wb");
-	if (!b->corpus.inputs) {
-		fclose(b->corpus.frames);
-		b->corpus.frames = NULL;
-		return -1;
-	}
-	if (!write_u32(b->corpus.inputs, 0x54504E49u) || !write_u32(b->corpus.inputs, 1)) {
-		corpus_close(b);
-		return -1;
-	}
+	b->corpus.file_ver = LIFT_FRAME_VER;
 	b->corpus.recording = 1;
 	return 0;
+}
+
+/* While replaying, write what this host produces as a new session. The
+ * inputs are the replayed port reads, so a version 2 session replayed on
+ * the Z80 comes out as the same play in version 3. */
+int corpus_open_rewrite(Board *b, const char *dir)
+{
+	return open_session(dir, b->corpus.dsw1, b->rand_seed, &b->corpus.out_frames,
+			    &b->corpus.out_inputs);
+}
+
+static void write_frame(Board *b, FILE *frames, FILE *inputs)
+{
+	uint16_t n = b->cur.nreads;
+
+	if (!write_all(frames, b->corpus.packed, LIFT_FRAME_BYTES) ||
+	    !write_u16(inputs, n) || (n && !write_all(inputs, b->cur.reads, n)))
+		fprintf(stderr, "lift: frame %u write failed\n", b->frame_index);
+	fflush(frames);
+	fflush(inputs);
 }
 
 void corpus_close(Board *b)
@@ -339,8 +406,14 @@ void corpus_close(Board *b)
 		fclose(b->corpus.inputs);
 	if (b->corpus.frames)
 		fclose(b->corpus.frames);
+	if (b->corpus.out_inputs)
+		fclose(b->corpus.out_inputs);
+	if (b->corpus.out_frames)
+		fclose(b->corpus.out_frames);
 	b->corpus.inputs = NULL;
 	b->corpus.frames = NULL;
+	b->corpus.out_inputs = NULL;
+	b->corpus.out_frames = NULL;
 	b->corpus.recording = 0;
 	b->corpus.replaying = 0;
 }
@@ -361,7 +434,7 @@ int corpus_begin_frame(Board *b)
 	b->corpus.replay_nreads = n;
 	b->corpus.read_pos = 0;
 	if (b->c_only && b->frame_index > b->corpus.start_frame &&
-	    !read_all(b->corpus.frames, b->corpus.want, LIFT_FRAME_BYTES)) {
+	    !read_record(b, b->corpus.want)) {
 		snprintf(b->corpus.mismatch_msg, sizeof b->corpus.mismatch_msg,
 			 "frame %u truncated record", b->frame_index);
 		return -1;
@@ -386,15 +459,10 @@ int corpus_want_paused(Board *b, uint16_t regs[5])
 void corpus_note_frame(Board *b)
 {
 	pack_frame(b, b->corpus.packed);
-	if (b->corpus.recording) {
-		uint16_t n = b->cur.nreads;
-		if (!write_all(b->corpus.frames, b->corpus.packed, LIFT_FRAME_BYTES) ||
-		    !write_u16(b->corpus.inputs, n) ||
-		    (n && !write_all(b->corpus.inputs, b->cur.reads, n)))
-			fprintf(stderr, "lift: frame %u write failed\n", b->frame_index);
-		fflush(b->corpus.frames);
-		fflush(b->corpus.inputs);
-	}
+	if (b->corpus.recording)
+		write_frame(b, b->corpus.frames, b->corpus.inputs);
+	if (b->corpus.out_frames)
+		write_frame(b, b->corpus.out_frames, b->corpus.out_inputs);
 	if (!b->corpus.replaying || b->mismatch)
 		return;
 	if (b->cur.nreads != b->corpus.replay_nreads) {
@@ -407,14 +475,14 @@ void corpus_note_frame(Board *b)
 	uint8_t expect[LIFT_FRAME_BYTES];
 	if (b->c_only) {
 		memcpy(expect, b->corpus.want, LIFT_FRAME_BYTES);
-	} else if (!read_all(b->corpus.frames, expect, LIFT_FRAME_BYTES)) {
+	} else if (!read_record(b, expect)) {
 		snprintf(b->corpus.mismatch_msg, sizeof b->corpus.mismatch_msg,
 			 "frame %u truncated record", b->frame_index);
 		b->mismatch = 1;
 		return;
 	}
 	char detail[96];
-	if (diff_from(expect, b->corpus.packed, b->c_only, detail,
+	if (diff_from(expect, b->corpus.packed, compare_mask(b), detail,
 		      sizeof detail) >= 0) {
 		snprintf(b->corpus.mismatch_msg, sizeof b->corpus.mismatch_msg,
 			 "frame %u %s", b->frame_index, detail);
@@ -435,13 +503,14 @@ int corpus_open_replay(Board *b, const char *dir)
 	uint32_t ver = 0, bytes = 0, cycles = 0, seed = 0;
 	uint8_t dsw = 0, pad[3];
 	if (!read_all(fr, magic, 4) || memcmp(magic, "MSPF", 4) != 0 ||
-	    !read_u32(fr, &ver) || ver != LIFT_FRAME_VER ||
-	    !read_u32(fr, &bytes) || bytes != LIFT_FRAME_BYTES ||
+	    !read_u32(fr, &ver) || !read_u32(fr, &bytes) ||
+	    !((ver == LIFT_FRAME_VER && bytes == LIFT_FRAME_BYTES) ||
+	      (ver == 2 && bytes == LIFT_FRAME_BYTES_V2)) ||
 	    !read_u32(fr, &cycles) || cycles != LIFT_CYCLES_PER_FRAME ||
 	    !read_all(fr, &dsw, 1) || !read_all(fr, pad, 3) ||
 	    !read_u32(fr, &seed)) {
 		fclose(fr);
-		fprintf(stderr, "lift: bad frames header in %s (need MSPF version %u)\n",
+		fprintf(stderr, "lift: bad frames header in %s (need MSPF version 2 or %u)\n",
 			dir, LIFT_FRAME_VER);
 		return -1;
 	}
@@ -450,7 +519,7 @@ int corpus_open_replay(Board *b, const char *dir)
 		return -1;
 	}
 	long sz = ftell(fr);
-	if (sz < LIFT_FRAME_HDR || (sz - LIFT_FRAME_HDR) % LIFT_FRAME_BYTES != 0) {
+	if (sz < LIFT_FRAME_HDR || (sz - LIFT_FRAME_HDR) % (long)bytes != 0) {
 		fclose(fr);
 		fprintf(stderr, "lift: frames length is not a whole number of records\n");
 		return -1;
@@ -480,7 +549,8 @@ int corpus_open_replay(Board *b, const char *dir)
 	b->rand_seed = seed;
 	b->corpus.frames = fr;
 	b->corpus.inputs = in;
-	b->corpus.play_count = (uint32_t)((sz - LIFT_FRAME_HDR) / LIFT_FRAME_BYTES);
+	b->corpus.file_ver = ver;
+	b->corpus.play_count = (uint32_t)((sz - LIFT_FRAME_HDR) / (long)bytes);
 	b->corpus.replaying = 1;
 	b->corpus.recording = 0;
 	b->frame_index = 0;

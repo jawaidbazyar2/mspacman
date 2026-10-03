@@ -20,9 +20,11 @@
 #define LIFT_CALL_DEPTH       8
 #define LIFT_SENTINEL         0xFFFE
 #define LIFT_DSW1_DEFAULT     0xC9
-#define LIFT_FRAME_VER        2
+#define LIFT_FRAME_VER        3
 #define LIFT_FRAME_HDR        24
-#define LIFT_FRAME_BYTES      2664
+#define LIFT_FRAME_BYTES      3176
+/* Version 2 records stop work RAM at $4DEF. */
+#define LIFT_FRAME_BYTES_V2   2664
 /* Session seed. A draw is one step of state = state * MUL + ADD. */
 #define LIFT_RAND_SEED        1u
 #define LIFT_RAND_MUL         1664525u
@@ -72,6 +74,9 @@ typedef struct {
 	uint8_t replay_reads[LIFT_MAX_READS];
 	FILE *inputs;
 	FILE *frames;
+	FILE *out_frames;
+	FILE *out_inputs;
+	uint32_t file_ver;
 	uint8_t dsw1;
 	uint8_t reset_ram[0x1000];
 	uint8_t packed[LIFT_FRAME_BYTES];
@@ -152,6 +157,7 @@ void audio_render(Board *b, float *out, int nsamples);
 void input_poll(Board *b);
 
 int corpus_open_record(Board *b, const char *dir);
+int corpus_open_rewrite(Board *b, const char *dir);
 int corpus_open_replay(Board *b, const char *dir);
 int corpus_begin_frame(Board *b);
 void corpus_note_frame(Board *b);

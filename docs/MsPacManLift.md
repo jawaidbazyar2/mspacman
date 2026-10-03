@@ -121,13 +121,13 @@ Coin and 1-player start, which the play corpus has to include, are keypad 0 and 
 
 Capture once per frame, at a fixed point: the CPU has finished that frame's VBLANK work and is waiting for the next interrupt. The capture is before the host bumps the watchdog and before a watchdog reset.
 
-The corpus is two files. `inputs` is the byte returned by each `IN0` / `IN1` read, in read order: what the program observed, not the host key event. Coin and start are those port reads. `frames` is one fixed 2664-byte little-endian record per frame. Replay compares that record byte for byte. The first differing offset names the field. A stored checksum is not part of the format. Frame length and frame number catch a truncated or skipped record.
+The corpus is two files. `inputs` is the byte returned by each `IN0` / `IN1` read, in read order: what the program observed, not the host key event. Coin and start are those port reads. `frames` is one fixed 3176-byte little-endian record per frame. Replay compares that record byte for byte. The first differing offset names the field. A stored checksum is not part of the format. Frame length and frame number catch a truncated or skipped record.
 
 Each record:
 
 | Offset | Size | Field |
 |-------:|-----:|-------|
-| 0 | 4 | Frame length, always 2664 |
+| 0 | 4 | Frame length, always 3176 |
 | 4 | 4 | Frame number, from 0 at reset |
 | 8 | 26 | `PC SP AF BC DE HL AF' BC' DE' HL' IX IY WZ`, each `u16` |
 | 34 | 8 | `I`, a zero `R` slot, `IFF1 IFF2 IM Q INT HALT`, each `u8` |
@@ -136,18 +136,18 @@ Each record:
 | 82 | 2 | Watchdog, frames since the last kick |
 | 84 | 1024 | Tile RAM `$4000`–`$43FF` |
 | 1108 | 1024 | Color RAM `$4400`–`$47FF` |
-| 2132 | 496 | Work RAM `$4C00`–`$4DEF` |
-| 2628 | 16 | Sprite RAM `$4FF0`–`$4FFF` |
-| 2644 | 16 | Sprite positions `$5060`–`$506F` |
-| 2660 | 4 | Generator state after this frame, `u32` little-endian |
+| 2132 | 1008 | Work RAM `$4C00`–`$4FEF` |
+| 3140 | 16 | Sprite RAM `$4FF0`–`$4FFF` |
+| 3156 | 16 | Sprite positions `$5060`–`$506F` |
+| 3172 | 4 | Generator state after this frame, `u32` little-endian |
 
-`$4DF0`–`$4FEF` is not in the record. That range holds the `$4E00` page (game mode, level, lives, pellet bitmap, credits, scores, sound state) and the stack at `$4F01`–`$4FBF`. A wrong byte there shows up only when it reaches a recorded field. Widening the record needs a new version and new sessions.
+Version 2 records are 2664 bytes and stop work RAM at `$4DEF`. They miss the `$4E00` page (game mode, level, lives, pellet bitmap, credits, scores, sound state) and the stack at `$4F01`–`$4FBF`. Version 3 widened work RAM to `$4FEF`. Replay still reads version 2 and does not compare the bytes it lacks. `--replay OLD --rewrite NEW` on the Z80 host (shadow mode) writes the same play as a version 3 session with identical `inputs`.
 
 `INT` is the pin. The `$5000` latch is the mask. `WZ`, `Q`, and the two IFF flip-flops are real Z80 state. The waveform phase counters stay out; they are playback position.
 
-The file starts with 24 bytes: magic `MSPF`, version 2, frame size 2664, the 50688-cycle period, the DIP byte, 3 zero pad bytes, and the generator seed as a `u32`. Reset RAM is the pinned zero image applied at reset. It is not stored. A recording before version 2 has to be played again.
+The file starts with 24 bytes: magic `MSPF`, version 3, frame size 3176, the 50688-cycle period, the DIP byte, 3 zero pad bytes, and the generator seed as a `u32`. Reset RAM is the pinned zero image applied at reset. It is not stored. A recording before version 2 has to be played again.
 
-That is about 9 MB per minute. A ten-minute session is about 90 MB. An hour is about 540 MB. The host streams the file. It does not hold the session in RAM.
+That is about 11.5 MB per minute. A ten-minute session is about 115 MB. An hour is about 690 MB. The host streams the file. It does not hold the session in RAM.
 
 Regenerating a session means playing it again by hand. Get the capture format right before a long play.
 
@@ -273,7 +273,7 @@ There is no interrupt, and the IIgs build keeps that shape: poll for VBLANK, the
 
 On the arcade, setup ran across several frames, and the game clock after it depends on how many. Finishing setup in one frame moves every later frame earlier, so an arcade trace cannot be compared frame for frame as-is. Checking an arcade trace, the C-only host holds a setup routine where the arcade frame ended: a record whose `PC` is not the idle spin names the stop, and the setup slice stops when `PC SP BC DE HL` match it. The next frame runs the interrupt routines, then resumes the slice. The routines charge the Z80's cycles for that reason only. Live play and recording never hold.
 
-Replay starts at the first idle record of the trace, loaded whole into the machine. Each later record is compared with the registers (offsets 8–41) masked. The C does not keep the Z80's scratch registers.
+Replay starts at the first idle record of the trace, loaded whole into the machine. Each later record is compared with the registers (offsets 8–41) and the stack (`$4F01`–`$4FBF`) masked. The C keeps neither the way the Z80 did.
 
 `make c-only-check` replays `testplay2` this way and records and replays a C-only attract run.
 
@@ -322,7 +322,7 @@ One directory per session under `corpus/`. A session contains:
 
 | File | Role |
 |------|------|
-| `frames` | `MSPF` version 2 header, then one 2664-byte record per frame |
+| `frames` | `MSPF` version 3 header, then one 3176-byte record per frame (version 2: 2664) |
 | `inputs` | `INPT` header, then per frame a `u16` count and the `IN0` / `IN1` bytes in read order |
 
 Replay is a pure function of the `frames` header (DIP byte, interrupt period, generator seed) and `inputs`. Host key timing is not an input. Comparison is `memcmp` of each live record against `frames`. The message names the first differing field and the two bytes. The `R` slot in a frame record is zero. The last four bytes are the generator state after that frame.

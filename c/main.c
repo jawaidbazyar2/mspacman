@@ -22,7 +22,8 @@ static const char *k_wave = "mspacman/82s126.1m";
 static void usage(void)
 {
 	fprintf(stderr,
-		"usage: mspac-c [--rom PATH] [--c-primary | --c-only] [--record DIR | --replay DIR [--video] | --check N]\n"
+		"usage: mspac-c [--rom PATH] [--c-primary | --c-only] [--record DIR | --replay DIR [--video] [--rewrite OUT] | --check N]\n"
+		"  --rewrite OUT  write the replayed play as a new session in the current record version\n"
 		"  --c-primary  commit each lifted routine's C result\n"
 		"  --c-only     run only C; no Z80 instruction executes\n"
 		"  keypad 8/4/6/2 move, 0 coin, Enter start, F9 record, Esc quit\n");
@@ -280,6 +281,7 @@ int main(int argc, char **argv)
 {
 	const char *record = NULL;
 	const char *replay = NULL;
+	const char *rewrite = NULL;
 	int check_n = 0;
 	int video = 1;
 	int census = 0;
@@ -294,6 +296,8 @@ int main(int argc, char **argv)
 		} else if (strcmp(argv[i], "--replay") == 0 && i + 1 < argc) {
 			replay = argv[++i];
 			video = 0;
+		} else if (strcmp(argv[i], "--rewrite") == 0 && i + 1 < argc) {
+			rewrite = argv[++i];
 		} else if (strcmp(argv[i], "--video") == 0) {
 			video = 1;
 		} else if (strcmp(argv[i], "--check") == 0 && i + 1 < argc) {
@@ -312,6 +316,12 @@ int main(int argc, char **argv)
 			usage();
 			return 1;
 		}
+	}
+	/* A C-only replay starts at the first idle record, so its output would
+	 * not start at frame 0. */
+	if (rewrite && (!replay || c_only)) {
+		usage();
+		return 1;
 	}
 
 	Board *b = calloc(1, sizeof *b);
@@ -332,7 +342,10 @@ int main(int argc, char **argv)
 	} else if (replay) {
 		if (corpus_open_replay(b, replay) != 0)
 			rc = 1;
-		else if (video)
+		else if (rewrite && corpus_open_rewrite(b, rewrite) != 0) {
+			fprintf(stderr, "lift: cannot write %s\n", rewrite);
+			rc = 1;
+		} else if (video)
 			rc = play(b, 1);
 		else
 			rc = replay_headless(b);
