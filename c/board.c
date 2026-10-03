@@ -241,6 +241,11 @@ void board_apply_draw(Board *b)
 static zuint8 cb_fetch_opcode(void *ctx, zuint16 addr)
 {
 	Board *b = ctx;
+	if (b->c_only && !b->mismatch) {
+		b->mismatch = 1;
+		snprintf(b->corpus.mismatch_msg, sizeof b->corpus.mismatch_msg,
+			 "Z80 fetch at %04X in the C-only host", addr);
+	}
 	if (rand_pc(addr)) {
 		b->rand_draw = 1;
 		z80_break(&b->cpu);
@@ -365,6 +370,8 @@ void board_reset(Board *b)
 		z80_instant_reset(&b->cpu);
 	z80_power(&b->cpu, Z_TRUE);
 	z80_int(&b->cpu, Z_FALSE);
+	if (b->c_only)
+		c_only_power_on(b);
 }
 
 void board_lift_add(Board *b, uint16_t pc)
@@ -462,7 +469,7 @@ void board_frame(Board *b)
 		}
 	}
 
-	if (b->latch[0])
+	if (b->latch[0] && !b->c_only)
 		z80_int(&b->cpu, Z_TRUE);
 
 	if (b->c_depth != 0) {
@@ -471,7 +478,9 @@ void board_frame(Board *b)
 		b->c_depth = 0;
 	}
 
-	if (b->lift_dispatch) {
+	if (b->c_only) {
+		c_only_frame(b);
+	} else if (b->lift_dispatch) {
 		run_lifted(b);
 	} else {
 		int guard = 0;

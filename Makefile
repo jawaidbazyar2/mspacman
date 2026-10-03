@@ -92,6 +92,11 @@ $(C_BIN): $(wildcard c/*.c) $(wildcard c/*.h) c/fiber_arm64.S $(BIN) | $(BUILD_D
 c-check: $(C_BIN)
 	$(C_BIN) --replay testplay2
 
+# Phase 2 exit: no Z80 instruction runs.
+c-only-check: $(C_BIN)
+	$(C_BIN) --c-only --replay testplay2
+	$(C_BIN) --c-only --check 600
+
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 

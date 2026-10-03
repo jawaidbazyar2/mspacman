@@ -873,6 +873,27 @@ static void run_pc_budget(Board *b, int (*inside)(Board *))
 	}
 }
 
+/* The probe has already run. Primary mode leaves the C board, its input
+ * cursor, and its generator. Sliced routines also keep the cycles the C
+ * slice charged. The default writes the probe snapshot back. */
+static void commit_probe(Board *b, int keep_c,
+			 const Z80 *cpu, const uint8_t *mem,
+			 const uint8_t spr[16], const uint8_t latch[8],
+			 const uint8_t voice[32], uint32_t kick,
+			 uint16_t pos, uint16_t nreads, const uint8_t *reads,
+			 uint32_t rand_state, int restore_cycles, zusize cycles)
+{
+	if (keep_c)
+		return;
+	load_board(b, cpu, mem, spr, latch, voice, kick);
+	b->corpus.read_pos = pos;
+	b->cur.nreads = nreads;
+	memcpy(b->cur.reads, reads, LIFT_MAX_READS);
+	b->rand_state = rand_state;
+	if (restore_cycles)
+		b->cycles_left = cycles;
+}
+
 static void shadow_delay(Board *b, LiftEnt *ent, int (*inside)(Board *))
 {
 	const char *name = ent && ent->name ? ent->name : "j_32ed";
@@ -961,13 +982,10 @@ static void shadow_delay(Board *b, LiftEnt *ent, int (*inside)(Board *))
 		}
 	}
 
-	load_board(b, &cpu_result, mem_result, spr_result, latch_result,
-		   voice_result, kick_result);
-	b->corpus.read_pos = pos1;
-	b->cur.nreads = n1;
-	memcpy(b->cur.reads, reads1, sizeof reads1);
-	b->rand_state = rand1;
-	b->cycles_left = cycles1;
+	commit_probe(b, b->c_primary && ent && ent->fn,
+		     &cpu_result, mem_result, spr_result, latch_result,
+		     voice_result, kick_result,
+		     pos1, n1, reads1, rand1, 1, cycles1);
 	b->mismatch = mismatch;
 	memcpy(b->corpus.mismatch_msg, msg_saved, sizeof msg_saved);
 	free(mem_entry);
@@ -1141,16 +1159,71 @@ static void c_dispatch(Board *b, uint16_t entry)
 		}
 	}
 
-	load_board(b, &cpu_result, mem_result, spr_result, latch_result,
-		   voice_result, kick_result);
-	b->corpus.read_pos = pos1;
-	b->cur.nreads = n1;
-	memcpy(b->cur.reads, reads1, sizeof reads1);
-	b->rand_state = rand1;
+	commit_probe(b, b->c_primary && ent && ent->fn,
+		     &cpu_result, mem_result, spr_result, latch_result,
+		     voice_result, kick_result,
+		     pos1, n1, reads1, rand1, 0, 0);
 	b->mismatch = mismatch;
 	memcpy(b->corpus.mismatch_msg, msg_saved, sizeof msg_saved);
 	free(mem_entry);
 	free(mem_result);
+}
+
+/* Run the routine at PC to its return, with no Z80 probe. The budget is
+ * unlimited, so the setup routines finish in one call and perform their
+ * own RET. Self-test, the $32ED delay, and the clear-I fork are not part
+ * of the C-only machine. -1 when PC is not a routine it runs. */
+int c_run_pc(Board *b)
+{
+	uint16_t pc = Z80_PC(b->cpu);
+	int i;
+
+	if (c_boot_pc(pc)) {
+		j_0000(b);
+		return 0;
+	}
+	if (c_sched_pc(pc)) {
+		j_238d(b);
+		return 0;
+	}
+	if (c_span_pc(pc) || delay_pc(pc))
+		return -1;
+	if ((pc == 0x0038 || pc == 0x1F9B) && b->cpu.i == 0)
+		return -1;
+	/* Task $10's table word is $000D, which is `jp j_070e`. */
+	if (pc == 0x000D) {
+		Z80_PC(b->cpu) = 0x070E;
+		Z80_MEMPTR(b->cpu) = 0x070E;
+		return 0;
+	}
+	for (i = 0; i < k_n; i++) {
+		if (k_lifts[i].pc == pc)
+			break;
+	}
+	if (i == k_n || !k_lifts[i].fn) {
+		/* A setup slice held mid-routine. Each one returns untouched on
+		 * a PC it does not step, and an opcode it shares (rst $08) does
+		 * the same work whichever slice steps it. */
+		static void (*const held[])(Board *) = {
+			j_2419, j_2448, j_24d7, j_2a35, j_240d
+		};
+		for (i = 0; i < (int)(sizeof held / sizeof held[0]); i++) {
+			held[i](b);
+			if (Z80_PC(b->cpu) != pc || b->slice_hit)
+				return 0;
+		}
+		return -1;
+	}
+	k_lifts[i].fn(b);
+	if (pc == 0x240D || pc == 0x2419 || pc == 0x2448 || pc == 0x24D7 ||
+	    pc == 0x2A35)
+		return 0;
+	/* The service switch jumps to $0000 out of j_008d. */
+	if ((pc == 0x0038 || pc == 0x1F9B || pc == 0x008D) &&
+	    Z80_PC(b->cpu) == 0)
+		return 0;
+	apply_ret(b);
+	return 0;
 }
 
 static void c_prove(Board *b)
@@ -1235,6 +1308,8 @@ int c_done(Board *b)
 {
 	if (b->lift_watch && !b->lift_dispatch)
 		return census_report(b);
+	if (b->c_only)
+		return 0;
 	if (k_n == 0)
 		return 0;
 	if (shadow_misses == 0) {

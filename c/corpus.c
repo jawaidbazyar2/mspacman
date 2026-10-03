@@ -124,10 +124,20 @@ static void field_name(int off, char *name, size_t cap)
 	}
 }
 
-int corpus_diff_at(const uint8_t *expect, const uint8_t *got, char *msg, size_t cap)
+/* C-only compare leaves out the register block. The CPU stack at
+ * $4F01-$4FBF is past the 496 bytes of work RAM in the record. */
+static int c_only_masked(int off)
+{
+	return off >= 8 && off < 42;
+}
+
+static int diff_from(const uint8_t *expect, const uint8_t *got, int masked,
+		     char *msg, size_t cap)
 {
 	for (int off = 0; off < LIFT_FRAME_BYTES; off++) {
 		if (expect[off] == got[off])
+			continue;
+		if (masked && c_only_masked(off))
 			continue;
 		char name[32];
 		field_name(off, name, sizeof name);
@@ -137,6 +147,96 @@ int corpus_diff_at(const uint8_t *expect, const uint8_t *got, char *msg, size_t 
 	}
 	if (cap)
 		msg[0] = 0;
+	return -1;
+}
+
+int corpus_diff_at(const uint8_t *expect, const uint8_t *got, char *msg, size_t cap)
+{
+	return diff_from(expect, got, 0, msg, cap);
+}
+
+static uint16_t get_u16(const uint8_t *p)
+{
+	return (uint16_t)(p[0] | (uint16_t)(p[1] << 8));
+}
+
+/* The idle spin at $238D. A record outside it ended mid-setup. */
+static int idle_record(const uint8_t *rec)
+{
+	uint16_t pc = get_u16(rec + 8);
+
+	return pc >= 0x238D && pc <= 0x2392;
+}
+
+static void unpack_frame(Board *b, const uint8_t *rec)
+{
+	const uint8_t *p = rec + 8;
+	uint16_t pairs[13];
+
+	for (int i = 0; i < 13; i++, p += 2)
+		pairs[i] = get_u16(p);
+	Z80_PC(b->cpu) = pairs[0];
+	Z80_SP(b->cpu) = pairs[1];
+	Z80_AF(b->cpu) = pairs[2];
+	Z80_BC(b->cpu) = pairs[3];
+	Z80_DE(b->cpu) = pairs[4];
+	Z80_HL(b->cpu) = pairs[5];
+	Z80_AF_(b->cpu) = pairs[6];
+	Z80_BC_(b->cpu) = pairs[7];
+	Z80_DE_(b->cpu) = pairs[8];
+	Z80_HL_(b->cpu) = pairs[9];
+	Z80_IX(b->cpu) = pairs[10];
+	Z80_IY(b->cpu) = pairs[11];
+	Z80_MEMPTR(b->cpu) = pairs[12];
+	b->cpu.i = *p++;
+	p++;
+	b->cpu.iff1 = *p++;
+	b->cpu.iff2 = *p++;
+	b->cpu.im = *p++;
+	b->cpu.q = *p++;
+	b->cpu.int_line = *p++;
+	b->cpu.halt_line = *p++;
+	b->cpu.request = 0;
+	memcpy(b->latch, p, 8);
+	p += 8;
+	memcpy(b->audio.reg, p, 32);
+	p += 32;
+	b->frames_since_kick = get_u16(p);
+	p += 2;
+	memcpy(b->mem + 0x4000, p, 1024);
+	p += 1024;
+	memcpy(b->mem + 0x4400, p, 1024);
+	p += 1024;
+	memcpy(b->mem + 0x4C00, p, 496);
+	p += 496;
+	memcpy(b->mem + 0x4FF0, p, 16);
+	p += 16;
+	memcpy(b->spr2, p, 16);
+	p += 16;
+	b->rand_state = get_u32(p);
+}
+
+/* C-only replay does not run the self-test or boot. It loads the first
+ * record that ends in the idle spin and checks from the frame after it. */
+static int seek_idle(Board *b)
+{
+	uint8_t rec[LIFT_FRAME_BYTES];
+
+	b->corpus.start_frame = UINT32_MAX;
+	for (uint32_t i = 0; i < b->corpus.play_count; i++) {
+		b->frame_index = i;
+		if (corpus_begin_frame(b) != 0)
+			return -1;
+		if (!read_all(b->corpus.frames, rec, LIFT_FRAME_BYTES))
+			return -1;
+		if (idle_record(rec)) {
+			unpack_frame(b, rec);
+			b->frame_index = i + 1;
+			b->corpus.start_frame = i;
+			b->corpus.paused = 0;
+			return 0;
+		}
+	}
 	return -1;
 }
 
@@ -260,7 +360,27 @@ int corpus_begin_frame(Board *b)
 	}
 	b->corpus.replay_nreads = n;
 	b->corpus.read_pos = 0;
+	if (b->c_only && b->frame_index > b->corpus.start_frame &&
+	    !read_all(b->corpus.frames, b->corpus.want, LIFT_FRAME_BYTES)) {
+		snprintf(b->corpus.mismatch_msg, sizeof b->corpus.mismatch_msg,
+			 "frame %u truncated record", b->frame_index);
+		return -1;
+	}
 	return 0;
+}
+
+int corpus_want_paused(Board *b, uint16_t regs[5])
+{
+	const uint8_t *w = b->corpus.want;
+
+	if (!b->c_only || !b->corpus.replaying || idle_record(w))
+		return 0;
+	regs[0] = get_u16(w + 8);
+	regs[1] = get_u16(w + 10);
+	regs[2] = get_u16(w + 14);
+	regs[3] = get_u16(w + 16);
+	regs[4] = get_u16(w + 18);
+	return 1;
 }
 
 void corpus_note_frame(Board *b)
@@ -285,14 +405,17 @@ void corpus_note_frame(Board *b)
 		return;
 	}
 	uint8_t expect[LIFT_FRAME_BYTES];
-	if (!read_all(b->corpus.frames, expect, LIFT_FRAME_BYTES)) {
+	if (b->c_only) {
+		memcpy(expect, b->corpus.want, LIFT_FRAME_BYTES);
+	} else if (!read_all(b->corpus.frames, expect, LIFT_FRAME_BYTES)) {
 		snprintf(b->corpus.mismatch_msg, sizeof b->corpus.mismatch_msg,
 			 "frame %u truncated record", b->frame_index);
 		b->mismatch = 1;
 		return;
 	}
 	char detail[96];
-	if (corpus_diff_at(expect, b->corpus.packed, detail, sizeof detail) >= 0) {
+	if (diff_from(expect, b->corpus.packed, b->c_only, detail,
+		      sizeof detail) >= 0) {
 		snprintf(b->corpus.mismatch_msg, sizeof b->corpus.mismatch_msg,
 			 "frame %u %s", b->frame_index, detail);
 		b->mismatch = 1;
@@ -364,5 +487,10 @@ int corpus_open_replay(Board *b, const char *dir)
 	b->mismatch = 0;
 	b->corpus.mismatch_msg[0] = 0;
 	board_reset(b);
+	if (b->c_only && seek_idle(b) != 0) {
+		fprintf(stderr, "lift: %s has no record in the idle spin\n", dir);
+		corpus_close(b);
+		return -1;
+	}
 	return 0;
 }

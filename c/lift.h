@@ -76,6 +76,11 @@ typedef struct {
 	uint8_t reset_ram[0x1000];
 	uint8_t packed[LIFT_FRAME_BYTES];
 	char mismatch_msg[160];
+	/* C-only replay: the record it started from, the record this frame
+	 * is checked against, and how many frames paused a setup routine. */
+	uint32_t start_frame;
+	uint8_t want[LIFT_FRAME_BYTES];
+	uint32_t paused;
 } LiftCorpus;
 
 typedef struct Board {
@@ -101,6 +106,15 @@ typedef struct Board {
 	jmp_buf c_jmp[LIFT_CALL_DEPTH];
 	int c_depth;
 	int lift_prove;
+	/* Commit the C result. The Z80 probe still runs and sets the budget. */
+	int c_primary;
+	/* No Z80 instruction runs. See conly.c. */
+	int c_only;
+	/* Set while a C-only replay holds a setup routine at the point an
+	 * arcade frame ended: PC SP BC DE HL. */
+	int slice_armed;
+	int slice_hit;
+	uint16_t slice_want[5];
 	void (*lift_prove_fn)(struct Board *b);
 	void (*lift_watch)(struct Board *b, uint16_t pc);
 	void (*lift_frame_end)(struct Board *b);
@@ -144,5 +158,24 @@ void corpus_note_frame(Board *b);
 void corpus_close(Board *b);
 /* -1 when the records match. Otherwise the first differing offset, with a field name in msg. */
 int corpus_diff_at(const uint8_t *expect, const uint8_t *got, char *msg, size_t cap);
+/* C-only replay: 1 when this frame's record ended mid-setup. regs gets
+ * PC SP BC DE HL from it. */
+int corpus_want_paused(Board *b, uint16_t regs[5]);
+
+/* Called after each setup-slice instruction. Ends the slice when it stands
+ * where the arcade frame ended. */
+static inline void lift_slice_check(Board *b)
+{
+	if (!b->slice_armed)
+		return;
+	if (Z80_PC(b->cpu) == b->slice_want[0] &&
+	    Z80_SP(b->cpu) == b->slice_want[1] &&
+	    Z80_BC(b->cpu) == b->slice_want[2] &&
+	    Z80_DE(b->cpu) == b->slice_want[3] &&
+	    Z80_HL(b->cpu) == b->slice_want[4]) {
+		b->slice_hit = 1;
+		b->cycles_left = 0;
+	}
+}
 
 #endif

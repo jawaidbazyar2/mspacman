@@ -15,6 +15,9 @@ int c_boot_pc(uint16_t pc);
 int c_boot_inside(Board *b);
 int c_sched_pc(uint16_t pc);
 int c_sched_inside(Board *b);
+int c_run_pc(Board *b);
+void c_only_frame(Board *b);
+void c_only_power_on(Board *b);
 
 void census_attach(Board *b);
 int census_report(Board *b);

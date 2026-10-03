@@ -136,10 +136,12 @@ Each record:
 | 82 | 2 | Watchdog, frames since the last kick |
 | 84 | 1024 | Tile RAM `$4000`–`$43FF` |
 | 1108 | 1024 | Color RAM `$4400`–`$47FF` |
-| 2132 | 496 | Work RAM `$4C00`–`$4FEF` |
+| 2132 | 496 | Work RAM `$4C00`–`$4DEF` |
 | 2628 | 16 | Sprite RAM `$4FF0`–`$4FFF` |
 | 2644 | 16 | Sprite positions `$5060`–`$506F` |
 | 2660 | 4 | Generator state after this frame, `u32` little-endian |
+
+`$4DF0`–`$4FEF` is not in the record. That range holds the `$4E00` page (game mode, level, lives, pellet bitmap, credits, scores, sound state) and the stack at `$4F01`–`$4FBF`. A wrong byte there shows up only when it reaches a recorded field. Widening the record needs a new version and new sessions.
 
 `INT` is the pin. The `$5000` latch is the mask. `WZ`, `Q`, and the two IFF flip-flops are real Z80 state. The waveform phase counters stay out; they are playback position.
 
@@ -259,11 +261,28 @@ Lifted code costs no Z80 cycles, so the interrupt can land in a different place.
 
 Default is also that a lifted C routine runs with the interrupt masked, matching most of these routines. The contract column flags the exceptions: long routines the ISR was allowed to cut, and any byte the ISR writes while the main line is in that routine. Lift the ISR path after the routines it calls are stable.
 
+### C-only host
+
+`--c-only` runs no Z80 instruction. An opcode fetch fails the run. Power-on skips the self-test and boot and enters the program at `$234B`, where the self-test hands off. A frame is:
+
+1. If the `$5000` mask is set, run the `$0038` interrupt routines.
+2. Run the main-line task list until it is empty.
+3. Park at the idle spin at `$238D`. That is the frame boundary, where the host presents.
+
+There is no interrupt, and the IIgs build keeps that shape: poll for VBLANK, then run what the interrupt would have run, then the task list. Board setup (color clear, maze draw, pellets) finishes inside its frame.
+
+On the arcade, setup ran across several frames, and the game clock after it depends on how many. Finishing setup in one frame moves every later frame earlier, so an arcade trace cannot be compared frame for frame as-is. Checking an arcade trace, the C-only host holds a setup routine where the arcade frame ended: a record whose `PC` is not the idle spin names the stop, and the setup slice stops when `PC SP BC DE HL` match it. The next frame runs the interrupt routines, then resumes the slice. The routines charge the Z80's cycles for that reason only. Live play and recording never hold.
+
+Replay starts at the first idle record of the trace, loaded whole into the machine. Each later record is compared with the registers (offsets 8–41) masked. The C does not keep the Z80's scratch registers.
+
+`make c-only-check` replays `testplay2` this way and records and replays a C-only attract run.
+
 ### Phase 2 exit
 
-- Every routine in the logic set is C-only. The Z80 core is no longer on the call path.
-- Every phase 1 trace replays to the same frame records.
-- The contract table covers the set, including the stack-surgery list.
+- Every routine in the logic set is C. The Z80 core is not on the call path in the C-only host.
+- Every phase 1 trace replays C-only to the same frame records, with registers masked and setup held where the trace says.
+- Shadow mode (`--replay`) and C-primary mode (`--c-primary`) still match every frame record, registers included.
+- New sessions recorded on the C-only host are the oracle for later phases. Their setup finishes in one frame.
 
 ---
 
@@ -334,4 +353,4 @@ Proposed plan:
 1. identify and name constants, and use these in the code.
 1. for this phase we'll drop comparing the Z80 register values but continue validating the rest of the machine state - RAM, the video data, sprite values, and sound values. As we decouple from Z80 code and structure it is these other states that are important.
 1. we no longer care about Z80 cycle accuracy. The key now is FRAME. At the end of each frame is when we will benchmark. Since some legacy Z80 routines exceeded a frame, we now deprecate them and nul them out - we'll record a new session with them removed.
-1. the code that was run by VBLANK interrupt, shall now be run right after the start 
+1. the code that was run by VBLANK interrupt, shall now be run right after the start of each frame (after the SDL3 present)

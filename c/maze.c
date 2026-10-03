@@ -531,6 +531,7 @@ static void charge_fill(Board *b, zusize ran)
 		b->cycles_left = 0;
 	else
 		b->cycles_left -= ran;
+	lift_slice_check(b);
 }
 
 static void fill_ret(Board *b)

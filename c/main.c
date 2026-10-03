@@ -22,7 +22,9 @@ static const char *k_wave = "mspacman/82s126.1m";
 static void usage(void)
 {
 	fprintf(stderr,
-		"usage: mspac-c [--rom PATH] [--record DIR | --replay DIR [--video] | --check N]\n"
+		"usage: mspac-c [--rom PATH] [--c-primary | --c-only] [--record DIR | --replay DIR [--video] | --check N]\n"
+		"  --c-primary  commit each lifted routine's C result\n"
+		"  --c-only     run only C; no Z80 instruction executes\n"
 		"  keypad 8/4/6/2 move, 0 coin, Enter start, F9 record, Esc quit\n");
 }
 
@@ -91,7 +93,7 @@ static int run_check(Board *b, int n)
 		free(recs);
 		return 1;
 	}
-	for (int i = 0; i < n; i++) {
+	while (b->frame_index < b->corpus.play_count) {
 		board_frame(b);
 		if (b->mismatch) {
 			fprintf(stderr, "lift-check: replay mismatch: %s\n",
@@ -121,7 +123,12 @@ static int replay_headless(Board *b)
 		fprintf(stderr, "lift: replay mismatch: %s\n", b->corpus.mismatch_msg);
 		return 1;
 	}
-	printf("lift: replay %u frames ok\n", b->corpus.play_count);
+	if (b->c_only)
+		printf("lift: c-only replay frames %u-%u ok, %u held mid-setup\n",
+		       b->corpus.start_frame + 1, b->corpus.play_count - 1,
+		       b->corpus.paused);
+	else
+		printf("lift: replay %u frames ok\n", b->corpus.play_count);
 	return 0;
 }
 
@@ -276,6 +283,8 @@ int main(int argc, char **argv)
 	int check_n = 0;
 	int video = 1;
 	int census = 0;
+	int c_primary = 0;
+	int c_only = 0;
 
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--rom") == 0 && i + 1 < argc) {
@@ -292,6 +301,10 @@ int main(int argc, char **argv)
 			video = 0;
 		} else if (strcmp(argv[i], "--census") == 0) {
 			census = 1;
+		} else if (strcmp(argv[i], "--c-primary") == 0) {
+			c_primary = 1;
+		} else if (strcmp(argv[i], "--c-only") == 0) {
+			c_only = 1;
 		} else if (strcmp(argv[i], "--help") == 0) {
 			usage();
 			return 0;
@@ -307,6 +320,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	board_init(b);
+	b->c_primary = c_primary;
+	b->c_only = c_only;
 	board_load_cpu(b, k_rom);
 	load_assets(b);
 	c_boot(b, census);
