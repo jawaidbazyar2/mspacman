@@ -48,6 +48,7 @@ All three phases share one logical machine image:
 |-------|---------|-----------|
 | 1 | Z80 core submodule + arcade hardware | A playable build records a deterministic per-frame corpus, and bazyar has played the coverage set |
 | 2 | C, one Z80 routine at a time | Every lifted routine is C, and replay of the phase 1 corpus matches per frame |
+| 2.5 | Idiomatic C, no Z80 machinery | The C-only corpus replays per frame with registers and stack masked, and no Z80 register, flag, PC, or stack access remains |
 | 3 | 65816, one C routine at a time | Every lifted routine is 65816, and replay of the same corpus matches per frame |
 
 Phase 1 data is the only acceptance oracle. Later phases do not invent a second corpus.
@@ -277,12 +278,71 @@ Replay starts at the first idle record of the trace, loaded whole into the machi
 
 `make c-only-check` replays `testplay2` this way and records and replays a C-only attract run.
 
+### C-only corpus test plan
+
+Sessions recorded on the C-only host are the oracle for phases 2.5 and 3. Their setup finishes in one frame, so later hosts replay them without holding anything. Record in version 3, so the `$4E00` page is compared.
+
+Setup:
+
+```bash
+make c
+mkdir -p corpus
+```
+
+Each session is one directory, recorded and then replayed before the next one:
+
+```bash
+./build/c/mspac-c --c-only --record corpus/NAME
+./build/c/mspac-c --c-only --replay corpus/NAME
+```
+
+The replay passes when it prints `lift: c-only replay frames 1-N ok, 0 held mid-setup`. A held frame in a C-only session is a bug: setup did not finish inside its frame. Esc ends a recording. F9 in the window also records, to `corpus/session-<date-time>`.
+
+| Session | Play |
+|---------|------|
+| `c-shakedown` | Coin, start, one life. Done: 2047 frames, coin at 172, play at 348, a life lost at 1952 |
+| `c-attract` | No coin. At least three full attract cycles |
+| `c-play1` | Coin, start, ordinary play through all lives |
+| `c-deaths` | Death in the ghost-house doorway, death in a tunnel |
+| `c-energizer` | All four ghosts on one energizer. An energizer running out while ghosts are still blue |
+| `c-fruit` | Fruit arriving and leaving uneaten. Fruit eaten |
+| `c-bonus` | Pass 10,000 points for the extra life |
+| `c-acts` | Clear levels 2, 5, and 9 for the three intermissions |
+| `c-late` | Reach level 5 or later, where the speed and timing tables change |
+| `c-corners` | Cornering through turns at speed |
+
+Several shorter sessions are better than one long one, and one session may cover several rows. About 11.5 MB per minute.
+
+After a session replays, confirm it holds what the row asks for. `py/corpus_byte.py corpus/NAME ADDR 0 LAST` prints a byte on each frame it changes:
+
+| Address | Field | Shows |
+|---------|-------|-------|
+| `$4E00` | Game mode | 1 attract, 2 coined, 3 playing |
+| `$4E6E` | Credits | Coin and start |
+| `$4E14` | Lives | Deaths, and the extra life |
+| `$4E13` | Level | Levels cleared |
+| `$4E80`–`$4E82` | P1 score, BCD | 10,000 points |
+
+`py/corpus_peek.py corpus/NAME FIRST LAST` prints PC, SP, task head, and game mode per frame.
+
+Regression, after any change to `c/`, before a session counts:
+
+| Command | Expect |
+|---------|--------|
+| `make c-only-check` | `testplay2` C-only, frames 295–24987 ok, 57 held. 600-frame C-only check ok |
+| `./build/c/mspac-c --replay testplay2` | 24988 frames ok |
+| `./build/c/mspac-c --c-primary --replay testplay2` | 24988 frames ok |
+| `./build/c/mspac-c --c-only --replay corpus/NAME` | Each recorded C-only session, 0 held |
+
+A version 2 session can be rewritten as version 3 on the Z80 host: `./build/c/mspac-c --replay OLD --rewrite NEW`. `inputs` comes out identical. `testplay2` rewritten that way replays C-only with the `$4E00` page compared.
+
 ### Phase 2 exit
 
 - Every routine in the logic set is C. The Z80 core is not on the call path in the C-only host.
 - Every phase 1 trace replays C-only to the same frame records, with registers masked and setup held where the trace says.
 - Shadow mode (`--replay`) and C-primary mode (`--c-primary`) still match every frame record, registers included.
 - New sessions recorded on the C-only host are the oracle for later phases. Their setup finishes in one frame.
+- Every session in the C-only corpus test plan is recorded, replays with 0 held, and shows the play its row asks for.
 
 ---
 
@@ -337,20 +397,120 @@ Replay is a pure function of the `frames` header (DIP byte, interrupt period, ge
 - Sample-exact WSG audio as an acceptance test. SDL3 plays the voices; the frame record stores the voice registers
 - Encrypted original-hardware `mspacman` (`u5`/`u6`/`u7` and aux-board traps)
 
---
+---
 
-## Phase 2.5 - Conversion to Idiomatic C
+## Phase 2.5 — Idiomatic C
 
-Proposed plan:
+Rewrite the phase 2 C into C a person can read: named state, named constants, functions that take arguments and return results, and no Z80 machinery. Behavior does not change. The C-only corpus is the oracle, compared per frame.
 
-1. is there any reason to think any normal play (i.e., not self test, not power on) exceeded a frame time?
-1. Copy /c/ code into /idiom/ - /idiom/ is the phase 2.5 work tree.
-1. for this phase we'll drop comparing the Z80 register values but continue validating the rest of the machine state - RAM, the video data, sprite values, and sound values. As we decouple from Z80 code and structure it is these other states that are important.
-1. no longer emulate Z80 code. Only the C code should be run now.
-1. Re-combine routines that were split because they crossed a frame boundary
-1. Conversion to Idiomatic C:
-1. continue to use RAM locations for variable storage, but give them human-readable and sensible names (perhaps through a union against the address space data structure).
-1. identify and name constants, and use these in the code.
-1. for this phase we'll drop comparing the Z80 register values but continue validating the rest of the machine state - RAM, the video data, sprite values, and sound values. As we decouple from Z80 code and structure it is these other states that are important.
-1. we no longer care about Z80 cycle accuracy. The key now is FRAME. At the end of each frame is when we will benchmark. Since some legacy Z80 routines exceeded a frame, we now deprecate them and nul them out - we'll record a new session with them removed.
-1. the code that was run by VBLANK interrupt, shall now be run right after the start of each frame (after the SDL3 present)
+Phase 3 lowers this tree, not `c/`. A function signature here becomes a 65816 calling convention there, so the rewrite also decides how phase 3 is shaped.
+
+### Starting point
+
+The phase 2 tree still runs on the Z80's terms. In `c/`:
+
+- 240 routines are dispatched by Z80 PC through `c_run_pc`, and return by popping the emulated stack (`apply_ret`).
+- Arguments and results go through `b->cpu`. There are about 3,300 `Z80_*` register accesses, and about 1,600 lines compute or test emulated flags. `ghost.c`, `move.c`, `sound.c`, `maze.c` and `score.c` carry the most.
+- Pushes, pops and return-address tricks write the emulated stack at `$4F01`–`$4FBF`.
+- The five setup routines that crossed a frame on the arcade (`j_240d` clear color RAM with its `rst $08` fill, `j_2419` draw the maze, `j_24d7` color the maze, `j_2448` draw pellets, `j_2a35` blank eaten pellets) are written as `switch (pc)` instruction steppers that charge cycles, so the C-only host can stop them where an arcade frame ended.
+- Fibers, shadow mode, C-primary mode, census, the Z80 core, `boot.c` and `selftest.c` are all linked into the binary.
+
+### Did normal play exceed a frame?
+
+Only during board setup. `py/frame_overruns.py` lists every frame record whose `PC` is not the idle spin at `$238D`:
+
+| Session | Frames | Frames not idle | Where |
+|---------|-------:|----------------:|-------|
+| `testplay2` (arcade, Z80) | 24,988 | 351 | Frames 0–293 are power-on and self-test. The other 17 runs, one to five frames each, all stop in `rst $08` (`$0008`–`$000A`) or in the maze, pellet and color loops at `$2420`–`$246D` and `$2A38`–`$2A50`. They come at game start and at each new board |
+| `c-attract`, `c-play1`, `c-shakedown` (C-only) | 41,188 | 0 | — |
+
+No ghost, movement, collision, score, sound or cutscene routine ever ran past a frame. The routines that did are board setup, and they cannot be dropped, because they draw the maze. The C-only host already finishes them inside one frame. Sessions recorded on it hold 0 frames, so no new recording is needed for that reason. Phase 2.5 deletes the hold machinery and turns those routines back into plain loops.
+
+Power-on and self-test are not ported. The C-only host already enters at `$234B`.
+
+### Oracle
+
+Sessions in `corpus/` recorded by the phase 2 C-only host (`build/c/mspac-c --c-only`) are the oracle. `testplay2` is not: its setup was held to arcade frames, and holding is removed here.
+
+The comparison is the version 3 frame record, with these bytes masked:
+
+| Offset | Bytes | Why |
+|-------:|------:|-----|
+| 8 | 34 | Z80 registers, `I`, `R`, IFFs, `IM`, `Q`, `INT`, `HALT`. The idiomatic host has none and writes zeros |
+| `$4F01`–`$4FBF` | 191 | The Z80 stack. Locals replace it |
+
+Everything else must still match every frame: latches `$5000`–`$5007`, voice registers, watchdog count, tile RAM, color RAM, work RAM `$4C00`–`$4FEF` outside the stack, sprite RAM, sprite positions, and the generator state.
+
+That has a consequence. A byte the Z80 stored in work RAM is still stored there, at the same time in the frame, even if it is only scratch. The task queue at `$4C80`, the timed tasks at `$4C90`, and the sprites-in-waiting all stay as bytes in RAM. They get names and types, but they cannot move into C locals or C-side data structures. Values that only ever lived in registers or on the stack are free to become locals.
+
+The phase 2 tree remains the reference. `c/` is not edited during this phase except to fix a phase 2 bug, and after any such fix `make c-only-check` and every corpus replay must pass again on `mspac-c`.
+
+#### Coverage before the rewrite
+
+A rewrite is only checked where the corpus actually runs the code. The C-only corpus currently has:
+
+| Session | Frames | Reaches |
+|---------|-------:|---------|
+| `c-shakedown` | 2,048 | Coin, start, one life |
+| `c-attract` | 9,313 | Attract mode, no coin |
+| `c-play1` | 29,827 | Ordinary play to level 4 (`$4E13` = 3), score 20,000+ |
+
+`c-play1` passes the 10,000-point extra life and the first intermission (after level 2). The rows still unrecorded are `c-deaths`, `c-energizer`, `c-fruit`, `c-acts` (intermissions 2 and 3 come after levels 5 and 9), `c-late`, and `c-corners`. Record them on `mspac-c` before step 5 below, which is where the rewrite starts touching game logic. Recording them later means rewritten code with no check on it.
+
+`make idiom-cov` builds the idiomatic host with clang source coverage (`-fprofile-instr-generate -fcoverage-mapping`), replays the whole corpus, and reports functions and branches that never ran. Any branch that no session reaches is either covered by a new recording or listed in the function's comment as unverified.
+
+### Frame shape
+
+Z80 cycles stop mattering. The frame is the unit. One iteration of the idiomatic host:
+
+1. Wait for the frame tick and present the previous frame (SDL3). Unthrottled replay skips the wait and the present.
+2. If the interrupt-enable latch at `$5000` is set and the game has interrupts enabled, run the VBLANK work: the routines `$0038` → `$1F9B` → `$008D` called.
+3. Run the main-line task list until it is empty.
+4. Capture the frame record. Compare it during replay, or append it while recording.
+
+This is the C-only frame with the present moved to the top. The capture point is unchanged, so C-only records still match. The game's own "interrupts enabled" state, which the C-only host still reads from `cpu.iff1`, becomes a board field that the code formerly doing `ei` / `di` sets and clears. The IIgs keeps the same loop, with VBLANK polling in step 1.
+
+### Rules for the rewrite
+
+These replace the phase 2 rules "Write the body the way the Z80 wrote it" and "Keep the Z80 label as the function name".
+
+- A function's inputs are its parameters and the named RAM it reads. Its outputs are its return value and the named RAM it writes. No function reads or writes a Z80 register, a flag, or the emulated stack.
+- A flag the caller tested becomes a return value: `bool` for one flag, a small enum or struct when there are several.
+- Stores the frame record can see keep their order and their final values. Stores only the Z80's later instructions could see, in a register or on the stack, can go.
+- Types stay at Z80 width. Bytes that wrap at 256 stay `uint8_t`, and code that relied on the wrap says so in the type, not with a cast at each use. BCD stays BCD. Keep `-Wconversion` and `-fno-strict-aliasing`.
+- No `malloc`, recursion, floating point, or 32-bit arithmetic in game logic. Each one makes the phase 3 lowering harder.
+- Constants get names. A table value stays the table value: give `0x1B` a name, but do not replace it with an expression that happens to equal it.
+- Two routines that look alike may be merged only if the corpus still matches after the merge and the merged function's comment states the difference the Z80 had.
+- Each function keeps a short contract comment: what it does, the RAM it reads and writes, and the Z80 address it came from (`$2419`) so the listing can be found. The Entry / Exit / Clobbers / Flags live-out block goes away once the function has no register interface.
+- `goto` is for loop exits that would otherwise need a flag variable, not for reproducing Z80 control flow.
+
+### Steps
+
+Each step ends with the whole C-only corpus replaying clean under `make idiom-check`. Within a step, work in small batches: one subsystem, or a few dozen functions. Replay after each batch and checkpoint (commit) when it is green. The first mismatched frame is the bug.
+
+1. **Fork.** Copy `c/` to `idiom/`. Add `make idiom` (`build/idiom/mspac-idiom`) and `make idiom-check`, which replays every `corpus/c-*` session with the mask above. The binary still links the Z80 core at this point. Gate: the copy replays the corpus as well as `mspac-c --c-only` does.
+
+2. **Drop the Z80 core and the phase 2 hosts.** Remove from `idiom/`: the `Z80.h` / `Z80.c` link, shadow and C-primary modes, census, the C-to-Z80 call (`lift_call_z80`, fibers, `fiber_arm64.S`), `boot.c`, `selftest.c`, the slice hold (`slice_*`, `corpus_want_paused`), and cycle charging. As temporary scaffolding, `b->cpu` becomes a plain register-file struct in `idiom/`, with the same `Z80_A(b->cpu)`-style accessors, so every routine still compiles unchanged. The emulated stack stays in `mem[]` for now. Power-on goes straight to the `$234B` state. Gate: corpus clean, and nothing in the build includes the Z80 library.
+
+3. **Direct calls.** Replace PC dispatch with C calls. `call_lifted(b, ret, fn)`, `apply_ret`, the `k_lifts` table, and the special cases in `c_run_pc` go away. The task dispatchers (`rst $20` jump tables, the task list at `$4C80`, timed tasks at `$4C90`) index a `const` table of function pointers, built from the ROM jump tables, by task number. A `JP (HL)` table becomes a `switch` or a function-pointer table. Routines that fell into the next one become a call. Gate: no code writes `Z80_PC`. The emulated stack is still used only for values the Z80 pushed.
+
+4. **Rejoin the setup routines.** Rewrite `j_240d`, `j_2419`, `j_24d7`, `j_2448` and `j_2a35`, and the `rst $08` fill they use, as plain loops that run to the end. Delete `charge_fill`, `maze_prologue_cost`, `delay_pc`, `c_span_pc`, and the held-slice list. Gate: corpus clean, and no `switch (pc)` stepper is left anywhere in `idiom/`.
+
+5. **Name the RAM.** Generate `idiom/ram.h` from `py/ram_symbols.py` with a new `py/gen_idiom_ram.py`, then curate it by hand. Work RAM `$4C00`–`$4FEF` becomes a packed struct overlaid on `mem + 0x4C00`, with a `_Static_assert(offsetof(...) == addr - 0x4C00)` for every field. Strided regions become arrays of structs: the four ghosts and Ms. Pac-Man, sprites-in-waiting, sound voices, the task queue. BCD scores become `uint8_t[3]` with named helpers. Plain RAM is read and written through the struct. Writes with side effects (latches, `$50C0` watchdog, voice registers, sprite positions) keep going through `board_mem_write`. Tile and color RAM get coordinate helpers that hide the cabinet's rotated layout. `corpus_diff_at` reports the field name from `ram.h` instead of a work-RAM offset. Gate: no numeric work-RAM address is left in game logic.
+
+6. **Remove the register interface, leaves first.** For each function, read its contract row, give it parameters and a return value, and change all of its callers in the same batch. Flags that some caller tests become return values. Flags no caller tests disappear, and so do the flag helpers (`inc_l`, `and_flags`, and the rest). `push_word` / `pop` pairs become locals. The stack-surgery routines, already listed in phase 2, get explicit return codes. When no `Z80_*` accessor is left, delete the scaffold register file and the emulated stack. Gate: `idiom/` contains no `Z80_` token, and nothing reads or writes `$4F01`–`$4FBF`.
+
+7. **Name constants and functions.** Add enums for game mode (`$4E00`), task numbers, ghost states, directions, tile codes, color codes, sound effects and fruit. Rename `j_xxxx` / `sub_xxxx` to what each function does, keeping the address in its comment. Regroup files by job where the phase 2 grouping no longer fits. Gate: corpus clean, and no function is still named by address.
+
+8. **Read-through.** Read each file top to bottom as a newcomer would. Simplify control flow that only made sense as Z80 (`DJNZ` counters that run backwards with no reason, double-negated tests, re-reads of a value already in a local). Remove comments that describe Z80 mechanics. Gate: corpus clean, and `make idiom-cov` shows no unexplained unreached branch.
+
+Steps 1–4 are mechanical and can each be done in one pass. Steps 5–7 are most of the work and go subsystem by subsystem, roughly in this order: task scheduler and timers, score and HUD, sound, maze and pellets, sprites, movement, ghost AI, fruit, mode and level flow, cutscenes. That puts the leaves first and the most-shared state (actors, mode) last, when the names around it already exist.
+
+### Phase 2.5 exit
+
+- `idiom/` builds without the Z80 core, fibers, or any Z80 register, flag, PC, or stack access.
+- Every C-only corpus session replays clean on `mspac-idiom` with only the registers and the stack masked.
+- The coverage list from the C-only corpus test plan is recorded, and `make idiom-cov` accounts for every unreached branch.
+- Every function has a descriptive name, typed parameters and results, and a contract comment naming the RAM it touches and its Z80 address.
+- Work RAM is reached through `ram.h`, with offsets checked at compile time. Magic numbers in game logic are named.
+- `c/` and `mspac-c` still pass their own phase 2 regression, unchanged.
