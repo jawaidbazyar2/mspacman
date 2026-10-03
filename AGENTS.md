@@ -106,6 +106,7 @@ Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system
 | `mspac.asm`, `src/mspac.asm` | **LOCKED** — reference only for IIgs work |
 | `src/ram.inc` | Generated RAM/I/O symbols; treat as Z80-side support (avoid drive-by edits) |
 | `docs/IIgs-Design.md` | IIgs display / render / input decisions |
+| `idiom/` | Idiomatic C game logic, no Z80 core (phase 2.5 of `docs/MsPacManLift.md`). Gate: `make idiom-check` replays `corpus/c-*` clean; `make idiom-cov` for coverage. Phase 3 lowers this tree |
 | New IIgs code | New paths (e.g. under `iigs/` or as agreed) — do not overwrite locked Z80 artifacts |
 
 ## Python helpers (`py/`)
@@ -137,6 +138,9 @@ Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system
   - `py/preview_tiles_8x8.py` — native 8×8 maze/tile PPM+PNG to check rotate/flip before scale
   - `py/gen_palette.py` — arcade PROMs → SHR palette 0 + `iigs/palette_data.s`
   - `py/gen_maze1.py` — level-1 upright 28×31 tilemap + stitched 6×6 cells
+  - `py/gen_idiom_ram.py` — generates `idiom/ram.h` / `idiom/ram.c` (packed `WorkRam` overlay with offset asserts, field names for corpus diffs)
+  - `py/frame_overruns.py` — list corpus frames whose record did not end in the idle spin
+  - `py/scan_sound_tables.py` — decode the ROM's effect, song and cutscene sound tables (which envelope types and song commands are reachable)
   - `py/gs2_*.py` / `py/check_frame_count.py` — Makefile/CI only (`make iigs-test`, `make iigs-demo`). **Do not** use these (or `gs2debug` / `PYTHONPATH`) for live debugging.
 
 ## GSSquared live debug (MCP)

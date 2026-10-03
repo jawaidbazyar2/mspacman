@@ -1,3 +1,5 @@
+/* Host side: the keyboard as the joystick, coin, and start buttons.
+ * Replay supplies the inputs instead. */
 #include "lift.h"
 
 #include <SDL3/SDL.h>

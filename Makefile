@@ -49,7 +49,7 @@ SDL_LIBS := -L/usr/local/lib -lSDL3 -Wl,-rpath,/usr/local/lib
 
 .PHONY: all clean verify sjasmplus-check gfx gfx-ppm palette maze tiles-preview \
 	iigs iigs-test iigs-demo iigs-game iigs-game-test iigs-game-demo iigs-gsos \
-	lift lift-check c c-check
+	lift lift-check c c-check c-only-check idiom idiom-check idiom-cov
 
 all: $(BIN)
 
@@ -96,6 +96,53 @@ c-check: $(C_BIN)
 c-only-check: $(C_BIN)
 	$(C_BIN) --c-only --replay testplay2
 	$(C_BIN) --c-only --check 600
+
+# Phase 2.5 host. Always C-only. Replay masks Z80 registers and the stack.
+IDIOM_BIN := $(BUILD_DIR)/idiom/mspac-idiom
+IDIOM_SRCS := $(wildcard idiom/*.c)
+IDIOM_CFLAGS := -std=c11 -O2 -Wall -Wextra -Wconversion -fno-strict-aliasing \
+	-I idiom \
+	$(SDL_CFLAGS)
+
+$(BUILD_DIR)/idiom:
+	mkdir -p $(BUILD_DIR)/idiom
+
+idiom: $(IDIOM_BIN)
+
+$(IDIOM_BIN): $(wildcard idiom/*.c) $(wildcard idiom/*.h) $(BIN) | $(BUILD_DIR)/idiom
+	cc $(IDIOM_CFLAGS) -o $@ $(IDIOM_SRCS) $(SDL_LIBS)
+
+idiom-check: $(IDIOM_BIN)
+	@fail=0; \
+	for d in corpus/c-*; do \
+		echo "idiom-check: $$d"; \
+		$(IDIOM_BIN) --replay "$$d" || fail=1; \
+	done; \
+	exit $$fail
+
+IDIOM_COV_BIN := $(BUILD_DIR)/idiom/mspac-idiom-cov
+IDIOM_PROF := $(BUILD_DIR)/idiom/cov
+LLVM_PROFDATA := $(shell xcrun --find llvm-profdata 2>/dev/null || echo llvm-profdata)
+LLVM_COV := $(shell xcrun --find llvm-cov 2>/dev/null || echo llvm-cov)
+
+idiom-cov: $(wildcard idiom/*.c) $(wildcard idiom/*.h) | $(BUILD_DIR)/idiom
+	cc $(IDIOM_CFLAGS) -fprofile-instr-generate -fcoverage-mapping \
+		-o $(IDIOM_COV_BIN) $(IDIOM_SRCS) $(SDL_LIBS)
+	rm -rf $(IDIOM_PROF)
+	mkdir -p $(IDIOM_PROF)
+	fail=0; \
+	for d in corpus/c-*; do \
+		name=$$(basename "$$d"); \
+		LLVM_PROFILE_FILE="$(IDIOM_PROF)/$$name-%p.profraw" \
+			$(IDIOM_COV_BIN) --replay "$$d" || fail=1; \
+	done; \
+	$(LLVM_PROFDATA) merge -sparse $(IDIOM_PROF)/*.profraw -o $(IDIOM_PROF)/cov.profdata; \
+	$(LLVM_COV) report $(IDIOM_COV_BIN) -instr-profile=$(IDIOM_PROF)/cov.profdata \
+		> $(IDIOM_PROF)/report.txt; \
+	$(LLVM_COV) show $(IDIOM_COV_BIN) -instr-profile=$(IDIOM_PROF)/cov.profdata \
+		-show-branches=count > $(IDIOM_PROF)/show.txt; \
+	echo "idiom-cov: $(IDIOM_PROF)/report.txt"; \
+	exit $$fail
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)

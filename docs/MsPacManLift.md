@@ -348,13 +348,13 @@ A version 2 session can be rewritten as version 3 on the Z80 host: `./build/c/ms
 
 ## Phase 3 — C to 65816, one routine at a time
 
-Lower the C functions to 65816 until the logic is all 65816. The oracle does not change. Replay the phase 1 traces and compare the same per-frame records.
+Lower the idiomatic C in `idiom/` (phase 2.5) to 65816 until the logic is all 65816. The source is `idiom/`, not `c/`. The oracle is the C-only corpus (`corpus/c-*`) with the same mask `make idiom-check` uses: the per-frame records minus the Z80 register bytes and the stack.
 
 ### Mixed execution, again
 
 The workstation host stays the test harness. A routine under conversion runs as 65816; its callees and callers stay C until they are lowered. Both use the same `mem[]`.
 
-At each call, snapshot, run the C function, save the result, restore, run the 65816, compare, commit the C result. The trajectory stays on the phase 1 path, and one replay lists every lowered routine that diverged. Acceptance, after the routine is flipped to 65816-only, is a full unthrottled replay of the phase 1 frame records.
+At each call, snapshot, run the C function, save the result, restore, run the 65816, compare, commit the C result. The trajectory stays on the recorded path, and one replay lists every lowered routine that diverged. Acceptance, after the routine is flipped to 65816-only, is a full unthrottled replay of the C-only corpus.
 
 The 65816 execution vehicle for this phase is in-process on the workstation (a small 65816 core, or an equivalent that runs the assembled bytes against `mem[]`). Per-routine comparison does not depend on GSSquared frame timing. GSSquared is for the integrated IIgs build, where the existing SHR renderer draws and the lowered logic is what advances `$4D00`–`$4E3F` and the rest of the work RAM.
 
@@ -371,7 +371,7 @@ Rendering, palette, sprite blit, HUD chrome, and keyboard latch stay the IIgs co
 ### Phase 3 exit
 
 - Every lifted routine is 65816, running in the integrated IIgs build.
-- Every phase 1 trace, applied to that build's input latch, produces the same frame records.
+- Every C-only corpus session, applied to that build's input latch, produces the same frame records (registers and stack masked).
 - Attract, death, energizer, fruit, 10,000-point life, intermissions, and later-level speed changes all pass on those traces.
 
 ---

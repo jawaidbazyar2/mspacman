@@ -1,3 +1,5 @@
+/* Host side: command line, the SDL window and audio, and the frame
+ * loop for play, record, replay, and check. */
 #include "lift.h"
 #include "dispatch.h"
 
@@ -22,10 +24,7 @@ static const char *k_wave = "mspacman/82s126.1m";
 static void usage(void)
 {
 	fprintf(stderr,
-		"usage: mspac-c [--rom PATH] [--c-primary | --c-only] [--free-play] [--record DIR | --replay DIR [--video] [--rewrite OUT] | --check N]\n"
-		"  --rewrite OUT  write the replayed play as a new session in the current record version\n"
-		"  --c-primary  commit each lifted routine's C result\n"
-		"  --c-only     run only C; no Z80 instruction executes\n"
+		"usage: mspac-idiom [--rom PATH] [--free-play] [--record DIR | --replay DIR [--video] | --check N]\n"
 		"  --free-play  set the coinage DIP switches to free play (replay uses the session's switches)\n"
 		"  keypad 8/4/6/2 move, 0 coin, Enter 1P start, + 2P start, . rack test, F9 record, Esc quit\n");
 }
@@ -125,12 +124,8 @@ static int replay_headless(Board *b)
 		fprintf(stderr, "lift: replay mismatch: %s\n", b->corpus.mismatch_msg);
 		return 1;
 	}
-	if (b->c_only)
-		printf("lift: c-only replay frames %u-%u ok, %u held mid-setup\n",
-		       b->corpus.start_frame + 1, b->corpus.play_count - 1,
-		       b->corpus.paused);
-	else
-		printf("lift: replay %u frames ok\n", b->corpus.play_count);
+	printf("lift: replay frames %u-%u ok\n",
+	       b->corpus.start_frame + 1, b->corpus.play_count - 1);
 	return 0;
 }
 
@@ -282,12 +277,8 @@ int main(int argc, char **argv)
 {
 	const char *record = NULL;
 	const char *replay = NULL;
-	const char *rewrite = NULL;
 	int check_n = 0;
 	int video = 1;
-	int census = 0;
-	int c_primary = 0;
-	int c_only = 0;
 	int free_play = 0;
 
 	for (int i = 1; i < argc; i++) {
@@ -298,19 +289,11 @@ int main(int argc, char **argv)
 		} else if (strcmp(argv[i], "--replay") == 0 && i + 1 < argc) {
 			replay = argv[++i];
 			video = 0;
-		} else if (strcmp(argv[i], "--rewrite") == 0 && i + 1 < argc) {
-			rewrite = argv[++i];
 		} else if (strcmp(argv[i], "--video") == 0) {
 			video = 1;
 		} else if (strcmp(argv[i], "--check") == 0 && i + 1 < argc) {
 			check_n = atoi(argv[++i]);
 			video = 0;
-		} else if (strcmp(argv[i], "--census") == 0) {
-			census = 1;
-		} else if (strcmp(argv[i], "--c-primary") == 0) {
-			c_primary = 1;
-		} else if (strcmp(argv[i], "--c-only") == 0) {
-			c_only = 1;
 		} else if (strcmp(argv[i], "--free-play") == 0) {
 			free_play = 1;
 		} else if (strcmp(argv[i], "--help") == 0) {
@@ -321,12 +304,6 @@ int main(int argc, char **argv)
 			return 1;
 		}
 	}
-	/* A C-only replay starts at the first idle record, so its output would
-	 * not start at frame 0. */
-	if (rewrite && (!replay || c_only)) {
-		usage();
-		return 1;
-	}
 
 	Board *b = calloc(1, sizeof *b);
 	if (!b) {
@@ -336,11 +313,8 @@ int main(int argc, char **argv)
 	board_init(b);
 	if (free_play)
 		b->corpus.dsw1 &= (uint8_t)~0x03u;
-	b->c_primary = c_primary;
-	b->c_only = c_only;
-	board_load_cpu(b, k_rom);
+	board_load_rom(b, k_rom);
 	load_assets(b);
-	c_boot(b, census);
 
 	int rc = 0;
 	if (check_n > 0) {
@@ -348,10 +322,7 @@ int main(int argc, char **argv)
 	} else if (replay) {
 		if (corpus_open_replay(b, replay) != 0)
 			rc = 1;
-		else if (rewrite && corpus_open_rewrite(b, rewrite) != 0) {
-			fprintf(stderr, "lift: cannot write %s\n", rewrite);
-			rc = 1;
-		} else if (video)
+		else if (video)
 			rc = play(b, 1);
 		else
 			rc = replay_headless(b);
@@ -362,11 +333,6 @@ int main(int argc, char **argv)
 			rc = play(b, 1);
 	}
 
-	{
-		int extra = c_done(b);
-		if (rc == 0)
-			rc = extra;
-	}
 	corpus_close(b);
 	free(b);
 	return rc;
