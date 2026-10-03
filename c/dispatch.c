@@ -145,11 +145,16 @@ extern void j_2487(Board *b);
 extern void j_267e(Board *b);
 extern void j_3641(Board *b);
 extern void j_0042(Board *b);
+extern void j_23e8(Board *b);
+extern void j_3000(Board *b);
+extern void j_0000(Board *b);
+extern void j_238d(Board *b);
 extern void j_2000(Board *b);
 extern void j_2b80(Board *b);
 extern void j_2a12(Board *b);
 extern void j_29ea(Board *b);
 extern void j_291e(Board *b);
+extern void j_28e3(Board *b);
 extern void j_2966(Board *b);
 extern void j_2086(Board *b);
 extern void j_20a9(Board *b);
@@ -240,6 +245,71 @@ extern void j_349c(Board *b);
 extern void j_3611(Board *b);
 extern void j_0e6c(Board *b);
 extern void j_15e6(Board *b);
+extern void j_06be(Board *b);
+extern void j_0879(Board *b);
+extern void j_0899(Board *b);
+extern void j_08cd(Board *b);
+extern void j_08de(Board *b);
+extern void j_08e5(Board *b);
+extern void j_090d(Board *b);
+extern void j_0940(Board *b);
+extern void j_0972(Board *b);
+extern void j_0988(Board *b);
+extern void j_09d2(Board *b);
+extern void j_09d8(Board *b);
+extern void j_09e8(Board *b);
+extern void j_09ea(Board *b);
+extern void j_09fe(Board *b);
+extern void j_0a02(Board *b);
+extern void j_0a04(Board *b);
+extern void j_0a06(Board *b);
+extern void j_0a08(Board *b);
+extern void j_0a0a(Board *b);
+extern void j_0a0c(Board *b);
+extern void j_0a0e(Board *b);
+extern void j_0a2c(Board *b);
+extern void j_0a6f(Board *b);
+extern void j_0a7c(Board *b);
+extern void j_0aa0(Board *b);
+extern void j_0aa3(Board *b);
+extern void j_0aa6(Board *b);
+extern void j_94a1(Board *b);
+extern void j_2108(Board *b);
+extern void j_219e(Board *b);
+extern void j_2297(Board *b);
+extern void j_3435(Board *b);
+extern void j_344f(Board *b);
+extern void j_3469(Board *b);
+extern void j_03c8(Board *b);
+extern void j_03d4(Board *b);
+extern void j_03dc(Board *b);
+extern void j_03fe(Board *b);
+extern void j_057c(Board *b);
+extern void j_3ec9(Board *b);
+extern void j_3e5c(Board *b);
+extern void j_141f(Board *b);
+extern void j_1490(Board *b);
+extern void j_14fe(Board *b);
+extern void j_168c(Board *b);
+extern void j_16b1(Board *b);
+extern void j_16d6(Board *b);
+extern void j_16f7(Board *b);
+extern void j_869c(Board *b);
+extern void j_86b1(Board *b);
+extern void j_86c5(Board *b);
+extern void j_86d9(Board *b);
+extern void j_2d0c(Board *b);
+extern void j_2dee(Board *b);
+extern void j_2df4(Board *b);
+extern void j_2d44(Board *b);
+extern void j_364e(Board *b);
+extern void j_2cc4(Board *b);
+extern void j_9797(Board *b);
+extern void j_2cc1(Board *b);
+extern void j_008d(Board *b);
+extern void j_0038(Board *b);
+extern void j_1f9b(Board *b);
+extern void j_0038_clear(Board *b);
 extern void j_1a6a(Board *b);
 extern void j_1376(Board *b);
 extern void j_0ac3(Board *b);
@@ -258,6 +328,7 @@ void c_register_leaves(Board *b)
 	c_add_lift(0x267E, j_267e, "j_267e");
 	c_add_lift(0x3641, j_3641, "j_3641");
 	c_add_lift(0x0042, j_0042, "j_0042");
+	c_add_lift(0x23E8, j_23e8, "j_23e8");
 	c_add_lift(0x2000, j_2000, "j_2000");
 	c_add_lift(0x2B80, j_2b80, "j_2b80");
 	c_add_lift(0x2A12, j_2a12, "j_2a12");
@@ -301,6 +372,7 @@ void c_register_leaves(Board *b)
 	c_add_lift(0x0267, j_0267, "j_0267");
 	c_add_lift(0x2BEA, j_2bea, "j_2bea");
 	c_add_lift(0x291E, j_291e, "j_291e");
+	c_add_lift(0x28E3, j_28e3, "j_28e3");
 	c_add_lift(0x2966, j_2966, "j_2966");
 	c_add_lift(0x0383, j_0383, "j_0383");
 	c_add_lift(0x0390, j_0390, "j_0390");
@@ -424,6 +496,70 @@ void c_register_leaves(Board *b)
 	c_add_lift(0x3497, j_3497, "j_3497");
 	c_add_lift(0x349C, j_349c, "j_349c");
 	c_add_lift(0x3611, j_3611, "j_3611");
+	c_add_lift(0x0AA6, j_0aa6, "j_0aa6");
+	c_add_lift(0x09EA, j_09ea, "j_09ea");
+	c_add_lift(0x09E8, j_09e8, "j_09e8");
+	c_add_lift(0x09FE, j_09fe, "j_09fe");
+	c_add_lift(0x0A02, j_0a02, "j_0a02");
+	c_add_lift(0x0A04, j_0a04, "j_0a04");
+	c_add_lift(0x0A06, j_0a06, "j_0a06");
+	c_add_lift(0x0A08, j_0a08, "j_0a08");
+	c_add_lift(0x0A0A, j_0a0a, "j_0a0a");
+	c_add_lift(0x0A0C, j_0a0c, "j_0a0c");
+	c_add_lift(0x0879, j_0879, "j_0879");
+	c_add_lift(0x0899, j_0899, "j_0899");
+	c_add_lift(0x08E5, j_08e5, "j_08e5");
+	c_add_lift(0x94A1, j_94a1, "j_94a1");
+	c_add_lift(0x08DE, j_08de, "j_08de");
+	c_add_lift(0x08CD, j_08cd, "j_08cd");
+	c_add_lift(0x090D, j_090d, "j_090d");
+	c_add_lift(0x0940, j_0940, "j_0940");
+	c_add_lift(0x0972, j_0972, "j_0972");
+	c_add_lift(0x0988, j_0988, "j_0988");
+	c_add_lift(0x09D2, j_09d2, "j_09d2");
+	c_add_lift(0x09D8, j_09d8, "j_09d8");
+	c_add_lift(0x0A0E, j_0a0e, "j_0a0e");
+	c_add_lift(0x0A6F, j_0a6f, "j_0a6f");
+	c_add_lift(0x3435, j_3435, "j_3435");
+	c_add_lift(0x344F, j_344f, "j_344f");
+	c_add_lift(0x3469, j_3469, "j_3469");
+	c_add_lift(0x2108, j_2108, "j_2108");
+	c_add_lift(0x219E, j_219e, "j_219e");
+	c_add_lift(0x2297, j_2297, "j_2297");
+	c_add_lift(0x0A2C, j_0a2c, "j_0a2c");
+	c_add_lift(0x0A7C, j_0a7c, "j_0a7c");
+	c_add_lift(0x0AA0, j_0aa0, "j_0aa0");
+	c_add_lift(0x0AA3, j_0aa3, "j_0aa3");
+	c_add_lift(0x06BE, j_06be, "j_06be");
+	c_add_lift(0x03DC, j_03dc, "j_03dc");
+	c_add_lift(0x03D4, j_03d4, "j_03d4");
+	c_add_lift(0x057C, j_057c, "j_057c");
+	c_add_lift(0x3EC9, j_3ec9, "j_3ec9");
+	c_add_lift(0x3E5C, j_3e5c, "j_3e5c");
+	c_add_lift(0x03FE, j_03fe, "j_03fe");
+	c_add_lift(0x03C8, j_03c8, "j_03c8");
+	c_add_lift(0x869C, j_869c, "j_869c");
+	c_add_lift(0x86B1, j_86b1, "j_86b1");
+	c_add_lift(0x86C5, j_86c5, "j_86c5");
+	c_add_lift(0x86D9, j_86d9, "j_86d9");
+	c_add_lift(0x168C, j_168c, "j_168c");
+	c_add_lift(0x16B1, j_16b1, "j_16b1");
+	c_add_lift(0x16D6, j_16d6, "j_16d6");
+	c_add_lift(0x16F7, j_16f7, "j_16f7");
+	c_add_lift(0x14FE, j_14fe, "j_14fe");
+	c_add_lift(0x141F, j_141f, "j_141f");
+	c_add_lift(0x1490, j_1490, "j_1490");
+	c_add_lift(0x2DF4, j_2df4, "j_2df4");
+	c_add_lift(0x364E, j_364e, "j_364e");
+	c_add_lift(0x2D44, j_2d44, "j_2d44");
+	c_add_lift(0x2DEE, j_2dee, "j_2dee");
+	c_add_lift(0x2D0C, j_2d0c, "j_2d0c");
+	c_add_lift(0x2CC4, j_2cc4, "j_2cc4");
+	c_add_lift(0x9797, j_9797, "j_9797");
+	c_add_lift(0x2CC1, j_2cc1, "j_2cc1");
+	c_add_lift(0x008D, j_008d, "j_008d");
+	c_add_lift(0x0038, j_0038, "j_0038");
+	c_add_lift(0x1F9B, j_1f9b, "j_1f9b");
 }
 
 void lift_call_z80(Board *b, uint16_t target)
@@ -688,6 +824,25 @@ static int delay_inside(Board *b)
 	return delay_pc(Z80_PC(b->cpu));
 }
 
+int c_span_pc(uint16_t pc)
+{
+	return pc >= 0x3000 && pc <= 0x3297;
+}
+
+static int selftest_inside(Board *b)
+{
+	return c_span_pc(Z80_PC(b->cpu));
+}
+
+static int fork_inside(Board *b)
+{
+	uint16_t pc = Z80_PC(b->cpu);
+
+	return pc == 0x0038 || pc == 0x1F9B || pc == 0x1F9C || pc == 0x1F9E ||
+	       pc == 0x1F9F || pc == 0x1FA1 || pc == 0x1FA2 || pc == 0x1FA5 ||
+	       pc == 0x1FA6;
+}
+
 static int color_inside(Board *b)
 {
 	return color_pc(Z80_PC(b->cpu));
@@ -841,6 +996,48 @@ static void c_dispatch(Board *b, uint16_t entry)
 	int returned;
 	int i;
 
+	if (c_span_pc(entry)) {
+		LiftEnt span;
+
+		span.pc = entry;
+		span.fn = j_3000;
+		span.name = "j_3000";
+		shadow_delay(b, &span, selftest_inside);
+		return;
+	}
+	if ((entry == 0x0038 || entry == 0x1F9B) && b->cpu.i == 0) {
+		LiftEnt span;
+
+		span.pc = entry;
+		span.fn = j_0038_clear;
+		span.name = entry == 0x0038 ? "j_0038" : "j_1f9b";
+		shadow_delay(b, &span, fork_inside);
+		return;
+	}
+	if (c_boot_pc(entry)) {
+		LiftEnt span;
+
+		span.pc = entry;
+		span.fn = j_0000;
+		if (entry >= 0x234B)
+			span.name = "j_234b";
+		else if (entry >= 0x230B)
+			span.name = "j_230b";
+		else
+			span.name = "j_0000";
+		shadow_delay(b, &span, c_boot_inside);
+		return;
+	}
+	if (c_sched_pc(entry)) {
+		LiftEnt span;
+
+		span.pc = entry;
+		span.fn = j_238d;
+		span.name = "j_238d";
+		shadow_delay(b, &span, c_sched_inside);
+		return;
+	}
+
 	for (i = 0; i < k_n; i++) {
 		if (k_lifts[i].pc == entry) {
 			ent = &k_lifts[i];
@@ -926,7 +1123,9 @@ static void c_dispatch(Board *b, uint16_t entry)
 	if (ent && ent->fn) {
 		char detail[120];
 		ent->fn(b);
-		apply_ret(b);
+		/* j_008d's service switch jumps to j_0000 and does not return. */
+		if (!(entry == 0x008D && Z80_PC(b->cpu) == 0))
+			apply_ret(b);
 		if (b->rand_state != rand1) {
 			snprintf(detail, sizeof detail, "rand expected %08X got %08X",
 				 (unsigned)rand1, (unsigned)b->rand_state);

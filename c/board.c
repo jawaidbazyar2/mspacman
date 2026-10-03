@@ -36,6 +36,53 @@ static int task_idle(Board *b)
 	return (v & 0x80) != 0;
 }
 
+/* Pac-Man bytes the Ms. Pac path never fetches. A hit fails the frame. */
+static int dead_pc(uint16_t addr)
+{
+	if (addr >= 0x0471 && addr <= 0x0505)
+		return 1;
+	if (addr >= 0x051C && addr <= 0x057B)
+		return 1;
+	if (addr >= 0x0580 && addr <= 0x0584)
+		return 1;
+	if (addr >= 0x0593 && addr <= 0x05BE)
+		return 1;
+	if (addr >= 0x05BF && addr <= 0x05E4)
+		return 1;
+	if (addr >= 0x1005 && addr <= 0x100A)
+		return 1;
+	if (addr >= 0x210B && addr <= 0x212A)
+		return 1;
+	if (addr >= 0x2130 && addr <= 0x2194)
+		return 1;
+	if (addr >= 0x21A4 && addr <= 0x21EF)
+		return 1;
+	if (addr >= 0x21F5 && addr <= 0x2296)
+		return 1;
+	if (addr >= 0x229D && addr <= 0x22B8)
+		return 1;
+	if (addr >= 0x22BE && addr <= 0x230A)
+		return 1;
+	if (addr >= 0x3298 && addr <= 0x32EC)
+		return 1;
+	if (addr >= 0x3AF4 && addr <= 0x3B06)
+		return 1;
+	return 0;
+}
+
+static void note_dead(Board *b, uint16_t addr)
+{
+	if (b->mismatch)
+		return;
+	fprintf(stderr, "lift: unused Pac-Man code fetched at %04X frame %u\n",
+		addr, b->frame_index);
+	snprintf(b->corpus.mismatch_msg, sizeof b->corpus.mismatch_msg,
+		 "unused Pac-Man code at %04X", addr);
+	b->mismatch = 1;
+	b->stop = 1;
+	z80_break(&b->cpu);
+}
+
 static uint8_t rom_read(Board *b, uint16_t addr)
 {
 	if (addr < 0x4000)
@@ -200,22 +247,42 @@ static zuint8 cb_fetch_opcode(void *ctx, zuint16 addr)
 	}
 	if (b->lift_watch)
 		b->lift_watch(b, addr);
-	if (!b->lift_suspend && b->c_depth > 0 && addr == LIFT_SENTINEL) {
-		b->lift_sentinel = 1;
-		return steal_nop(b, addr);
-	}
-	if (!b->lift_suspend && b->lift_dispatch && is_lifted(b, addr)) {
-		b->lift_hit = 1;
-		return steal_nop(b, addr);
-	}
-	if (is_lifted(b, addr)) {
-		b->lift_hit = 1;
-		z80_break(&b->cpu);
-	}
 	if (addr == 0x0038)
 		b->irq_seen = 1;
 	if (!b->lift_suspend && b->irq_seen && addr == 0x238D && task_idle(b)) {
 		b->stop = 1;
+		z80_break(&b->cpu);
+		return mem_read(b, addr);
+	}
+	if (dead_pc(addr)) {
+		note_dead(b, addr);
+		return mem_read(b, addr);
+	}
+	if (!b->lift_suspend && b->lift_dispatch && c_span_pc(addr)) {
+		b->lift_hit = 1;
+		return steal_nop(b, addr);
+	}
+	if (!b->lift_suspend && b->lift_dispatch && c_boot_pc(addr)) {
+		b->lift_hit = 1;
+		return steal_nop(b, addr);
+	}
+	if (!b->lift_suspend && b->lift_dispatch && c_sched_pc(addr) &&
+	    !((addr == 0x238D || addr == 0x2390 || addr == 0x2391 ||
+	       addr == 0x2392) && task_idle(b))) {
+		b->lift_hit = 1;
+		return steal_nop(b, addr);
+	}
+	if (!b->lift_suspend && b->c_depth > 0 && addr == LIFT_SENTINEL) {
+		b->lift_sentinel = 1;
+		return steal_nop(b, addr);
+	}
+	if (!b->lift_suspend && b->lift_dispatch && is_lifted(b, addr) &&
+	    !(addr == 0x238D && task_idle(b))) {
+		b->lift_hit = 1;
+		return steal_nop(b, addr);
+	}
+	if (is_lifted(b, addr) && !(addr == 0x238D && task_idle(b))) {
+		b->lift_hit = 1;
 		z80_break(&b->cpu);
 	}
 	return mem_read(b, addr);

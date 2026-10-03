@@ -2902,6 +2902,48 @@ void j_27f1(Board *b)
 	aim_tile(b, 0x4D10, 0x4D2F, read_word(b, 0x4D39), 0x2834, 0x4D24);
 }
 
+/* Twice Ms. Pac-Man's tile, reflected through the pink ghost. */
+static uint16_t flee_pink(Board *b)
+{
+	uint16_t pac = read_word(b, 0x4D39);
+	uint16_t pink = read_word(b, 0x4D0C);
+	uint8_t y = (uint8_t)pac;
+	uint8_t x = (uint8_t)(pac >> 8);
+
+	y = (uint8_t)(y + y);
+	y = (uint8_t)(y - (uint8_t)pink);
+	x = (uint8_t)(x + x);
+	x = (uint8_t)(x - (uint8_t)(pink >> 8));
+	return (uint16_t)(((uint16_t)x << 8) | y);
+}
+
+/* j_28e3  demo steering for Ms. Pac-Man
+ * Entry:    rst $20 task $17. The return on the stack is the task loop.
+ *           ($4DA7) = red fright flag. Zero means run away from pink.
+ *           ($4D12) = demo tile. ($4D3C) = wanted direction.
+ *           ($4D0C) = pink tile. ($4D39) = Ms. Pac-Man's tile.
+ * Exit:     ($4D26) = the tile step. ($4D3C) = the new direction.
+ *           A and HL are that direction and step. The other registers
+ *           are whatever j_2966 left. A frightened red ghost chases pink.
+ *           Otherwise the aim is the reflected tile.
+ *           Host finishes the RET.
+ * Clobbers: A, F, BC, DE, HL, IX, IY
+ * Flags live-out: none. The task loop discards them.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: one call to j_2966, returned.
+ */
+void j_28e3(Board *b)
+{
+	uint16_t target;
+
+	if (board_mem_read(b, 0x4DA7) == 0)
+		target = flee_pink(b);
+	else
+		target = read_word(b, 0x4D0C);
+	aim_tile(b, 0x4D12, 0x4D3C, target,
+		 board_mem_read(b, 0x4DA7) == 0 ? 0x2917 : 0x28F7, 0x4D26);
+}
+
 /* Eyes go to the tile above the house. A live frightened ghost wanders. */
 static void fright(Board *b, uint16_t state, uint16_t tile, uint16_t dir,
 		   uint16_t dy2, uint16_t home_ret, uint16_t wander_ret)

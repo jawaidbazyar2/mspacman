@@ -324,8 +324,14 @@ Replay is a pure function of the `frames` header (DIP byte, interrupt period, ge
 
 Proposed plan:
 
+1. is there any reason to think any normal play (i.e., not self test, not power on) exceeded a frame time?
+1. Copy /c/ code into /idiom/ - /idiom/ is the phase 2.5 work tree.
+1. for this phase we'll drop comparing the Z80 register values but continue validating the rest of the machine state - RAM, the video data, sprite values, and sound values. As we decouple from Z80 code and structure it is these other states that are important.
+1. no longer emulate Z80 code. Only the C code should be run now.
 1. Re-combine routines that were split because they crossed a frame boundary
-2. continue to use RAM locations for variable storage, but somehow give them human-readable and sensible names (perhaps through a union against the address space data structure).
-3. Conversion to Idiomatic C:
-4. from the leaves again, refactor away from "register gets set with a value" and towards "return logic values"
-5. 
+1. Conversion to Idiomatic C:
+1. continue to use RAM locations for variable storage, but give them human-readable and sensible names (perhaps through a union against the address space data structure).
+1. identify and name constants, and use these in the code.
+1. for this phase we'll drop comparing the Z80 register values but continue validating the rest of the machine state - RAM, the video data, sprite values, and sound values. As we decouple from Z80 code and structure it is these other states that are important.
+1. we no longer care about Z80 cycle accuracy. The key now is FRAME. At the end of each frame is when we will benchmark. Since some legacy Z80 routines exceeded a frame, we now deprecate them and nul them out - we'll record a new session with them removed.
+1. the code that was run by VBLANK interrupt, shall now be run right after the start 

@@ -49,3 +49,24 @@ void j_0042(Board *b)
 	Z80_HL(b->cpu) = hl;
 	Z80_F(b->cpu) = flags;
 }
+
+/* j_23e8  advance the level-state byte
+ * Entry:    rst $20 task $16. The return on the stack is the task loop.
+ *           ($4E04) = level state. Carry is live-in.
+ * Exit:     ($4E04) has been incremented. HL = $4E04.
+ *           F is `inc (hl)`. Carry is unchanged.
+ *           Host finishes the RET.
+ * Clobbers: HL, F
+ * Flags live-out: none. The task loop discards them.
+ * Interrupt: returns inside the frame budget on every testplay2 call.
+ * Stack: normal RET. No callee.
+ */
+void j_23e8(Board *b)
+{
+	uint8_t flags = Z80_F(b->cpu);
+	uint8_t next = inc_l(board_mem_read(b, 0x4E04), &flags);
+
+	board_mem_write(b, 0x4E04, next);
+	Z80_HL(b->cpu) = 0x4E04;
+	Z80_F(b->cpu) = flags;
+}
