@@ -115,20 +115,54 @@ SoundInit
 	sta	|SndVol+1
 	sta	|SndWave
 	sta	|SndWave+1
+	sta	|SndOn
+	ldx	#30
+]sh	sta	|SndRegs,x
+	dex
+	dex
+	bpl	]sh
 	plp
 	rts
 
-* Mirror the voice registers into the DOC, writing what changed.
+* Mirror the voice registers into the DOC, writing what changed. With
+* $5001 and $5044-$505F as last frame left them, the DOC is untouched.
 LowerSound
 	php
-	sei
+	rep	#$30
+	sep	#$20
+	lda	>G_SOUND_ON
+	cmp	|SndOn
+	bne	:chg
+	rep	#$20
+	ldx	#26
+]same	lda	>G_VOICE+4,x
+	cmp	|SndRegs+4,x
+	bne	:chg
+	dex
+	dex
+	bpl	]same
+	plp
+	rts
+:chg	sei
 	sep	#$20
 	jsr	GluWait
 	jsr	GluRegs
 	rep	#$30
 	stz	<SD_V
 	stz	<SD_X
-]voice	lda	#$0080			; round D to nearest
+* The voice's nibbles are within the three words at $5050+5v.
+]voice	ldx	<SD_X
+	lda	>G_VOICE+$10,x
+	cmp	|SndRegs+$10,x
+	bne	:sum
+	lda	>G_VOICE+$12,x
+	cmp	|SndRegs+$12,x
+	bne	:sum
+	lda	>G_VOICE+$14,x
+	cmp	|SndRegs+$14,x
+	bne	:sum
+	brl	:vol
+:sum	lda	#$0080			; round D to nearest
 	sta	<SD_ACC
 	stz	<SD_ACC+2
 	lda	<SD_V
@@ -240,7 +274,16 @@ LowerSound
 	cmp	#3
 	bcs	:done
 	jmp	]voice
-:done	plp
+:done	ldx	#26
+]copy	lda	>G_VOICE+4,x
+	sta	|SndRegs+4,x
+	dex
+	dex
+	bpl	]copy
+	sep	#$20
+	lda	>G_SOUND_ON
+	sta	|SndOn
+	plp
 	rts
 
 * Quiet and halt oscillators 0-2 (on quit).
@@ -299,3 +342,7 @@ DocPoke
 SndFreq	ds	6
 SndVol	ds	3
 SndWave	ds	3
+* $5040-$505F and $5001 as of the last DOC update. The nibbles are 4
+* bits, so the $FF fill never matches.
+SndRegs	ds	32
+SndOn	ds	2

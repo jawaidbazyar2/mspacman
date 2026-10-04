@@ -55,6 +55,9 @@ G_REPLAY	equ	GAME+$F013
 G_VID_FULL	equ	GAME+$F200	; video change log (lower/dp.s VID_*)
 G_VID_N	equ	GAME+$F202
 G_VID_LOG	equ	GAME+$F204
+G_RC_KEY	equ	GAME+$F800	; LowerDrawCell's remap cache, 32-byte slots:
+G_RC_BUF	equ	GAME+$F802	; bank << 8 | tile, then its 18 bytes
+RC_SLOTS	equ	64
 
 DSW1_DEFAULT	equ	$C9	; LIFT_DSW1_DEFAULT
 FRUIT_ROW_MAX	equ	7	; draw_fruit_row: one fruit per level up to seven
@@ -280,6 +283,14 @@ LowerInit
 	dex
 	dex
 	bpl	]hud
+	ldx	#RC_SLOTS*32-32
+]rc	sta	>G_RC_KEY,x
+	txa
+	sec
+	sbc	#32
+	tax
+	lda	#$FFFF
+	bcs	]rc
 	ldx	#TILEMAP_CELLS-2
 	lda	#$4040
 ]tm	sta	>TILEMAP,x
@@ -759,8 +770,7 @@ LowerDrawCell
 	cmp	#TILE_EMPTY
 	beq	:raw
 	sty	<LT_BANK
-	jsr	LowerRemapTile
-	jmp	LowerDrawTileBuf
+	jmp	LowerCachedTile
 :maze	lda	<R_TILE
 	jsr	Mul18
 	tay
@@ -775,6 +785,71 @@ LowerDrawCell
 	bcc	]c
 	jmp	LowerDrawTileBuf
 :raw	jmp	DrawTile
+
+* R_TILE in bank LT_BANK (Y) through LowerRemapTile, or from the remap
+* cache when the slot holds that tile and bank.
+LowerCachedTile
+	tya
+	asl
+	asl
+	asl
+	eor	<R_TILE
+	and	#RC_SLOTS-1
+	asl
+	asl
+	asl
+	asl
+	asl
+	tax
+	tya
+	xba
+	ora	<R_TILE
+	cmp	>G_RC_KEY,x
+	beq	:hit
+	pha
+	phx
+	jsr	LowerRemapTile
+	plx
+	pla
+	sta	>G_RC_KEY,x
+	lda	<LT_BUF
+	sta	>G_RC_BUF,x
+	lda	<LT_BUF+2
+	sta	>G_RC_BUF+2,x
+	lda	<LT_BUF+4
+	sta	>G_RC_BUF+4,x
+	lda	<LT_BUF+6
+	sta	>G_RC_BUF+6,x
+	lda	<LT_BUF+8
+	sta	>G_RC_BUF+8,x
+	lda	<LT_BUF+10
+	sta	>G_RC_BUF+10,x
+	lda	<LT_BUF+12
+	sta	>G_RC_BUF+12,x
+	lda	<LT_BUF+14
+	sta	>G_RC_BUF+14,x
+	lda	<LT_BUF+16
+	sta	>G_RC_BUF+16,x
+	jmp	LowerDrawTileBuf
+:hit	lda	>G_RC_BUF,x
+	sta	<LT_BUF
+	lda	>G_RC_BUF+2,x
+	sta	<LT_BUF+2
+	lda	>G_RC_BUF+4,x
+	sta	<LT_BUF+4
+	lda	>G_RC_BUF+6,x
+	sta	<LT_BUF+6
+	lda	>G_RC_BUF+8,x
+	sta	<LT_BUF+8
+	lda	>G_RC_BUF+10,x
+	sta	<LT_BUF+10
+	lda	>G_RC_BUF+12,x
+	sta	<LT_BUF+12
+	lda	>G_RC_BUF+14,x
+	sta	<LT_BUF+14
+	lda	>G_RC_BUF+16,x
+	sta	<LT_BUF+16
+	jmp	LowerDrawTileBuf
 
 * R_TILE's 18 bytes into LT_BUF, each nibble through LT_BANK's row of
 * TileBankPens. DBR = the program bank.
