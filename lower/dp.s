@@ -42,6 +42,14 @@ HB_STOP	equ	$F003
 HB_RAND	equ	$F004	; 4 bytes, little-endian
 HB_LATCH	equ	$F008	; 8 bytes, read-only
 
+* Video change log, read and cleared by the IIgs host's LowerTiles once
+* a frame. Stores to maze cells log their address (vid_log); routines
+* that rewrite the maze set VID_FULL instead. VID_N is a byte offset
+* into VID_LOG and wraps at 256 (128 entries); VID_N+1 stays 0.
+VID_FULL	equ	$F200	; nonzero: LowerTiles walks every cell
+VID_N	equ	$F202
+VID_LOG	equ	$F204	; bus addresses of written cells, one word each
+
 * Arcade I/O in the game bank.
 IN0	equ	$5000
 IN1	equ	$5040
@@ -77,6 +85,14 @@ QT	MAC
 	lda	#]1
 	ldx	#]2
 	jsr	queue_task
+	<<<
+
+* VIDFULL: set VID_FULL. Keeps A (8-bit).
+VIDFULL	MAC
+	pha
+	lda	#1
+	sta	VID_FULL
+	pla
 	<<<
 
 * Per-file direct-page locals ($20-$FF). Each file owns its range.

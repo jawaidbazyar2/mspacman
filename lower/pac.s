@@ -93,6 +93,7 @@ eat_pill
 	ldx	PAC_CELL
 	lda	#TILE_BLANK
 	sta	|$0000,x
+	jsr	vid_log
 	lda	T8
 	cmp	#ENERGIZER
 	beq	:en

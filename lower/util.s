@@ -25,6 +25,61 @@ fillb
 	bne	:l
 :done	rts
 
+* vid_log: append X, the bus address of a video or color cell just
+* written, to VID_LOG. Keeps A, X, Y and P.
+vid_log
+	php
+	rep	#$30
+	mx	%00
+	pha
+	phy
+	ldy	VID_N
+	txa
+	sta	VID_LOG,y
+	iny
+	iny
+	sep	#$20
+	tya
+	sta	VID_N
+	rep	#$20
+	ply
+	pla
+	plp
+	mx	%10
+	rts
+
+* vid_log4: the 2x2 block at X (X, X+1, X+$20, X+$21). Keeps A, X, Y
+* and P.
+vid_log4
+	php
+	rep	#$30
+	mx	%00
+	pha
+	phy
+	phx
+	ldy	VID_N
+	txa
+	sta	VID_LOG,y
+	inc
+	sta	VID_LOG+2,y
+	clc
+	adc	#$001F
+	sta	VID_LOG+4,y
+	inc
+	sta	VID_LOG+6,y
+	tya
+	clc
+	adc	#8
+	sep	#$20
+	sta	VID_N
+	rep	#$20
+	plx
+	ply
+	pla
+	plp
+	mx	%10
+	rts
+
 * The I/O versions store through (T12): an indexed store reads its target
 * first, and a read of IN0/IN1 consumes replay input.
 

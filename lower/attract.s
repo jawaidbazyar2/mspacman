@@ -19,6 +19,7 @@ LIT	MAC
 	sep	#$20
 	lda	#]2
 	sta	|$0000,x
+	jsr	vid_log
 	<<<
 
 * DIM offset;tile: dim the bulb at T8+offset, light the one after it.
@@ -35,6 +36,9 @@ DIM	MAC
 	sta	|$0000,y
 	lda	#]2
 	sta	|$0000,x
+	jsr	vid_log
+	tyx
+	jsr	vid_log
 	<<<
 
 * marquee_bulbs ($3ED0): the lit bulbs step around the marquee. On odd
@@ -178,6 +182,7 @@ draw_midway_logo
 	sta	|$0000,x
 	lda	#1
 	sta	|COLOR_RAM,x
+	jsr	vid_log
 	dec	T7
 	beq	:rowend
 	inx

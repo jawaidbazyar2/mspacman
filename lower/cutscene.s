@@ -412,6 +412,8 @@ run_cutscene
 	bne	:mv
 	lda	#TILE_BLANK
 	sta	$42AC
+	ldx	#$42AC
+	jsr	vid_log
 	lda	#1
 	sta	CS_ADV
 	bra	:store
@@ -449,6 +451,8 @@ run_act
 	sta	$42AC
 	lda	#$16
 	sta	$46AC
+	ldx	#$42AC
+	jsr	vid_log
 :run	lda	CS_ACT
 	dec
 	sta	T0

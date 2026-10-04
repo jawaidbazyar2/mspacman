@@ -17,6 +17,11 @@ enum {
 	HB_SIZE = 0x10
 };
 
+/* The IIgs host's video change log (VID_FULL, VID_N, VID_LOG in dp.s).
+ * Plain RAM to the game logic; no frame record or diff covers it. */
+#define LOWER_VID_LOG 0xF200u
+#define LOWER_VID_LOG_SIZE 0x204u
+
 /* sched.c fail() reasons, in A at WDM $02. X carries the detail. */
 enum {
 	FAIL_BAD_TASK = 1,   /* X = the task byte */

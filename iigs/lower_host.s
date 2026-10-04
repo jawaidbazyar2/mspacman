@@ -52,6 +52,9 @@ G_IN0	equ	GAME+$F010
 G_IN1	equ	GAME+$F011
 G_DSW1	equ	GAME+$F012
 G_REPLAY	equ	GAME+$F013
+G_VID_FULL	equ	GAME+$F200	; video change log (lower/dp.s VID_*)
+G_VID_N	equ	GAME+$F202
+G_VID_LOG	equ	GAME+$F204
 
 DSW1_DEFAULT	equ	$C9	; LIFT_DSW1_DEFAULT
 FRUIT_ROW_MAX	equ	7	; draw_fruit_row: one fruit per level up to seven
@@ -105,32 +108,59 @@ GameEnter
 	jsr	WaitVBL
 
 MainLoop
+* One color per activity (BRD_* in equates.s). Erase, draw and sort paint
+* their own; everything else is painted here so a color cannot stick
+* past the routine that owns it. FrameDone is the check breakpoint and
+* stays on the sound color.
 	sep	#$20
 	jsr	LowerKeys
-	bcs	:exit
-	rep	#$30
+	bcc	:run
+	brl	:exit
+:run	rep	#$30
 	lda	>DEMO_FREEZE
 	and	#$00FF
 	bne	:frozen
-	jsr	EraseAllSprites
+	jsr	EraseAllSprites		; purple
+	lda	#BRD_TILES
+	jsr	SetBorder
 	jsr	LowerApplyTiles
-	jsr	DrawAllSprites
+	jsr	DrawAllSprites		; green
+	lda	#BRD_COPY
+	jsr	SetBorder
 	jsr	CopySpritePos
+	lda	#BRD_TICK
+	jsr	SetBorder
 	jsr	CallFrame
+	lda	#BRD_SOUND
+	jsr	SetBorder
 	jsr	LowerSound
 	jsr	FrameDone
+	lda	#BRD_DIFF
+	jsr	SetBorder
 	jsr	LowerTiles
+	lda	#BRD_ACTOR
+	jsr	SetBorder
 	jsr	LowerSprites
+	lda	#BRD_HUD
+	jsr	SetBorder
 	jsr	LowerHud
 	lda	#ACT_OY
-	jsr	SortActorsByY
+	jsr	SortActorsByY		; yellow
 	lda	>G_REPLAY
 	and	#$00FF
 	bne	MainLoop
-	jsr	WaitVBL
-	bra	MainLoop
-:frozen	jsr	WaitVBL
-	bra	MainLoop
+	jsr	WaitVBL			; black
+	brl	MainLoop
+* Hold white across the blank. WaitVBL would paint black immediately.
+:frozen	lda	#BRD_FREEZE
+	jsr	SetBorder
+	sep	#$20
+]fw1	lda	>RDVBLBAR
+	bmi	]fw1
+]fw2	lda	>RDVBLBAR
+	bpl	]fw2
+	rep	#$30
+	brl	MainLoop
 :exit	jmp	ExitDemo
 
 ExitDemo
@@ -234,7 +264,11 @@ LowerInit
 	lda	#DSW1_DEFAULT
 	sta	>G_DSW1
 	rep	#$20
-:adapt	lda	#$FFFF
+:adapt	lda	#1
+	sta	>G_VID_FULL
+	lda	#0
+	sta	>G_VID_N
+	lda	#$FFFF
 	ldx	#$03FE
 ]sh	sta	|SH_TILE,x
 	sta	|SH_COLOR,x
@@ -366,13 +400,61 @@ LT_BANK	equ	$3C	; cell's bank (LowerDrawCell, LowerRemapTile)
 LT_BK16	equ	$3E	; bank * 16: its row of TileBankPens
 LT_I	equ	$40	; byte index into LT_BUF
 LT_BUF	equ	$42	; 18 resolved tile bytes, +2 for word stores
+LT_N	equ	$56	; VID_N, the log's length in bytes
 
-* Diff the game bank's tiles and colors against the last pass. Changed
-* cells go to TILEMAP and the dirty list, or to a full redraw.
+* Changed cells to TILEMAP and the dirty list, or to a full redraw.
+* VID_FULL: diff every cell against the last pass. Otherwise only the
+* cells the game logged; a tile or color address both name the cell at
+* (addr & $3FF) - $40, the offset :cell takes.
 LowerTiles
 	php
 	jsr	LowerMazeBank
+	sep	#$20
+	lda	>G_VID_FULL
+	bne	:full
 	rep	#$30
+	lda	>G_VID_N
+	and	#$00FF
+	beq	:pens
+	sta	<LT_N
+	ldy	#0
+]l	tyx
+	lda	>G_VID_LOG,x
+	and	#$03FF
+	sec
+	sbc	#$0040
+	bcc	:nx			; bottom chrome rows
+	cmp	#$0380			; top chrome rows
+	bcs	:nx
+	tax
+* :cell is for cells that changed. Text is rewritten every frame on
+* some screens, and a logged cell may repeat.
+	sep	#$20
+	lda	>G_TILE,x
+	cmp	|SH_TILE,x
+	bne	:lchg
+	lda	>G_COLOR,x
+	cmp	|SH_COLOR,x
+	beq	:lsame
+:lchg	rep	#$20
+	phy
+	jsr	:cell
+	ply
+:lsame	rep	#$20
+:nx	iny
+	iny
+	cpy	<LT_N
+	bcc	]l
+	lda	#0
+	sta	>G_VID_N
+:pens	rep	#$30
+	jsr	LowerMazePens
+	plp
+	rts
+:full	rep	#$30
+	lda	#0
+	sta	>G_VID_FULL
+	sta	>G_VID_N
 	ldx	#$037E
 ]w	lda	>G_TILE,x
 	cmp	|SH_TILE,x

@@ -24,15 +24,27 @@ SOUNDADRL      equ $E0C03E
 SOUNDADRH      equ $E0C03F
 SYS_VOL        equ $E100CA	; the system volume, low nibble (Control Panel)
 
-* MainLoop phase border colors (classic 16; keep far apart — avoid orange+red→“yellow”)
-BRD_ERASE      equ $03		; purple — EraseSprite entry
-BRD_DRAW       equ $0C		; green — DrawSprite entry
+* MainLoop phase border colors (classic 16). Width on screen is time at
+* 2.8 MHz. Neighbors in time stay far apart in this palette so they do
+* not blend (orange beside red reads as yellow).
+* Erase, draw and sort are painted inside those routines. The lowered
+* loop (lower_host.s) paints the rest at each phase boundary. The static
+* shell only paints copy and tick; it has no tile, sound or adapter phase.
+* Black is WaitVBL slack: no black on the visible frame means the work
+* ran through the whole scan.
+BRD_ERASE      equ $03		; purple — EraseAllSprites
+BRD_TILES      equ $0E		; aqua — LowerApplyTiles (dirty cells or full maze)
+BRD_DRAW       equ $0C		; green — DrawAllSprites
 BRD_COPY       equ $07		; light blue — CopySpritePos
-BRD_RAILS      equ $09		; orange — demo rails / FrameTick (alias BRD_TICK)
-BRD_TICK       equ $09		; orange — FrameTick (DemoTick or LogicTick)
-BRD_SORT       equ $0D		; yellow — SortActorsByY (after tick, before WaitVBL)
-BRD_VBL        equ $00		; black — WaitVBL slack (absent ⇒ no headroom / possible miss)
-BRD_FREEZE     equ $0F		; white — DEMO_FREEZE spin
+BRD_RAILS      equ $09		; orange — alias of BRD_TICK
+BRD_TICK       equ $09		; orange — CallFrame / FrameTick (game logic)
+BRD_SOUND      equ $01		; deep red — LowerSound (DOC register update)
+BRD_DIFF       equ $05		; gray — LowerTiles (video and color RAM diff)
+BRD_ACTOR      equ $06		; medium blue — LowerSprites (publish actors)
+BRD_HUD        equ $0B		; pink — LowerHud
+BRD_SORT       equ $0D		; yellow — SortActorsByY
+BRD_VBL        equ $00		; black — WaitVBL slack
+BRD_FREEZE     equ $0F		; white — DEMO_FREEZE (held across the wait)
 
 SHR_PIXEL_BYTES equ 32000
 * Strides (bytes/row). SHR is full 320-wide; BCK is PF strip (S_BCK).

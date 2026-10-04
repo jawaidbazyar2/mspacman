@@ -215,6 +215,8 @@ draw_bonus_digits
 	clc
 	adc	#TILE_DIGIT0
 	sta	CELL_BONUS1
+	ldx	#CELL_BONUS1
+	jsr	vid_log
 	lda	dip_bonus_life
 	lsr
 	lsr
@@ -224,6 +226,8 @@ draw_bonus_digits
 	clc
 	adc	#TILE_DIGIT0
 	sta	CELL_BONUS10
+	ldx	#CELL_BONUS10
+	jmp	vid_log
 :done	rts
 
 * read_dip_switches ($26D0), task $14. T0 dip, T1 coinage.

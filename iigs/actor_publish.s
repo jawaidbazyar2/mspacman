@@ -7,125 +7,76 @@
 * Arcade pixel (Y in A, X in X) → R_X / R_Y screen sprite coords.
 * Rails: ACT = tile*6+SPR_BASE (centers sprite on tile). Arcade &7==4 is that
 * center — offset by (sub-4)×6/8. Upright X is mirrored: sub_x = 4-(ax&7).
+* R_X = ArcTileX[ax>>3] + ArcSubX[ax&7], R_Y the same from ay. ay < 8
+* is above the maze: R_Y = SPR_Y_LIMIT, which ActorTunnelVis hides (a
+* row of -1 would put the blit near row 254, into $01/C0xx).
 ArcadeToScreen
 	php
 	sep	#$30
 	sta	<R_TMP			; ay
 	stx	<R_OFF			; ax
-* our_tx = 27 - ((ax>>3) - 2)
-	lda	<R_OFF
+	txa
 	lsr
 	lsr
-	lsr
-	sec
-	sbc	#2
-	sta	<R_ACT
-	lda	#27
-	sec
-	sbc	<R_ACT
-	sta	<R_TX
-* our_ty = (ay>>3) - 1. ay < 8 underflows 8-bit DEC to $FF → tile*6
-* ≈1530 and ScreenXY's Y&$FF puts the blit near row 254 → $01/C0xx.
-* Happy path falls through (still sep #$30). OOB is a trailing block —
-* never bra over a rep #$30 into code Merlin then assembles as 16-bit.
-	lda	<R_TMP
-	lsr
-	lsr
-	lsr
-	beq	:yOOB			; ay < 8 — above maze
-	dec
-	cmp	#PF_ROWS		; 31 — one past last maze row
-	bcs	:yOOB
-	sta	<R_TY
-* sub_x = 4-(ax&7), sub_y = (ay&7)-4  (signed bytes)
-	lda	<R_OFF
-	and	#$07
-	sta	<R_ACT
-	lda	#4
-	sec
-	sbc	<R_ACT
-	sta	<R_BTMP
-	lda	<R_TMP
-	and	#$07
-	sec
-	sbc	#4
-	sta	<R_SAVE
-	rep	#$30
-	lda	<R_TX
-	and	#$00FF
-	jsr	:tileBase
-	clc
-	adc	#SPR_BASE_X
+	and	#$3E
+	tax
+	rep	#$20
+	lda	|ArcTileX,x
 	sta	<R_X
-	lda	<R_BTMP
-	jsr	:subScale
+	sep	#$20
+	lda	<R_OFF
+	and	#$07
+	asl
+	tax
+	rep	#$20
+	lda	|ArcSubX,x
 	clc
 	adc	<R_X
 	sta	<R_X
-	lda	<R_TY
-	and	#$00FF
-	jsr	:tileBase
-	clc
-	adc	#SPR_BASE_Y
+	sep	#$20
+	lda	<R_TMP
+	lsr
+	lsr
+	and	#$3E
+	beq	:yOOB			; ay < 8
+	tax
+	rep	#$20
+	lda	|ArcTileY,x
 	sta	<R_Y
-	lda	<R_SAVE
-	jsr	:subScale
+	sep	#$20
+	lda	<R_TMP
+	and	#$07
+	asl
+	tax
+	rep	#$20
+	lda	|ArcSubY,x
 	clc
 	adc	<R_Y
 	sta	<R_Y
 	plp
 	rts
-
 :yOOB	rep	#$30
-	lda	#SPR_Y_LIMIT		; ActorTunnelVis → FLAG_NODRAW
+	lda	#SPR_Y_LIMIT
 	sta	<R_Y
-* Finish X so tunnel check stays valid
-	lda	<R_TX
-	and	#$00FF
-	jsr	:tileBase
-	clc
-	adc	#SPR_BASE_X
-	sta	<R_X
-	lda	<R_OFF
-	and	#$0007
-	sta	<R_ACT
-	lda	#4
-	sec
-	sbc	<R_ACT
-	jsr	:subScale
-	clc
-	adc	<R_X
-	sta	<R_X
 	plp
 	rts
 
-* A = tile index → A = tile*6 (m=0)
-:tileBase
-	and	#$00FF
-	sta	<R_TMP
-	asl
-	clc
-	adc	<R_TMP
-	asl
-	rts
-
-* A = signed sub-pixel -4..4 → A = ASR(sub*6, 3) (m=0)
-:subScale
-	and	#$00FF
-	bit	#$0080
-	beq	:pl
-	ora	#$FF00
-:pl	sta	<R_TMP
-	asl
-	clc
-	adc	<R_TMP
-	asl				; *6
-	ldx	#3
-]asr	cmp	#$8000			; C = sign
-	ror	a
-	dex
-	bne	]asr
-	rts
+* Upright X is mirrored: tile column t = (29 - (ax>>3)) & $FF, so ax>>3
+* of 30 and 31 give 255 and 254, far right and hidden. Entry =
+* t*6 + SPR_BASE_X (72).
+ArcTileX	dw	246,240,234,228,222,216,210,204
+	dw	198,192,186,180,174,168,162,156
+	dw	150,144,138,132,126,120,114,108
+	dw	102,96,90,84,78,72,1602,1596
+* Sub-tile offset s = 4 - (ax&7), scaled to ASR(s*6, 3).
+ArcSubX	dw	3,2,1,0,0,-1,-2,-3
+* Row (ay>>3) - 1, times 6, + SPR_BASE_Y (4). Entry 0 is never read.
+ArcTileY	dw	0,4,10,16,22,28,34,40
+	dw	46,52,58,64,70,76,82,88
+	dw	94,100,106,112,118,124,130,136
+	dw	142,148,154,160,166,172,178,184
+* Sub-tile offset s = (ay&7) - 4, scaled to ASR(s*6, 3).
+ArcSubY	dw	-3,-3,-2,-1,0,0,1,2
 
 * A = dir 0..3 → A = $20 + dir*2 + ((FRAME>>3)&1)
 GhostSprFromDir

@@ -124,12 +124,21 @@ static int in_host(uint16_t a)
 	return a >= LOWER_HOST_BLOCK && a < LOWER_HOST_BLOCK + HB_SIZE;
 }
 
+static uint8_t vid_log[LOWER_VID_LOG_SIZE];
+
+static int in_vid_log(uint16_t a)
+{
+	return a >= LOWER_VID_LOG && a < LOWER_VID_LOG + LOWER_VID_LOG_SIZE;
+}
+
 static uint8_t bus_read(uint16_t a, int *fault)
 {
 	if (game_rom(a) || game_ram(a) || game_io(a))
 		return board_mem_read(g_lower_board, a);
 	if (in_host(a))
 		return host_read(a, fault);
+	if (in_vid_log(a))
+		return vid_log[a - LOWER_VID_LOG];
 	*fault = 1;
 	return 0;
 }
@@ -142,6 +151,10 @@ static void bus_write(uint16_t a, uint8_t v, int *fault)
 	}
 	if (in_host(a)) {
 		host_write(a, v, fault);
+		return;
+	}
+	if (in_vid_log(a)) {
+		vid_log[a - LOWER_VID_LOG] = v;
 		return;
 	}
 	*fault = 1;

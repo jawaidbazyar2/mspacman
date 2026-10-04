@@ -103,7 +103,10 @@ flash_power_pills
 :off	lda	#0
 :set	sta	$4732
 	sta	$4678
-	rts
+	ldx	#$4732
+	jsr	vid_log
+	ldx	#$4678
+	jmp	vid_log
 :play	lda	$447E
 	sta	T10
 	lda	#0
@@ -119,6 +122,7 @@ flash_power_pills
 	ply
 	lda	T10
 	sta	|COLOR_RAM,x
+	jsr	vid_log
 	iny
 	cpy	#4
 	bcc	:pp
@@ -190,6 +194,7 @@ reset_pills
 
 * draw_pills ($2448), task $03: the pills the bitmap says are present.
 draw_pills
+	VIDFULL
 	ldx	#PILL_DELTAS
 	jsr	maze_word
 	stx	T8
@@ -224,6 +229,7 @@ draw_pills
 
 * erase_pills ($2A35), task $13: blank every pill and power pill.
 erase_pills
+	VIDFULL
 	ldx	#MAZE_TOP
 :loop	lda	|$0000,x
 	cmp	#$10
@@ -241,6 +247,7 @@ erase_pills
 
 * clear_colors ($240D), task $06.
 clear_colors
+	VIDFULL
 	lda	#0
 	ldx	#$4400
 	ldy	#$0400
@@ -248,6 +255,7 @@ clear_colors
 
 * clear_screen(which in A) ($23ED), task $00: 1 blanks only the maze.
 clear_screen
+	VIDFULL
 	cmp	#1
 	bne	:all
 	lda	#TILE_BLANK
@@ -263,6 +271,7 @@ clear_screen
 * left half; each tile is mirrored onto the right half with bit 0
 * flipped. Y walks the layout. T8 cell, T10 tile.
 draw_maze
+	VIDFULL
 	ldx	#MAZE_LAYOUTS
 	jsr	maze_word
 	txy
@@ -331,6 +340,7 @@ wall_color
 * tunnel cells (color bit 6) before level 3 and colors the house door.
 * T8 cell, T12 which.
 maze_colors
+	VIDFULL
 	sta	T12
 	jsr	wall_color
 	ldx	#$4440

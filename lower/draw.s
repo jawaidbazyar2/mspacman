@@ -16,7 +16,7 @@ draw_block
 	sta	|$0001,x
 	sta	|$0020,x
 	sta	|$0021,x
-	rts
+	jmp	vid_log4
 
 * draw_icon(cell in X, tile in A): four consecutive tiles.
 draw_icon
@@ -27,7 +27,7 @@ draw_icon
 	sta	|$0020,x
 	inc
 	sta	|$0021,x
-	rts
+	jmp	vid_log4
 
 * draw_fruit_row ($2BEA), task $1B: one fruit per level up to seven,
 * then blanks. The attract mode leaves the row alone.
@@ -133,6 +133,7 @@ draw_message
 	lda	#TILE_BLANK
 :keep	ldx	T4
 	sta	|$0000,x
+	jsr	vid_log
 	rep	#$20
 	lda	T4
 	clc
@@ -177,6 +178,7 @@ draw_message
 	iny
 :all	ldx	T6
 	sta	|$0000,x
+	jsr	vid_log
 	rep	#$20
 	lda	T6
 	clc
@@ -201,6 +203,7 @@ draw_tile_list
 	sep	#$20
 	lda	|$0001,y
 	sta	|$0000,x
+	jsr	vid_log
 	rep	#$20
 	txa
 	ora	#COLOR_RAM
@@ -208,6 +211,7 @@ draw_tile_list
 	sep	#$20
 	lda	T0
 	sta	|$0000,x
+	jsr	vid_log
 	iny
 	iny
 	iny
