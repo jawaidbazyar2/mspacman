@@ -451,6 +451,14 @@ def generate(
             tiles6 = read_contact_sheet(
                 clean_dir / CLEAN_TILES_PPM, NUM_TILES, 16, TILE_DST, TILE_DST
             )
+            for code in (0x14, 0x15):
+                pens = {p for row in tiles6[code] for p in row}
+                if not pens <= {0, 1}:
+                    raise SystemExit(
+                        f"{clean_dir / CLEAN_TILES_PPM}: power pill {code:#04x} uses pens "
+                        f"{sorted(pens)}; draw it in red (pen 1, the dot color). White is "
+                        f"pen 2, which maze cells draw as the wall fill"
+                    )
         else:
             tile_rom = tile_rom_path.read_bytes()
             if len(tile_rom) != 4096:
