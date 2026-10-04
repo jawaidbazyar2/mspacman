@@ -584,7 +584,7 @@ The I/O page is plain RAM. `read_latch0` reads the interrupt enable back from `$
 `lower_host.s` frame loop: keyboard, erase sprites, apply tile changes, draw sprites, call `c_only_frame` (D = `$1E00`, DBR = `$06`, `MX %10`, `JSL` through `LE_c_only_frame`), `FrameDone`, then the adapters, then wait for VBLANK. Each adapter diffs the game bank against a shadow:
 
 - `LowerTiles`: tile and color RAM into the renderer's tilemap and dirty list. A cell with color 0 is drawn blank. Past 120 dirty cells, it redraws all of them.
-- `LowerSprites`: `sprite_out` and the actor positions into the renderer's actors. Ghost frames, eyes, blue and flashing (by palette poke), points, Ms. Pac-Man's poses, the fruit.
+- `LowerSprites`: `sprite_out` and the actor positions into the renderer's actors. Ghost frames, eyes, blue and flashing (their own blits), points, Ms. Pac-Man's poses, the fruit.
 - `LowerHud`: scores, lives, and level into the side HUD.
 
 `FrameDone` (host `$0004`) is an `RTS` that exists to carry a breakpoint. `CheckMode` (host `$0003`) is set by the checker and stops the host from clearing the game bank at start.
@@ -619,7 +619,7 @@ Notes, not yet a plan. Phase 3 ends with the lowered logic driving the IIgs rend
 ### Starting point
 
 - `make lower-iigs-check` passes the first 600 frames of `c-shakedown`, `c-attract`, and `c-play1`. It takes about 72 seconds per session, so full sessions have not been run.
-- Sound is silent. The lowered logic writes the voice registers at `$5040`–`$505F` of the game bank every frame, and nothing reads them.
+- Sound was silent: the lowered logic wrote the voice registers at `$5040`–`$505F` of the game bank every frame, and nothing read them. Now done; see "Audio" below.
 - The sprite adapter in `iigs/lower_host.s` handles ghosts (body, eyes, blue, flashing, points), Ms. Pac-Man's walk poses, and the fruit. Codes outside those sets are hidden or shown as closed-mouth Ms. Pac-Man. That covers her death animation and the intermission actors.
 - Color RAM is used only to blank cells. Per-cell colors come from the prebaked tiles.
 - Nobody has played the IIgs build by hand (`make iigs-lower-demo`).
@@ -650,14 +650,23 @@ The arcade uses Namco's WSG: three voices, each with a 4-bit volume and a freque
 
 The IIgs plays them on the Ensoniq DOC, through the sound GLU (`$C03C`–`$C03F`):
 
-- At startup, load the eight waveforms into DOC RAM. Each 32-nibble table becomes 8-bit samples in the DOC's smallest table (256 bytes). No sample byte may be `$00`, because zero stops a DOC oscillator.
+- At startup, load the eight waveforms into DOC RAM. Each 32-nibble wave becomes 8-bit samples, one cycle per 4 KB table, with each sample repeated 128 times. No sample byte may be `$00`, because zero stops a DOC oscillator.
 - Give each arcade voice one free-running oscillator.
 - After each game frame, beside `LowerTiles`, an adapter reads the voice registers from the game bank. It sets each oscillator's table pointer from the wave select, its frequency from the WSG frequency, and its volume from the 4-bit volume. A voice is silent when its volume is 0 or sound is disabled. Registers are written only when they change, through a shadow, as the tile adapter does.
 - Frequency conversion depends on the DOC scan rate, which depends on how many oscillators are enabled. Take the formula from the IIgs Hardware Reference, check it against GSSquared's ENSONIQ emulation, and use a table or one multiply per voice.
 
-Testing: sample-exact audio is still out of scope. The check is at the register level. During `make lower-iigs-check`, read the DOC registers (gs2-debug `ENSONIQ` domain, or a host shadow), and compare them per frame with values computed from the corpus's voice registers. The DOC state is a pure function of those bytes. By ear: play `make iigs-lower-demo` beside `mspac`.
+Testing: sample-exact audio is still out of scope. The check is at the register level. During `make lower-iigs-check`, read the DOC registers (the Ensoniq `STATE_GET`, device 22; the `ENSONIQ` memory domain is DOC RAM only), and compare them per frame with values computed from the corpus's voice registers. The DOC state is a pure function of those bytes. By ear: play `make iigs-lower-demo` beside `mspac`.
 
-Open questions: table interpolation versus nearest sample, the volume curve, aliasing at high frequencies, and which oscillators stay free for the DOC's own use.
+Status: done (`iigs/lower_sound.s`; design in [IIgs-Design.md](IIgs-Design.md) §5). The check is at the register level, as planned. GSSquared's Ensoniq `STATE_GET` exposes the oscillator registers, so `make lower-iigs-check` compares the chip itself, not a host shadow. It passes the first 600 frames of the three default sessions; 205 of `c-play1`'s 600 frames have a voice sounding. The GS/OS build was checked live: the coin sound, the start song on two voices, and silence after Q.
+
+Answers to the open questions:
+
+- **Nearest sample.** Each wave is stretched over a 4 KB table, one cycle per table. The first version packed 8 cycles into a 256-byte table. A free-running oscillator wraps one entry short of its table, so that layout lost a sample every 8 cycles, which was audible as an extra buzz.
+- **Linear volume:** WSG volume × 16.
+- **4 oscillators enabled:** about 149 kHz, set explicitly. The voices use oscillators 0–2, and 3 stays halted. The first version enabled 32 (26 kHz), which aliased any note above about 820 Hz.
+- **Resolution 3:** keeps the lowest game notes (F = `$80`) within 0.6% while the highest (F = `$9800`) fits 16 bits.
+
+Still open: tune the volume by ear against `mspac`.
 
 ### Sprites and colors
 

@@ -185,7 +185,7 @@ def make_centered_pellet(size: int = 8) -> list[list[int]]:
 
 
 def make_power_pill(size: int = 8) -> list[list[int]]:
-    """Solid octagon/disc pen-14 COL_POWER (ROM+scale pinches 0x14 into an H/bowtie)."""
+    """Solid octagon/disc in pen 1, the arcade pill's pen (ROM+scale pinches 0x14 into an H/bowtie)."""
     out = [[0] * size for _ in range(size)]
     # Radius-ish fill; works for 8×8 and survives symmetric 8→6 subsample.
     mid = (size - 1) / 2.0
@@ -193,7 +193,7 @@ def make_power_pill(size: int = 8) -> list[list[int]]:
     for y in range(size):
         for x in range(size):
             if (x - mid) ** 2 + (y - mid) ** 2 <= rad * rad:
-                out[y][x] = 14
+                out[y][x] = 1
     return out
 
 
@@ -218,9 +218,8 @@ def mask_from_pens(img: list[list[int]]) -> list[list[int]]:
     return [[0xF if p else 0 for p in row] for row in img]
 
 
-# Arcade sprite pens 1–3 → SHR pens. Body (pen 3) stays at marker slot 6 so
-# DrawSprite can substitute ACT_COLOR (Blinky/Pinky/Inky/Clyde). Eyes use
-# slots that do not collide with those body colors (5/7/9/11).
+# Arcade sprite pens 1–3 → sheet nibbles. Pen 3 (a ghost's body) is the
+# marker 6 that py/gen_compiled_ghosts.py replaces with each ghost's pen.
 #   pen1 (eye white) → 1 (maze pale), pen2 (pupil) → 15, pen3 (body) → 6
 _SPRITE_PEN_MAP = (0, 1, 15, 6)
 

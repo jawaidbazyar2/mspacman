@@ -16,6 +16,13 @@ KBD            equ $E0C000	; bit7=strobe; 0–6=key
 KBDSTRB        equ $E0C010	; read: clear strobe; bit7=AKD (IIe/IIgs); 0–6=key
 BORDCOLOR      equ $E0C034	; low nibble = border
 TXTCLR         equ $E0C050
+* Sound GLU (the DOC's window). SOUNDCTL: bit 7 busy, bit 6 RAM (vs
+* registers), bit 5 auto-increment, bits 3-0 master volume (write-only).
+SOUNDCTL       equ $E0C03C
+SOUNDDATA      equ $E0C03D
+SOUNDADRL      equ $E0C03E
+SOUNDADRH      equ $E0C03F
+SYS_VOL        equ $E100CA	; the system volume, low nibble (Control Panel)
 
 * MainLoop phase border colors (classic 16; keep far apart — avoid orange+red→“yellow”)
 BRD_ERASE      equ $03		; purple — EraseSprite entry
@@ -98,22 +105,31 @@ ACT_OY         equ 6		; old Y (Y-sort before WaitVBL)
 ACT_SPR        equ 8
 ACT_FLAGS      equ 9
 ACT_WP         equ 10		; waypoint index into RailPath (byte)
-ACT_COLOR      equ 11		; SHR pen for body (replaces marker pen 6)
+ACT_COLOR      equ 11		; ghost blit slot (COL_*)
 ACT_DEST       equ 12		; SHR offset cached at DrawSprite
 ACT_BDEST      equ 14		; BCK offset cached at DrawSprite (EraseSprite)
 FLAG_DRAWN     equ $01
 FLAG_NODRAW    equ $02		; skip DrawSprite (inactive fruit, tunnel / Y clip)
 FLAG_POINTS    equ $04		; eat-ghost freeze: blit $28–$2B points (not body)
 
-* Ghost body pens (palette slots from gen_palette color-ROM fill)
-COL_BLINKY     equ 5		; red (fright: palette poke → blue/white)
-COL_PINKY      equ 7		; pink
-COL_INKY       equ 9		; cyan
-COL_CLYDE      equ 11		; orange
-COL_EYES       equ 0		; ghost blit slot 4 — body→transparent (eyes only)
-COL_POWER      equ 14		; energizer fade (palette poke only)
+* Ghost blit slots (ACT_COLOR), py/gen_compiled_ghosts.py
+COL_BLINKY     equ 0		; red
+COL_PINKY      equ 1		; pink
+COL_INKY       equ 2		; cyan
+COL_CLYDE      equ 3		; orange
+COL_FRIGHT     equ 4		; frightened: deep blue, peach face
+COL_FLASH      equ 5		; end-of-fright flash: pale, red face
+COL_EYES       equ 6		; body transparent (eyes only)
 BODY_PEN       equ 6		; marker in sprite assets
 COL_DIGIT      equ 1		; white ink for HUD glyphs (arcade bank #0F pen 3)
+
+* Maze walls: outline and fill pens, loaded per maze bank by SetMazePens
+MAZE_OUTLINE_PEN equ 12	; bank pen 3
+MAZE_FILL_PEN  equ 14		; bank pen 2
+MAZE_BANK1     equ $1D		; levels 1-2
+FLASH_BANK     equ $1F		; level-end flash: pale outline, black fill
+CLEAR_DELAY    equ 120		; board clear to first flash (arcade #09D8 timer #54)
+CLEAR_STEP     equ 12		; frames per flash step (#09E8 / #09FE timer #42), 8 steps
 
 * Side HUD — the 76px gutters either side of the 168px playfield (§1 design).
 * Glyphs are 6×6 tiles blitted at absolute screen XY (SHR only: sprites never

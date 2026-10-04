@@ -47,29 +47,6 @@ FRUITS = (
     (7, 0x09, "Junior"),  # table lists #00; PROM bank 0 is blank
 )
 
-# Color-ROM index → preferred SHR pen (§2).
-# Red→3 (maze-red alias), orange→12 (spare alias of Clyde): same RGBs as
-# pens 5/11 at rest, but fright palette pokes only poke ghost body pens
-# 5/7/9/11 — fruit must not share those nibbles or cherries turn blue.
-_ROM_TO_SHR = {
-    0: 0,
-    1: 3,   # red (cherry/strawberry/apple) — not COL_BLINKY
-    2: 6,
-    3: 8,   # pink — stable alias of Pinky
-    4: 0,
-    5: 9,
-    6: 10,
-    7: 12,  # orange (peach/pretzel) — not COL_CLYDE
-    8: 0,
-    9: 13,
-    10: 0,
-    11: 15,
-    12: 4,
-    13: 10,  # teal has no pen; nearest light blue
-    14: 2,
-    15: 1,
-}
-
 
 def _load_gfx():
     path = ROOT / "py" / "gen_shr_gfx.py"
@@ -93,7 +70,7 @@ def bank_to_shr_map(palette_rom: Path, bank: int) -> tuple[int, int, int, int]:
     """Arcade bank pens 0–3 → SHR pen indices."""
     pal = _load_pal()
     rom_pens = pal.load_palette_pens(palette_rom, bank)
-    return tuple(_ROM_TO_SHR[p & 15] for p in rom_pens)  # type: ignore[return-value]
+    return tuple(pal.STABLE_ROM_TO_SHR[p & 15] for p in rom_pens)  # type: ignore[return-value]
 
 
 def remap_img(img: list[list[int]], shr_map: tuple[int, ...]) -> list[list[int]]:

@@ -14,8 +14,8 @@
 *            positions, into ACTORS
 *   HUD      the BCD scores, lives and level, into the side HUD
 *   input    the keyboard into the IN0/IN1 bytes of the host block
-*
-* Sound is not adapted: the voice registers stay in the game bank.
+*   sound    the voice registers at $5040 into DOC oscillators 0-2
+*            (lower_sound.s)
 *
 * lower-iigs-check sets CheckMode before the first frame, preloads the
 * game bank from a session and points the replay stream at its reads.
@@ -101,6 +101,7 @@ GameEnter
 	jsr	InitHUD
 	jsr	DrawHudChrome
 	jsr	LowerInit
+	jsr	SoundInit
 	jsr	WaitVBL
 
 MainLoop
@@ -116,6 +117,7 @@ MainLoop
 	jsr	DrawAllSprites
 	jsr	CopySpritePos
 	jsr	CallFrame
+	jsr	LowerSound
 	jsr	FrameDone
 	jsr	LowerTiles
 	jsr	LowerSprites
@@ -132,6 +134,7 @@ MainLoop
 :exit	jmp	ExitDemo
 
 ExitDemo
+	jsr	SoundOff
 	sep	#$30
 	lda	#0
 	jsr	SetBorder
@@ -380,6 +383,7 @@ LowerTiles
 :next	dex
 	dex
 	bpl	]w
+	jsr	LowerMazePens
 	plp
 	rts
 :chg	phx
@@ -389,16 +393,46 @@ LowerTiles
 	plx
 	bra	:next
 
-* One cell, X = its offset from $4040. Keeps X.
+* One cell, X = its offset from $4040. Keeps X. The level-end flash
+* (task #01, #24D7) repaints the playfield between the maze bank and #1F
+* with the tiles unchanged: that only sets MazeFlash, for LowerMazePens.
 :cell	sep	#$20
 	lda	>G_TILE,x
+	cmp	|SH_TILE,x
+	bne	:draw
+	lda	|SH_COLOR,x
+	jsr	:mz
+	bcc	:draw
+	lda	>G_COLOR,x
+	jsr	:mz
+	bcc	:draw
+	lda	>G_COLOR,x
+	cmp	|SH_COLOR,x
+	beq	:kept
+	sta	|SH_COLOR,x
+	and	#$1F
+	cmp	#FLASH_BANK		; C = flashed
+	lda	#0
+	rol
+	sta	|MazeFlash
+:kept	rep	#$20
+	rts
+	mx	%10
+:draw	lda	>G_TILE,x
 	sta	|SH_TILE,x
 	sta	<R_TILE
 	lda	>G_COLOR,x
 	sta	|SH_COLOR,x
 	and	#$1F
-	sta	<LT_BANK
-	bne	:lit
+	beq	:blank
+	cmp	#FLASH_BANK
+	bne	:bank
+	ldy	|MazeFlash
+	beq	:bank
+	lda	|MazeBank		; flashed maze cell: the maze sheet
+:bank	sta	<LT_BANK
+	bra	:lit
+:blank	sta	<LT_BANK
 	lda	#TILE_EMPTY
 	sta	<R_TILE
 :lit	rep	#$20
@@ -461,6 +495,34 @@ LowerTiles
 	plx
 :skip	rep	#$20
 	rts
+
+* C = A's bank (low 5 bits) is the maze's or the flash's. 8-bit A.
+	mx	%10
+:mz	and	#$1F
+	cmp	#FLASH_BANK
+	beq	:mzy
+	cmp	|MazeBank
+	beq	:mzy
+	clc
+	rts
+:mzy	sec
+	rts
+	mx	%00
+
+* Maze wall pens to the flash or the maze bank, when MazeFlash changed.
+LowerMazePens
+	lda	|MazeFlash
+	and	#$00FF
+	cmp	|MazeFlashShown
+	beq	:done
+	sta	|MazeFlashShown
+	tax
+	lda	|MazeBank
+	cpx	#0
+	beq	:set
+	lda	#FLASH_BANK
+:set	jsr	SetMazePens
+:done	rts
 
 * Between erase and draw: the dirty cells, or every cell.
 LowerApplyTiles
@@ -545,8 +607,9 @@ LowerApplyDirty
 	rts
 
 * The bank the game paints this level's maze in: j_9590's level ->
-* $95AE lookup, folds included. Cells in it draw raw, as before banks
-* were resolved, so every level's maze keeps palette pens 0-3.
+* $95AE lookup, folds included. When it changes, MazeSheet is rebuilt:
+* every tile resolved through it as a maze (walls on the maze pens), so
+* maze cells draw without a remap; and the maze pens get its colors.
 LowerMazeBank
 	php
 	sep	#$20
@@ -564,21 +627,48 @@ LowerMazeBank
 :look	rep	#$30
 	and	#$00FF
 	tax
-	sep	#$20
 	lda	>GAME+$95AE,x
-	and	#$1F
+	and	#$001F
+	cmp	|MazeBank
+	beq	:same
 	sta	|MazeBank
-	plp
+	jsr	SetMazePens
+	stz	|MazeFlash
+	stz	|MazeFlashShown
+	lda	|MazeBank
+	clc
+	adc	#32			; its maze row of TileBankPens
+	sta	<LT_BANK
+	stz	<R_TILE
+	ldy	#0
+]t	phy
+	jsr	LowerRemapTile
+	ply
+	ldx	#0
+]c	lda	<LT_BUF,x
+	sta	|MazeSheet,y
+	iny
+	iny
+	inx
+	inx
+	cpx	#18
+	bcc	]c
+	inc	<R_TILE
+	lda	<R_TILE
+	cmp	#256
+	bcc	]t
+:same	plp
 	rts
 	mx	%00
 
 * Draw TILEMAP cell X (R_TX, R_TY, R_TILE set) in its bank's colors.
-* Raw: the maze bank, banks whose map is the identity, and blanks.
+* Maze cells come from MazeSheet; raw: banks whose map is the identity,
+* and blanks.
 LowerDrawCell
 	lda	|CellBank,x
 	and	#$001F
 	cmp	|MazeBank
-	beq	:raw
+	beq	:maze
 	tay
 	lda	|TileBankRaw,y
 	and	#$00FF
@@ -588,6 +678,19 @@ LowerDrawCell
 	beq	:raw
 	sty	<LT_BANK
 	jsr	LowerRemapTile
+	jmp	LowerDrawTileBuf
+:maze	lda	<R_TILE
+	jsr	Mul18
+	tay
+	ldx	#0
+]c	lda	|MazeSheet,y
+	sta	<LT_BUF,x
+	iny
+	iny
+	inx
+	inx
+	cpx	#18
+	bcc	]c
 	jmp	LowerDrawTileBuf
 :raw	jmp	DrawTile
 
@@ -796,8 +899,8 @@ LowerSprites
 	rep	#$20
 	rts
 
-* Ghost: walking frames $20-$27 in the ghost's pen, eyes, points, or
-* blue ($1C-$1D), which recolors the ghost's own pen.
+* Ghost: walking frames $20-$27 in the ghost's colors, eyes, points, or
+* frightened ($1C-$1D): color $11 blue, $12 the flash's white.
 :ghost	ldx	<LS_BASE
 	sep	#$20
 	lda	<LS_CODE
@@ -815,32 +918,21 @@ LowerSprites
 	cmp	#$19
 	beq	:eyes
 	lda	<LS_SLOT
-	asl
+	clc
 	adc	#COL_BLINKY
-	sta	>ACTORS+ACT_COLOR,x
-	rep	#$20
-	lda	#0
-	bra	:pen
-	mx	%10
+	bra	:col
 :eyes	lda	#COL_EYES
-	sta	>ACTORS+ACT_COLOR,x
-	rep	#$20
-	lda	#0
-	bra	:pen
-	mx	%10
+	bra	:col
 :blue	and	#1
 	sta	>ACTORS+ACT_SPR,x
-	lda	<LS_SLOT
-	asl
-	adc	#COL_BLINKY
-	sta	>ACTORS+ACT_COLOR,x
 	lda	<LS_COLOR
 	cmp	#$12
+	lda	#COL_FRIGHT
+	bcc	:col
+	lda	#COL_FLASH
+:col	sta	>ACTORS+ACT_COLOR,x
 	rep	#$20
-	lda	#$022D			; blue
-	bcc	:pen
-	lda	#$0FFF			; flashing white
-	bra	:pen
+	rts
 	mx	%10
 :pts	cmp	#$2C
 	bcs	:gone
@@ -852,18 +944,6 @@ LowerSprites
 	rts
 :gone	rep	#$20
 	jmp	:hide
-* A = the body pen's color, 0 for the ghost's own.
-:pen	pha
-	lda	<LS_SLOT
-	asl
-	asl
-	adc	#COL_BLINKY*2
-	tax
-	pla
-	bne	:poke
-	lda	|PalTable,x
-:poke	sta	>SHR_PALETTE,x
-	rts
 
 * Ms. Pac-Man: the pose for her direction, closed or one of the open
 * mouths. Codes outside the walk set (death, cutscenes) show closed.
@@ -1091,5 +1171,8 @@ FULL_REDRAW	dw	0	; redraw every cell next pass
 SH_HUD	ds	16	; score1 x3, hiscore x3, lives, level
 SH_TILE	ds	$400	; last tile codes seen, 896 used
 SH_COLOR	ds	$400	; last colors seen
-MazeBank	dw	0	; LowerMazeBank: this level's maze bank
+MazeBank	dw	$FFFF	; LowerMazeBank: this level's maze bank (none yet)
+MazeFlash	dw	0	; LowerTiles: playfield painted #1F (level-end flash)
+MazeFlashShown	dw	0	; MazeFlash the maze pens hold
 CellBank	ds	TILEMAP_CELLS	; per TILEMAP cell: color & $1F
+MazeSheet	ds	256*18	; every tile resolved through MazeBank

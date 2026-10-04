@@ -46,6 +46,7 @@ LevelFsm
 	beq	:reload
 	dec
 	sta	>CLEAR_TIMER
+	jsr	ClearFlash
 	plp
 	rts
 :reload
@@ -94,5 +95,34 @@ ReloadBoard
 	rep	#$30
 	jsr	CopyMaze
 	jsr	DrawMaze
+	lda	#MAZE_BANK1
+	jsr	SetMazePens
 	plp
 	rts
+
+* == #09E8 / #09FE: after CLEAR_DELAY, 8 steps of CLEAR_STEP frames
+* alternate the maze between bank #1F and its own, starting with #1F.
+* A = CLEAR_TIMER frames left.
+ClearFlash
+	php
+	sep	#$20
+	rep	#$10
+	cmp	#8*CLEAR_STEP+1
+	bcs	:out			; still in the delay
+	dec
+	ldx	#0
+]d	cmp	#CLEAR_STEP
+	bcc	:k
+	sbc	#CLEAR_STEP
+	inx
+	bra	]d
+:k	txa				; step 7 (first) .. 0 (last)
+	and	#1
+	beq	:own
+	lda	#FLASH_BANK
+	bra	:set
+:own	lda	#MAZE_BANK1
+:set	jsr	SetMazePens
+:out	plp
+	rts
+	mx	%00

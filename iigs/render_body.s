@@ -749,23 +749,13 @@ DrawSprite
 	and	#$00FF
 	and	#FLAG_POINTS
 	bne	:pointsBlit
-* Ghost: index = color_slot*16 + (ACT_SPR&7)*2 + (X&1)
-* slot: 5/7/9/11 → 0..3; COL_EYES (0) → slot 4 (body transparent)
+* Ghost: index = ACT_COLOR*16 + (ACT_SPR&7)*2 + (X&1)
 	lda	>ACTORS+ACT_COLOR,x
-	and	#$00FF
-	bne	:bodySlot
-	lda	#4*16			; eyes-only compiled slot
-	bra	:gotSlot
-:bodySlot
-	sec
-	sbc	#5
-	lsr				; 5/7/9/11 → 0..3
-	and	#$0003
+	and	#$0007
 	asl
 	asl
 	asl
 	asl				; *16
-:gotSlot
 	sta	<R_TMP
 	lda	>ACTORS+ACT_SPR,x
 	and	#$0007
@@ -879,7 +869,15 @@ ApplyDirty
 	tax
 	lda	>TILEMAP,x
 	and	#$00FF
-	sta	<R_TILE
+	cmp	#TILE_POWER
+	bne	:put
+	lda	>POWER_FLASH_CNT	; bit 7: pills blinked off
+	and	#$0080
+	beq	:pill
+	lda	#TILE_EMPTY
+	bra	:put
+:pill	lda	#TILE_POWER
+:put	sta	<R_TILE
 	jsr	DrawTile
 	plx
 	inx

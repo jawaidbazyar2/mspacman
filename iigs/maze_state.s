@@ -176,7 +176,6 @@ EatPowerAtX
 	lda	>FRIGHT_TIME		; #4DBD → #4DCB
 	sta	>FRIGHT_TIMER
 	phx
-	jsr	FrightPaletteUpdate
 	sep	#$20
 	lda	>DOTS_EATEN
 	inc
@@ -232,7 +231,7 @@ CheckBoardClear
 	lda	>DOTS_EATEN
 	cmp	#PELLET_TARGET
 	bcc	:no
-	lda	#10
+	lda	#CLEAR_DELAY+{8*CLEAR_STEP}
 	sta	>CLEAR_TIMER
 	lda	#12
 	sta	>LEVEL_STATE

@@ -149,9 +149,9 @@ FrightTimerDec
 :done	plp
 	rts
 
-* == j_1398 — end energizer: clear pill/fright/timer/flash + restore body pens.
+* == j_1398 — end energizer: clear pill/fright/timer/flash.
 * Also used after death respawn (arcade task #11 zeros #4D00–#4DFF before
-* task #04 re-seeds actors; without this, SHR pens stay blue).
+* task #04 re-seeds actors; without this, ghosts stay blue).
 ClearFrightState
 	php
 	sep	#$20
@@ -175,7 +175,6 @@ ClearFrightState
 	rep	#$30
 	lda	#0
 	sta	>FRIGHT_TIMER
-	jsr	FrightPaletteUpdate
 	plp
 	rts
 
@@ -215,8 +214,8 @@ GhostOrientTick
 	rts
 
 FrightTick
-* Flash period + per-ghost colors. == j_0ac3 / j_0afe
-* Each ghost's body pen follows its own *_FRIGHT flag (arcade spr color).
+* Flash period and phase. == j_0ac3 / j_0afe
+* ActorPublish picks each ghost's blit from its *_FRIGHT flag and the phase.
 	php
 	sep	#$20
 	lda	>POWER_PILL_ACT
@@ -240,67 +239,8 @@ FrightTick
 	lda	>FRIGHT_FLASH_PHASE
 	eor	#1
 	sta	>FRIGHT_FLASH_PHASE
-:apply	jsr	FrightPaletteUpdate
+:apply
 :done	plp
-	rts
-
-* Per-ghost body pens 5/7/9/11 — == j_0afe…j_0bce
-* Frightened → blue ($022F) or flash white ($0DDF); else PalTable normal.
-FrightPaletteUpdate
-	php
-	sep	#$20
-	lda	>RED_FRIGHT
-	beq	:rNorm
-	jsr	FrightEdibleRGB		; m=0, A=RGB word
-	sta	>SHR_PALETTE+10
-	bra	:p
-:rNorm	rep	#$30
-	lda	|PalTable+10
-	sta	>SHR_PALETTE+10
-:p	sep	#$20
-	lda	>PINK_FRIGHT
-	beq	:pNorm
-	jsr	FrightEdibleRGB
-	sta	>SHR_PALETTE+14
-	bra	:b
-:pNorm	rep	#$30
-	lda	|PalTable+14
-	sta	>SHR_PALETTE+14
-:b	sep	#$20
-	lda	>BLUE_FRIGHT
-	beq	:bNorm
-	jsr	FrightEdibleRGB
-	sta	>SHR_PALETTE+18
-	bra	:o
-:bNorm	rep	#$30
-	lda	|PalTable+18
-	sta	>SHR_PALETTE+18
-:o	sep	#$20
-	lda	>ORANGE_FRIGHT
-	beq	:oNorm
-	jsr	FrightEdibleRGB
-	sta	>SHR_PALETTE+22
-	bra	:out
-:oNorm	rep	#$30
-	lda	|PalTable+22
-	sta	>SHR_PALETTE+22
-:out	plp
-	rts
-
-* A = fright body RGB word; leaves m=0.
-FrightEdibleRGB
-	rep	#$30
-	lda	>FRIGHT_TIMER
-	cmp	#$0100
-	bcc	:flash
-	lda	#$022F
-	rts
-:flash	lda	>FRIGHT_FLASH_PHASE
-	and	#$00FF
-	beq	:blue
-	lda	#$0DDF
-	rts
-:blue	lda	#$022F
 	rts
 
 EyesTick

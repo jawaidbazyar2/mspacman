@@ -7,17 +7,23 @@ VRAM image built from golden boot ROMs, then remaps Pac-Man VRAM to a row-major
 28x31 maze-only grid.
 
 When build/gfx/tiles6.bin is present, also writes maze1_cells.bin — per-cell 6×6
-4bpp graphics with shared-edge stitching so thin wall stems meet at corners.
+4bpp graphics with shared-edge stitching so thin wall stems meet at corners,
+walls on the maze pens (fill 14, outline 12; gen_palette.py).
 
 Usage:
   python3 py/gen_maze1.py
   python3 py/gen_maze1.py --out build/gfx --ppm
+  python3 py/gen_maze1.py --image build/mspac.bin
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gen_palette import MAZE_FILL_PEN, MAZE_OUTLINE_PEN  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = ROOT / "build" / "gfx"
@@ -178,10 +184,12 @@ def stitch_maze_cells(tilemap: bytes, tiles6: bytes) -> bytes:
                     m = a or b if (a == 0 or b == 0) else max(a, b)
                     grid[y][x][yy][TILE_W - 1] = m
                     grid[y][x + 1][yy][0] = m
+    wall = {2: MAZE_FILL_PEN, 3: MAZE_OUTLINE_PEN}
     out = bytearray()
     for y in range(ROWS_OUT):
         for x in range(COLS):
-            out.extend(pack_tile6(grid[y][x]))
+            cell = [[wall.get(p, p) for p in row] for row in grid[y][x]]
+            out.extend(pack_tile6(cell))
     return bytes(out)
 
 
@@ -217,13 +225,22 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--ppm", action="store_true", help="write maze1_28x31.ppm preview")
     ap.add_argument("--zoom", type=int, default=8)
+    ap.add_argument(
+        "--image",
+        type=Path,
+        help="mapped ROM image (e.g. build/mspac.bin, verify-clean) instead of boot1-boot6",
+    )
     args = ap.parse_args()
 
-    for p in BOOTS:
-        if not p.is_file():
-            raise SystemExit(f"missing golden ROM {p}")
-
-    rom = load_rom_image()
+    if args.image:
+        rom = bytearray(0x10000)
+        data = args.image.read_bytes()
+        rom[: len(data)] = data
+    else:
+        for p in BOOTS:
+            if not p.is_file():
+                raise SystemExit(f"missing golden ROM {p}")
+        rom = load_rom_image()
     vram = bytearray([TILE_EMPTY] * 0x400)
     decode_walls(vram, rom, MAZE1_RLE)
     draw_dots(vram, rom, MAZE1_PELLETS)

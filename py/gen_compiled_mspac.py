@@ -52,29 +52,6 @@ FRAMES = (
     (3, 2, 0x31, True, True, "N2"),
 )
 
-# Color-ROM index → SHR pen (§2). Same stable aliases as fruit.
-# Bank #09 is black / deep blue / red / yellow. The red bow is 2bpp pen 2
-# (color ROM 1). Pens 5/7/9/11 are ghost bodies; FrightPaletteUpdate
-# rewrites those slots blue or white, so the bow uses pen 3 ($0F00).
-_ROM_TO_SHR = {
-    0: 0,
-    1: 3,   # red bow — stable alias of Blinky red
-    2: 6,
-    3: 8,   # pink — stable alias of Pinky
-    4: 0,
-    5: 9,
-    6: 10,
-    7: 12,  # orange — stable alias of Clyde, unused by bank #09
-    8: 0,
-    9: 13,
-    10: 0,
-    11: 15,
-    12: 4,
-    13: 10,  # teal has no pen; nearest light blue
-    14: 2,
-    15: 1,
-}
-
 
 def _load_gfx():
     path = ROOT / "py" / "gen_shr_gfx.py"
@@ -97,7 +74,7 @@ def _load_pal():
 def bank_to_shr_map(palette_rom: Path, bank: int) -> tuple[int, int, int, int]:
     pal = _load_pal()
     rom_pens = pal.load_palette_pens(palette_rom, bank)
-    return tuple(_ROM_TO_SHR[p & 15] for p in rom_pens)  # type: ignore[return-value]
+    return tuple(pal.STABLE_ROM_TO_SHR[p & 15] for p in rom_pens)  # type: ignore[return-value]
 
 
 def remap_img(img: list[list[int]], shr_map: tuple[int, ...]) -> list[list[int]]:

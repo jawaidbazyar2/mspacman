@@ -13,7 +13,10 @@ loads the first record that ended in the idle spin into the game bank,
 sets CheckMode, points the replay stream at the session's logged IN0/IN1
 reads (bank $07 up), and stops at FrameDone after every frame to compare
 the game bank with the frame record, masked as the C-only replay masks
-it. Play mode (--play) starts a fresh game and leaves it running.
+it, and the DOC's oscillators 0-2 (Ensoniq STATE_GET) with the values
+iigs/lower_sound.s derives from the record's voice registers. The wave
+tables in DOC RAM are checked once per session. Play mode (--play)
+starts a fresh game and leaves it running.
 
 Usage:
   PYTHONPATH=$HOME/src/gssquared/clients/python/src \\
@@ -42,10 +45,28 @@ from gs2_render_test import (  # noqa: E402
     spawn_gs2,
     write_mem_chunked,
 )
+from gen_wave_data import (  # noqa: E402
+    DOC_E1,
+    DOC_WAVE_ADDR,
+    RESOLUTION,
+    SR_INT,
+    TABLE_SIZE_CODE,
+    doc_freq,
+    doc_samples,
+    wave_page,
+)
 from shr_dump_png import PALETTE_BYTES, PIXEL_BYTES, shr_to_png  # noqa: E402
 
 try:
-    from gs2debug import BP_KIND_EXEC, MEM_MAIN, PLATFORM_APPLE_IIGS, Client, ProtocolError
+    from gs2debug import (
+        BP_KIND_EXEC,
+        DEVICE_ID_ENSONIQ,
+        MEM_ENSONIQ,
+        MEM_MAIN,
+        PLATFORM_APPLE_IIGS,
+        Client,
+        ProtocolError,
+    )
 except ImportError as exc:  # pragma: no cover
     raise SystemExit("gs2debug not found; set PYTHONPATH to gssquared/clients/python/src") from exc
 
@@ -93,6 +114,13 @@ OFF_SPRITE = OFF_WORK + WORK_BYTES
 OFF_SPRPOS = OFF_SPRITE + 16
 OFF_RAND = OFF_SPRPOS + 16
 STACK_LO, STACK_HI = OFF_WORK + 0x301, OFF_WORK + 0x3BF
+
+# iigs/lower_sound.s: DOC RAM wave tables and oscillators 0-2, laid out
+# by py/gen_wave_data.py.
+WAVE_PROM = ROOT / "mspacman" / "82s126.1m"
+# GSSquared's Ensoniq STATE_GET v1 blob (soundglu.cpp pack_ensoniq_state).
+ENS_BLOB = 16 + 32 * 24
+ENS_REGE1, ENS_RATE, ENS_OSC, ENS_OSC_SIZE = 9, 12, 16, 24
 
 
 class Session:
@@ -181,6 +209,54 @@ def first_diff(want: bytes, got: bytes) -> int:
     return -1
 
 
+def doc_expected(rec: bytes) -> list[tuple[int, int, int]]:
+    """(freq, vol, wavetable pointer) per oscillator 0-2, as lower_sound.s
+    derives them from a frame record's voice registers and $5001."""
+    voice = [b & 0x0F for b in rec[OFF_VOICE : OFF_VOICE + 32]]
+    on = rec[OFF_LATCH + 1] & 1
+    out = []
+    for v in range(3):
+        nib = [voice[0x10 + 5 * v + k] for k in range(5)]
+        if v:
+            nib[0] = 0
+        vol = voice[0x15 + 5 * v] << 4 if on else 0
+        out.append((doc_freq(nib), vol, wave_page(voice[5 + 5 * v]) << 8))
+    return out
+
+
+def doc_diff(rec: bytes, blob: bytes) -> str:
+    """'' when the DOC's oscillators 0-2 match the record, else the first difference."""
+    if len(blob) != ENS_BLOB:
+        return f"Ensoniq state is {len(blob)} bytes, expected {ENS_BLOB}"
+    if blob[ENS_REGE1] != DOC_E1:
+        return f"DOC $E1 expected {DOC_E1:02X} got {blob[ENS_REGE1]:02X}"
+    (rate,) = struct.unpack_from("<I", blob, ENS_RATE)
+    if rate != SR_INT:
+        return f"DOC output rate expected {SR_INT} got {rate}"
+    for o, (freq, vol, ptr) in enumerate(doc_expected(rec)):
+        base = ENS_OSC + o * ENS_OSC_SIZE
+        (got_freq,) = struct.unpack_from("<H", blob, base)
+        got_ctl, got_vol = blob[base + 4], blob[base + 5]
+        (got_ptr,) = struct.unpack_from("<I", blob, base + 8)
+        got_size, got_res = blob[base + 12], blob[base + 13]
+        want = (freq, vol, ptr, 0, TABLE_SIZE_CODE, RESOLUTION)
+        got = (got_freq, got_vol, got_ptr, got_ctl, got_size, got_res)
+        if want != got:
+            names = ("freq", "vol", "wave ptr", "control", "table size", "resolution")
+            i = next(i for i in range(6) if want[i] != got[i])
+            return f"DOC osc {o} {names[i]} expected {want[i]:X} got {got[i]:X}"
+    return ""
+
+
+def doc_ram_diff(client: Client) -> str:
+    want = doc_samples(WAVE_PROM.read_bytes())
+    got = client.read_mem(MEM_ENSONIQ, DOC_WAVE_ADDR, len(want))
+    if got == want:
+        return ""
+    off = next(i for i in range(len(want)) if want[i] != got[i])
+    return f"DOC RAM ${DOC_WAVE_ADDR + off:04X} expected {want[off]:02X} got {got[off]:02X}"
+
+
 def boot(client: Client, own: bool) -> None:
     info = client.hello()
     st = client.get_status()
@@ -227,7 +303,12 @@ def preload(client: Client, s: Session, end: int) -> None:
 def check_session(client: Client, s: Session, end: int) -> bool:
     """Called stopped at FrameDone after the first replayed frame."""
     ptr = STREAM
+    audible = 0
     t0 = time.monotonic()
+    bad = doc_ram_diff(client)
+    if bad:
+        print(f"{s.name}: {bad}")
+        return False
     for i in range(s.start + 1, end + 1):
         if i > s.start + 1:
             client.continue_()
@@ -248,8 +329,14 @@ def check_session(client: Client, s: Session, end: int) -> bool:
         if off >= 0:
             print(f"{s.name}: frame {i} {field(off)} expected {s.records[i][off]:02X} got {got[off]:02X}")
             return False
+        bad = doc_diff(s.records[i], client.state_get(DEVICE_ID_ENSONIQ))
+        if bad:
+            print(f"{s.name}: frame {i} {bad}")
+            return False
+        audible += any(vol for _, vol, _ in doc_expected(s.records[i]))
     n = end - s.start
-    print(f"{s.name}: frames {s.start + 1}-{end} ok ({n} frames, {time.monotonic() - t0:.1f}s)")
+    print(f"{s.name}: frames {s.start + 1}-{end} ok ({n} frames, {audible} with sound, "
+          f"{time.monotonic() - t0:.1f}s)")
     return True
 
 

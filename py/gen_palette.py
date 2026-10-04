@@ -3,16 +3,18 @@
 
 Writes:
   build/gfx/palette.bin     — 16×16-bit SHR colors (32 bytes, little-endian)
-  iigs/palette_data.s       — Merlin32 `dw` table for PalTable
+  iigs/palette_data.s       — Merlin32 `dw` tables PalTable and MazeBankRGB
 
-Target pen map (docs/IIgs-Design.md §2):
-  0 black, 1 pale, 2 peach, 3 maze red, 4 green, 5 Blinky red, 6 brown,
-  7 Pinky, 8 tile pink (= Pinky RGB; not fright-poked), 9 Inky, 10 light blue, 11 Clyde,
-  12 fruit orange (= Clyde RGB; fright pokes leave this alone), 13 yellow,
-  14 COL_POWER (pale), 15 pupil blue.
+Target pen map (docs/ColorMap.md §3):
+  0 black, 1 pale, 2 peach, 3 red, 4 green, 6 brown, 7 pink, 9 cyan,
+  10 light blue, 11 orange, 12 maze outline, 13 yellow, 14 maze fill,
+  15 deep blue; 5 and 8 free (black).
 
-Slots 0–3 still track maze palette #1D for level-1 walls/dots.
-Fruit red uses pen 3 (same RGB as Blinky pen 5) so energizer recolor is safe.
+Slots 0–3 track maze palette #1D, so its tiles draw with no remapping.
+Maze walls draw their outline (bank pen 3) on pen 12 and their fill (bank
+pen 2) on pen 14. Those two are the only pens written at run time:
+SetMazePens loads them from MazeBankRGB for each level's maze bank, and
+for bank #1F during the level-end flash.
 
 Usage:
   python3 py/gen_palette.py
@@ -30,37 +32,36 @@ DEFAULT_PALETTE = ROOT / "mspacman-orig" / "82s126.4a"
 DEFAULT_OUT = ROOT / "build" / "gfx"
 DEFAULT_ASM = ROOT / "iigs" / "palette_data.s"
 MAZE_PAL = 0x1D
+NUM_BANKS = 32
+MAZE_OUTLINE_PEN = 12  # maze wall bank pen 3
+MAZE_FILL_PEN = 14     # maze wall bank pen 2
 
-# Color-ROM index per SHR pen (see §2).
-# Pens 0–3 overwritten by maze bank when building (pen 3 stays maze/fruit red).
+# Color-ROM index per SHR pen; None = free pen (black).
+# Pens 0–3, 12 and 14 overwritten from the maze bank when building.
 TARGET_COLOR_ROM = (
-    0,   # 0 black
-    15,  # 1 pale
-    14,  # 2 peach
-    1,   # 3 maze / fruit red (alias of Blinky RGB)
-    12,  # 4 green
-    1,   # 5 Blinky red (fright-poked)
-    2,   # 6 brown
-    3,   # 7 Pinky
-    3,   # 8 tile pink (alias of Pinky RGB; not fright-poked)
-    5,   # 9 Inky
-    6,   # 10 light blue
-    7,   # 11 Clyde (fright-poked)
-    7,   # 12 fruit orange (alias of Clyde RGB; not fright-poked)
-    9,   # 13 yellow
-    15,  # 14 COL_POWER (= pale)
-    11,  # 15 pupil blue
+    0,     # 0 black
+    15,    # 1 pale
+    14,    # 2 peach
+    1,     # 3 red (Blinky)
+    12,    # 4 green
+    None,  # 5 free
+    2,     # 6 brown
+    3,     # 7 pink (Pinky)
+    None,  # 8 free
+    5,     # 9 cyan (Inky)
+    6,     # 10 light blue
+    7,     # 11 orange (Sue)
+    1,     # 12 maze outline
+    9,     # 13 yellow
+    14,    # 14 maze fill
+    11,    # 15 deep blue
 )
 
 
-# Color-ROM index -> the SHR pen holding that RGB that no runtime palette
-# poke touches (docs/ColorMap.md). Red is pen 3, pink pen 8 and orange
-# pen 12, the aliases of the ghost body pens 5, 7 and 11. Cyan (9) has no
-# spare alias; the fright poke changes it while a ghost is blue. Teal (13)
-# has no pen and takes light blue 10; only the undrawn HUD pear bank #17
-# uses it.
+# Color-ROM index -> SHR pen (docs/ColorMap.md §4). Teal (13) has no pen
+# and takes light blue 10; only the undrawn HUD pear bank #17 uses it.
 STABLE_ROM_TO_SHR = {
-    0: 0, 1: 3, 2: 6, 3: 8, 4: 0, 5: 9, 6: 10, 7: 12,
+    0: 0, 1: 3, 2: 6, 3: 7, 4: 0, 5: 9, 6: 10, 7: 11,
     8: 0, 9: 13, 10: 0, 11: 15, 12: 4, 13: 10, 14: 2, 15: 1,
 }
 
@@ -95,13 +96,23 @@ def build_shr_palette(
     colors: list[tuple[int, int, int]],
     maze_pens: list[int],
 ) -> list[int]:
-    """§2 target pens; slots 0–3 = maze bank (level-1 walls/dots)."""
-    words = [rgb_to_shr(*colors[ci & 15]) for ci in TARGET_COLOR_ROM]
+    """Target pens; slots 0–3 = maze bank (level-1 walls/dots), and its
+    outline and fill in the maze wall pens."""
+    words = [0 if ci is None else rgb_to_shr(*colors[ci & 15]) for ci in TARGET_COLOR_ROM]
     for i, ci in enumerate(maze_pens):
         words[i] = rgb_to_shr(*colors[ci & 15])
-    # Pen 14 tracks pale (pen 1) for COL_POWER full-bright
-    words[14] = words[1]
+    words[MAZE_OUTLINE_PEN] = words[3]
+    words[MAZE_FILL_PEN] = words[2]
     return words
+
+
+def maze_bank_rgb(colors: list[tuple[int, int, int]], palette_rom: Path) -> list[tuple[int, int]]:
+    """Per bank: (outline, fill) SHR words, its pens 3 and 2."""
+    out = []
+    for b in range(NUM_BANKS):
+        pens = load_palette_pens(palette_rom, b)
+        out.append((rgb_to_shr(*colors[pens[3]]), rgb_to_shr(*colors[pens[2]])))
+    return out
 
 
 def write_palette_bin(path: Path, words: list[int]) -> None:
@@ -113,11 +124,14 @@ def write_palette_bin(path: Path, words: list[int]) -> None:
     path.write_bytes(blob)
 
 
-def write_palette_asm(path: Path, words: list[int], maze_pal: int) -> None:
+def write_palette_asm(
+    path: Path, words: list[int], maze_pal: int, mazes: list[tuple[int, int]]
+) -> None:
     lines = [
         "*",
-        f"* Generated by py/gen_palette.py — §2 target; maze #{maze_pal:02X} in 0–3",
+        f"* Generated by py/gen_palette.py — maze #{maze_pal:02X} in 0–3, 12 and 14",
         "* Do not edit by hand; regenerate with: python3 py/gen_palette.py",
+        "* MazeBankRGB: per arcade bank, outline (pen 12) and fill (pen 14) words",
         "*",
         "",
         "PalTable",
@@ -125,6 +139,10 @@ def write_palette_asm(path: Path, words: list[int], maze_pal: int) -> None:
     for row in range(4):
         chunk = words[row * 4 : row * 4 + 4]
         lines.append("\tdw\t" + ",".join(f"${w:04X}" for w in chunk))
+    lines.append("")
+    lines.append("MazeBankRGB")
+    for b, (outline, fill) in enumerate(mazes):
+        lines.append(f"\tdw\t${outline:04X},${fill:04X}\t; #{b:02X}")
     lines.append("")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -145,7 +163,7 @@ def main() -> int:
 
     bin_path = args.out / "palette.bin"
     write_palette_bin(bin_path, words)
-    write_palette_asm(args.asm, words, args.maze_pal)
+    write_palette_asm(args.asm, words, args.maze_pal, maze_bank_rgb(colors, args.palette_rom))
 
     print(f"wrote {bin_path} (32 bytes)")
     print(f"wrote {args.asm}")

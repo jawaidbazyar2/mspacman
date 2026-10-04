@@ -18,6 +18,8 @@
 	mx	%00
 	put	compiled_fruits.s
 	mx	%00
+	put	compiled_points.s
+	mx	%00
 	put	compiled_mspac.s
 	mx	%00
 	put	rails_body.s

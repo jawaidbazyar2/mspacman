@@ -77,7 +77,6 @@ CollideAll
 	sta	>EAT_FREEZE_TIMER
 	jsr	ScoreGhost
 	jsr	EatGhostSoundStub	; == #1786 CH3 bit3
-	jsr	FrightPaletteUpdate
 :none	plp
 	rts
 

@@ -61,25 +61,69 @@ LoadPalette
 
 * PalTable lives in palette_data.s (put from all.s) — maze PROM #1D → pens 0–3
 
+* A = arcade bank: maze wall pens ← its outline and fill (MazeBankRGB).
+* DBR = the program bank.
+SetMazePens
+	php
+	rep	#$30
+	and	#$001F
+	asl
+	asl
+	tax
+	lda	|MazeBankRGB,x
+	sta	>SHR_PALETTE+{MAZE_OUTLINE_PEN*2}
+	lda	|MazeBankRGB+2,x
+	sta	>SHR_PALETTE+{MAZE_FILL_PEN*2}
+	plp
+	rts
+
 BlinkPowerPills
-* Arcade #0C0D / FLASHEN: every POWER_FLASH_PERIOD frames, toggle pen 14
-* between pale (PalTable) and black. Pixels stay COL_POWER in SHR+BCK.
+* Arcade #0C0D / j_9524: every POWER_FLASH_PERIOD frames the pills go off
+* or back on. POWER_FLASH_CNT bit 7 is the off phase; ApplyDirty draws
+* TILE_POWER cells blank while it is set, and every pill cell is queued.
 	php
 	sep	#$20
 	lda	>POWER_FLASH_CNT
 	inc
 	sta	>POWER_FLASH_CNT
+	and	#$7F
 	cmp	#POWER_FLASH_PERIOD
 	bne	:done
-	lda	#0
+	lda	>POWER_FLASH_CNT
+	and	#$80
+	eor	#$80
 	sta	>POWER_FLASH_CNT
+	rep	#$30
+	ldx	#0
+	stx	<R_TY
+]y	stz	<R_TX
+]x	lda	>TILEMAP,x
+	and	#$00FF
+	cmp	#TILE_POWER
+	bne	:nx
+	phx
+	lda	>DIRTY_COUNT
+	asl
+	tax
+	sep	#$20
+	lda	<R_TX
+	sta	>DIRTY_LIST,x
+	lda	<R_TY
+	sta	>DIRTY_LIST+1,x
 	rep	#$20
-	lda	>SHR_PALETTE+28		; pen 14 word
-	beq	:on
-	lda	#0
-	bra	:store
-:on	lda	|PalTable+28		; full-bright pale
-:store	sta	>SHR_PALETTE+28
+	lda	>DIRTY_COUNT
+	inc
+	sta	>DIRTY_COUNT
+	plx
+:nx	inx
+	inc	<R_TX
+	lda	<R_TX
+	cmp	#PF_COLS
+	bcc	]x
+	inc	<R_TY
+	lda	<R_TY
+	cmp	#PF_ROWS
+	bcc	]y
 :done	plp
 	rts
 

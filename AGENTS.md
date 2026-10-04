@@ -110,7 +110,8 @@ Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system
 | `docs/IIgs-Design.md` | IIgs display / render / input decisions |
 | `lift/` | **LOCKED** — phase 1 Z80 host. Read-only |
 | `idiom/` | **LOCKED** — idiomatic C game logic, no Z80 core (phase 2.5 of `docs/MsPacManLift.md`). Read-only reference. `make idiom-check` replays `corpus/c-*` clean and must keep doing so; `make idiom-cov` for coverage |
-| `lower/` | Phase 3 working tree. Starts as a copy of `idiom/`; the `.c` files get entry hooks only, and each game-logic `.c` gets a Merlin32 `.s` twin. The `mspac-lower` harness (GSSquared 65816 core only) is in `lower/host/`. Gates: `make lower-check` (shadow comparison of every hooked function), `make lower-only-check` (65816 only, plus the cycle report), and `make lower-iigs-check` (the IIgs build under GSSquared). `make iigs-lower` builds the IIgs images (`iigs/lower_host.s`, `iigs/lower_io.s`, `iigs/all_lower.s`). `make iigs-lower-demo` plays it. `make iigs-lower-gsos` builds the GS/OS application `build/iigs/MSPACLOW.SYS16` on its own 800K disk, `build/iigs/MsPacLower.2mg`. With `IIGS_LOWER_GSOS_INSTALL=1` it is also copied onto `IIGS_GSOS_DISK`. See phases 3 and 4 of `docs/MsPacManLift.md` |
+| `lower/` | Phase 3 working tree. Starts as a copy of `idiom/`; the `.c` files get entry hooks only, and each game-logic `.c` gets a Merlin32 `.s` twin. The `mspac-lower` harness (GSSquared 65816 core only) is in `lower/host/`. Gates: `make lower-check` (shadow comparison of every hooked function), `make lower-only-check` (65816 only, plus the cycle report), and `make lower-iigs-check` (the IIgs build under GSSquared, including its DOC oscillator registers through the Ensoniq `STATE_GET`). `make iigs-lower` builds the IIgs images (`iigs/lower_host.s`, `iigs/lower_io.s`, `iigs/all_lower.s`). `make iigs-lower-demo` plays it. `make iigs-lower-gsos` builds the GS/OS application `build/iigs/MSPACLOW.SYS16` on its own 800K disk, `build/iigs/MsPacLower.2mg`. With `IIGS_LOWER_GSOS_INSTALL=1` it is also copied onto `IIGS_GSOS_DISK`. See phases 3 and 4 of `docs/MsPacManLift.md` |
+| Static IIgs builds | **FROZEN** — the prototype builds `make iigs` (rail demo), `make iigs-game`, `make iigs-gsos`, and their static-only sources: `all_demo.s`, `all_game.s`, `all_gsos_main.s`, `link_demo.s`, `link_game.s`, `link_gsos_game.s`, `frame_body.s`, `demo_tick.s`, `rails_body.s`, `rails_data.s`, `game_tick.s`, `input_adapt.s`, `logic_data.s`, `maze_state.s`, `ghost_ai.s`, `mspac_move.s`, `ghost_move.s`, `collide.s`, `fruit.s`, `leave_house.s`, `play_tick.s`, `level_fsm.s`, `game_init.s`. The lowered build replaces them. Do not edit, fix, or rebuild them, and do not run `make iigs-test` / `iigs-game-test` / `iigs-demo` / `iigs-game-demo`. A change to a shared file (`equates.s`, `shr_body.s`, `render_body.s`, `hud_body.s`, `actor_publish.s`, `palette_data.s`, `compiled_*.s`) may break the static builds; leave them broken. The old versions are in git history |
 | New IIgs code | New paths (e.g. under `iigs/` or as agreed) — do not overwrite locked Z80 artifacts |
 
 ## Python helpers (`py/`)
@@ -141,8 +142,11 @@ Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system
   - `py/gen_shr_gfx.py` — scale `5e`/`5f` → IIgs 6×6 tiles / 14×12 sprites (+ optional PPM previews)
   - `py/preview_tiles_8x8.py` — native 8×8 maze/tile PPM+PNG to check rotate/flip before scale
   - `py/gen_palette.py` — arcade PROMs → SHR palette 0 + `iigs/palette_data.s` (pen roles and the stable color map: `docs/ColorMap.md`)
- - `py/gen_tile_banks.py [--list]` — arcade color RAM banks → `iigs/tile_bank_data.s` (`TileBankPens` / `TileBankRaw`) for the lowered build's per-cell tile recolor (part of `make palette`)
-  - `py/gen_maze1.py` — level-1 upright 28×31 tilemap + stitched 6×6 cells
+ - `py/gen_tile_banks.py [--list]` — arcade color RAM banks → `iigs/tile_bank_data.s` (`TileBankPens` / `TileBankRaw`) for the lowered build's per-cell tile recolor, plus a maze row per bank that puts wall fill and outline on pens 14 and 12 (part of `make palette`)
+  - `py/gen_wave_data.py` — WSG sound PROM `82s126.1m` → `iigs/wave_data.s` (the eight waves as DOC samples, and the nibble → DOC frequency tables) for the lowered build's sound adapter `iigs/lower_sound.s` (built by `make iigs-lower`). Holds the DOC layout constants (4 oscillators, 4 KB tables at `$8000`, resolution 3); `py/gs2_lower_check.py` imports them
+ - `py/dump_voices.py SESSION [--tiles K] [--stats]` — a corpus session's WSG voice registers per frame (wave, F, volume, DOC frequency word) and tile/color bytes changed; `--stats` gives the audible F range
+ - `py/gen_maze1.py [--image build/mspac.bin]` — level-1 upright 28×31 tilemap + stitched 6×6 cells. Reads `boot1`–`boot6`, or the verify-clean mapped image with `--image` when the boots are not in the tree
+ - `py/gen_compiled_ghosts.py` — ghost blits: the four ghosts, frightened, flashing and eyes (the `COL_*` slots in `equates.s`), every pen from the stable map in `py/gen_palette.py`
   - `py/gen_idiom_ram.py` — generated `idiom/ram.h` / `idiom/ram.c` (packed `WorkRam` overlay with offset asserts, field names for corpus diffs). `idiom/` is locked: do not run it against `idiom/` again; phase 3 points it at `lower/`
   - `py/frame_overruns.py` — list corpus frames whose record did not end in the idle spin
   - `py/scan_sound_tables.py` — decode the ROM's effect, song and cutscene sound tables (which envelope types and song commands are reachable)
@@ -202,7 +206,8 @@ Makefile PNG dump (`make iigs-test`) still uses `py/gs2_render_test.py` under th
 5. For arcade behavior: **boots win for bytes**; **listing / locked source wins for comments and intent**.
 6. IIgs port work is in scope; follow `docs/IIgs-Design.md`. Keep changes focused on the asked task.
 7. Live GSSquared debugging uses the **gs2-debug MCP** tools. Do not drive the emu via `gs2debug` / `PYTHONPATH=…/clients/python` from agent sessions.
-8. Do not commit unless asked. Do not treat `sjasmplus/` third-party tree as something to casually edit.
+8. IIgs work targets the lowered build only (`make iigs-lower`, `make iigs-lower-gsos`, `make lower-iigs-check`). The static builds are frozen (see the working tree table).
+9. Do not commit unless asked. Do not treat `sjasmplus/` third-party tree as something to casually edit.
 
 ## Useful layout
 

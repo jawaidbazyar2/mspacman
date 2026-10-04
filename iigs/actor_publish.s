@@ -200,7 +200,11 @@ ActorPublish
 	beq	:rCol
 	lda	#COL_EYES
 	bra	:rSet
-:rCol	lda	#COL_BLINKY
+:rCol	lda	>RED_FRIGHT
+	beq	:rN
+	jsr	FrightSlot
+	bra	:rSet
+:rN	lda	#COL_BLINKY
 :rSet	sta	>ACTORS+ACT_COLOR,x
 * Pinky
 	sep	#$30
@@ -223,7 +227,11 @@ ActorPublish
 	beq	:pCol
 	lda	#COL_EYES
 	bra	:pSet
-:pCol	lda	#COL_PINKY
+:pCol	lda	>PINK_FRIGHT
+	beq	:pN
+	jsr	FrightSlot
+	bra	:pSet
+:pN	lda	#COL_PINKY
 :pSet	sta	>ACTORS+ACT_COLOR,x
 * Inky
 	sep	#$30
@@ -246,7 +254,11 @@ ActorPublish
 	beq	:bCol
 	lda	#COL_EYES
 	bra	:bSet
-:bCol	lda	#COL_INKY
+:bCol	lda	>BLUE_FRIGHT
+	beq	:bN
+	jsr	FrightSlot
+	bra	:bSet
+:bN	lda	#COL_INKY
 :bSet	sta	>ACTORS+ACT_COLOR,x
 * Clyde
 	sep	#$30
@@ -269,7 +281,11 @@ ActorPublish
 	beq	:oCol
 	lda	#COL_EYES
 	bra	:oSet
-:oCol	lda	#COL_CLYDE
+:oCol	lda	>ORANGE_FRIGHT
+	beq	:oN
+	jsr	FrightSlot
+	bra	:oSet
+:oN	lda	#COL_CLYDE
 :oSet	sta	>ACTORS+ACT_COLOR,x
 * Fruit — inactive: FLAG_NODRAW (never blit at 0,0; BckXY X-72 underflows)
 	sep	#$20
@@ -395,3 +411,19 @@ EatGhostPublish
 	sta	>ACTORS+ACT_FLAGS,x
 :out	plp
 	rts
+
+* A = COL_FRIGHT, or COL_FLASH in the white phase of the end-of-fright
+* flash (FrightTick). m = 1 in and out; keeps X.
+FrightSlot
+	rep	#$20
+	lda	>FRIGHT_TIMER
+	cmp	#$0100
+	sep	#$20
+	bcs	:blue
+	lda	>FRIGHT_FLASH_PHASE
+	beq	:blue
+	lda	#COL_FLASH
+	rts
+:blue	lda	#COL_FRIGHT
+	rts
+	mx	%00

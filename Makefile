@@ -23,6 +23,7 @@ TILE_ROM  := mspacman/5e
 SPRITE_ROM := mspacman/5f
 COLOR_ROM := mspacman/82s123.7f
 PALETTE_ROM := mspacman/82s126.4a
+WAVE_ROM  := mspacman/82s126.1m
 
 MERLIN32  ?= $(HOME)/src/Merlin32_v1.2_b2/MacOs/Merlin32
 MERLIN_LIB ?= $(HOME)/src/Merlin32_v1.2_b2/Library
@@ -353,8 +354,9 @@ iigs-gsos: palette gfx maze $(IIGS_COMPILED) $(IIGS_GSOS_BIN)
 
 $(IIGS_DIR)/compiled_ghosts.s: py/gen_compiled_ghosts.py \
 		$(GFX_DIR)/sprites14x12.bin $(GFX_DIR)/sprites14x12.mask.bin \
-		$(GFX_DIR)/sprites14x12.odd.bin $(GFX_DIR)/sprites14x12.odd.mask.bin
-	python3 py/gen_compiled_ghosts.py --gfx $(GFX_DIR) -o $(IIGS_DIR)/compiled_ghosts.s
+		$(GFX_DIR)/sprites14x12.odd.bin $(GFX_DIR)/sprites14x12.odd.mask.bin \
+		$(PALETTE_ROM) py/gen_palette.py
+	python3 py/gen_compiled_ghosts.py --gfx $(GFX_DIR) --palette-rom $(PALETTE_ROM) -o $(IIGS_DIR)/compiled_ghosts.s
 
 $(IIGS_DIR)/compiled_fruits.s: py/gen_compiled_fruits.py \
 		$(SPRITE_ROM) $(COLOR_ROM) $(PALETTE_ROM) py/gen_shr_gfx.py py/gen_palette.py
@@ -451,6 +453,11 @@ $(IIGS_GSOS_BIN): $(IIGS_GSOS_SRCS) $(GFX_DIR)/tiles6.bin $(GFX_DIR)/maze1_cells
 IIGS_LOWER_GAME := $(IIGS_BUILD)/lower_game.bin
 IIGS_LOWER_HOST := $(IIGS_BUILD)/lower_host.bin
 IIGS_LOWER_STAGE := $(IIGS_BUILD)/stage
+IIGS_WAVE_DATA := $(IIGS_DIR)/wave_data.s
+
+# DOC wave samples and frequency tables from the WSG sound PROM.
+$(IIGS_WAVE_DATA): $(WAVE_ROM) py/gen_wave_data.py
+	python3 py/gen_wave_data.py --prom $(WAVE_ROM) -o $@
 
 # Assemble in DIR with LINK; fail on any Merlin error line.
 define merlin_in
@@ -468,7 +475,7 @@ $(IIGS_LOWER_GAME): $(LOWER_ASM) $(LOWER_DIR)/entries.s $(IIGS_DIR)/lower_io.s \
 	cp $(IIGS_LOWER_STAGE)/game/lower.bin $@
 	@echo "lower_game.bin $$(wc -c < $@) bytes"
 
-$(IIGS_LOWER_HOST): $(wildcard $(IIGS_DIR)/*.s) $(LOWER_DIR)/entry_ids.s \
+$(IIGS_LOWER_HOST): $(wildcard $(IIGS_DIR)/*.s) $(IIGS_WAVE_DATA) $(LOWER_DIR)/entry_ids.s \
 		$(MERLIN32) | $(IIGS_BUILD)
 	rm -rf $(IIGS_LOWER_STAGE)/host
 	mkdir -p $(IIGS_LOWER_STAGE)/host
@@ -509,7 +516,7 @@ GFX_BINS := $(addprefix $(GFX_DIR)/,tiles6.bin sprites14x12.bin sprites14x12.mas
 	sprites14x12.odd.bin sprites14x12.odd.mask.bin)
 
 $(IIGS_LOWER_GSOS): $(LOWER_ASM) $(LOWER_DIR)/entries.s $(LOWER_DIR)/entry_ids.s \
-		$(wildcard $(IIGS_DIR)/*.s) $(BIN) $(GFX_BINS) py/omf_fix_align.py \
+		$(wildcard $(IIGS_DIR)/*.s) $(IIGS_WAVE_DATA) $(BIN) $(GFX_BINS) py/omf_fix_align.py \
 		$(MERLIN32) | $(IIGS_BUILD)
 	rm -rf $(IIGS_LOWER_GSOS_STAGE)
 	mkdir -p $(IIGS_LOWER_GSOS_STAGE)/game $(IIGS_LOWER_GSOS_STAGE)/host

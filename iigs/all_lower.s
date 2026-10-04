@@ -12,6 +12,7 @@
 	put	equates.s
 	put	entry_ids.s
 	put	lower_host.s
+	put	lower_sound.s
 	put	shr_body.s
 	put	render_body.s
 	put	actor_publish.s
@@ -26,5 +27,6 @@
 	put	hud_body.s
 	put	palette_data.s
 	put	tile_bank_data.s
+	put	wave_data.s
 
 	end

@@ -139,7 +139,7 @@ The color PROM has only **12 unique non-black RGBs** (four of its 16 entries are
 | SHR pens available | 16 |
 | **Free** | **3** |
 
-Those free pens cover `COL_POWER` fade (animates an existing pale RGB — does not invent a 13th hue), optional markers, and one spare.
+The palette uses 12 of the 16 pens: teal (only the undrawn HUD pear bank `#17`) shares light blue. Pens **5**, **8**, **12** and **14** are free.
 
 Fruit, ghosts, and maze **share** many RGBs (cherry red = Blinky red, Clyde orange = peach fruit accent, eye pale = pellet pale, etc.). Pinky pink and Inky cyan are ghost-only; green / pear-teal are fruit-only. Sharing is required and desirable — one global pen per RGB.
 
@@ -153,14 +153,14 @@ Arcade graphics are **2bpp**: each pixel is palette-bank pen 0–3. At runtime t
 
 | Source | Known color choice | Prebake does |
 |--------|-------------------|--------------|
-| Maze tiles | Level maze bank from `#95AE` (`#1D`, `#16`, `#14`, `#07`, `#18`, …) | Map bank pens 0–3 → SHR pens for that maze (level start may rewrite palette words 0–3; tile pixels stay on fixed SHR indices for ink roles) |
-| Dots `#10` | Maze pale | SHR pen **1** |
-| Power pills `#14`/`#15` | Same pale as dots on arcade; dedicated fade pen on IIgs | SHR pen **14** (`COL_POWER`) |
-| Ghosts `$20–$27` | Sprite color `#01/#03/#05/#07` (body) + eyes | Eye white → pen 1; pupil → pen 15; body → pens **5/7/9/11** (`COL_*`); compiled blits bake body color |
-| Frightened `#11`/`#12` | Blue / flash banks | Prebake or swap body pens to the matching PROM RGBs already in the table |
+| Maze tiles | Level maze bank from `#95AE` (`#1D`, `#16`, `#14`, `#07`, `#18`, …) | Tile art keeps the raw 2bpp pens 0–3 (pens 0–3 of palette 0 hold bank `#1D`). The lowered build resolves the level's bank into a recolored tile sheet when the bank changes (`docs/ColorMap.md` §6.3) |
+| Dots `#10` | Bank pen 1 | Raw pen **1** |
+| Power pills `#14`/`#15` | Bank pen 1, like dots | Raw pen **1**; the blink redraws the cells (below) |
+| Ghosts `$20–$27` | Sprite color `#01/#03/#05/#07` (body) + eyes | Eye white → pen 1; pupil → pen 15; body → pens **3/7/9/11**; compiled blits bake body color |
+| Frightened `$1C/$1D` | Banks `#11` (blue) / `#12` (flash) | Their own compiled blits: deep blue **15** with a peach **2** face, or pale **1** with a red **3** face |
 | Moving fruit `$00–$07` | Ms. Pac table `#879D` (sprite + color bank) | Even/odd compiled blits with **all four bank pens resolved to SHR indices** (no runtime recolor) |
 | HUD level fruit | Arcade uses tile bases `#90+` + colors at `#3B08` (max **7** icons) | v1 draws the current level's fruit with the same compiled actor blit (§3.4). The lowered build draws the whole 7-icon row with those blits, in two gutter rows of four |
-| Ms. Pac | Yellow bank `#09` (and related) | Prebake yellow / red / blue onto pens **13** / **3** / **15**. The bow is color-ROM red; pen **3** keeps it red while fright rewrites pen **5** |
+| Ms. Pac | Yellow bank `#09` (and related) | Prebake yellow / red / blue onto pens **13** / **3** / **15** |
 
 Harness today still uses a partial pack (`gen_palette.py` maze `#1D` in 0–3 + color-ROM 0–11 in 4–15, omitting green/teal). That is demo scaffolding. The **target** is: one fixed RGB→pen map covering all 12 chromatic colors; generators emit correct indices; runtime almost never remaps pixels.
 
@@ -173,46 +173,39 @@ Decoded with MAME `pacman` weights from `82s123.7f`. Color-ROM indices in bracke
 | **0** | `$0000` | `(0,0,0)` | 0/4/8/10 | Black, empty path, sprite transparency |
 | **1** | `$0DDF` | `(222,222,255)` | 15 | Dots, eye white, fruit highlight, many maze pen1s |
 | **2** | `$0FBA` | `(255,184,174)` | 14 | Maze `#1D` wall fill; some chrome / frightened accents |
-| **3** | `$0F00` | `(255,0,0)` | 1 | Maze `#1D` wall ink; **fruit red** (cherry / strawberry / apple); **Ms. Pac bow** — same RGB as pen 5, not fright-poked |
-| **4** | `$00F0` | `(0,255,0)` | 12 | **Green** — strawberry leaf, peach leaf, pear, frightened-bank accents |
-| **5** | `$0F00` | `(255,0,0)` | 1 | `COL_BLINKY` only (fright palette poke → blue/white) |
-| **6** | `$0D95` | `(222,151,81)` | 2 | Brown — fruit stems, maze `#14` accents; ghost `BODY_PEN` marker when needed |
-| **7** | `$0FBF` | `(255,184,255)` | 3 | `COL_PINKY` only (fright palette poke) |
-| **8** | `$0FBF` | `(255,184,255)` | 3 | **Tile pink** — Pinky RGB alias for the ghost-house door, PINKY text and maze `#18`; not fright-poked. Teal (color ROM 13, only the undrawn HUD pear bank `#17`) has no pen and falls back to pen 10 |
-| **9** | `$00FF` | `(0,255,255)` | 5 | `COL_INKY`; cyan text and maze `#18` cyan (fright-poked, see `docs/ColorMap.md`) |
-| **10** | `$04BF` | `(71,184,255)` | 6 | Light blue — banana / maze `#16` |
-| **11** | `$0FB5` | `(255,184,81)` | 7 | `COL_CLYDE` only (fright palette poke) |
-| **12** | `$0FB5` | `(255,184,81)` | 7 | **Fruit orange** (peach / pretzel) — Clyde RGB alias; not fright-poked |
-| **13** | `$0FF0` | `(255,255,0)` | 9 | Ms. Pac body; banana; maze `#16`/`#18` yellow |
-| **14** | `$0DDF` → fade | `(222,222,255)` base | 15 | **`COL_POWER`** — power-pill fade (same RGB as pen 1 at full bright) |
-| **15** | `$022F` | `(33,33,255)` | 11 | Ghost pupils; pretzel blue; maze `#07` deep blue |
+| **3** | `$0F00` | `(255,0,0)` | 1 | Maze `#1D` wall ink; Blinky body; fruit red; Ms. Pac bow; red text |
+| **4** | `$00F0` | `(0,255,0)` | 12 | **Green** — strawberry leaf, peach leaf, pear |
+| **5** | `$0000` | — | — | Free |
+| **6** | `$0D95` | `(222,151,81)` | 2 | Brown — fruit stems, maze `#14` fill |
+| **7** | `$0FBF` | `(255,184,255)` | 3 | Pinky body; ghost-house door; PINKY text; maze `#18` fill |
+| **8** | `$0000` | — | — | Free |
+| **9** | `$00FF` | `(0,255,255)` | 5 | Inky body; cyan text; maze `#18` dots |
+| **10** | `$04BF` | `(71,184,255)` | 6 | Light blue — banana, maze `#16` fill; stands in for teal |
+| **11** | `$0FB5` | `(255,184,81)` | 7 | Sue body; fruit orange; orange text |
+| **12** | `$0000` | — | — | Free |
+| **13** | `$0FF0` | `(255,255,0)` | 9 | Ms. Pac body; banana; maze `#16` dots, `#18` edges |
+| **14** | `$0000` | — | — | Free |
+| **15** | `$022F` | `(33,33,255)` | 11 | Ghost pupils; frightened body; pretzel blue; maze `#07` |
 
 | Consumer | Pens (target) |
 |----------|----------------|
-| Maze tiles | 0 + level bank’s three chromatics (subset of 1–3, 6–7, 9–11, 13, 15, …) |
-| Dots | 0, **1** |
-| Power pills | 0, **14** |
-| Ghosts | 0, 1, 15, body **5/7/9/11** |
-| Fruit (actor + HUD) | baked mix of 1, **3**, 4, 6, 10, **12**, 13, 15 (never ghost body pens) |
-| Ms. Pac | 0, **3** (bow), 13 (yellow), 15 (blue). Bow stays off ghost body pens **5/7/9/11** |
+| Maze tiles | 0 + level bank’s three chromatics |
+| Dots, power pills | 0 + the bank's pen 1 |
+| Ghosts | 0, 1, 15, body **3/7/9/11** |
+| Frightened ghosts | 0, **15** + **2** (blue), **1** + **3** (flash) |
+| Fruit (actor + HUD) | baked mix of 1, 3, 4, 6, 10, 11, 13, 15 |
+| Ms. Pac | 0, **3** (bow), 13 (yellow), 15 (blue) |
 
-Pens **3**/**5** (red), **8**/**7** (pink) and **12**/**11** (orange) share RGB so fruit, Ms. Pac and tiles stay stable while fright pokes only ghost body pens **5/7/9/11**. The full per-object color map, including the lowered build's per-cell tile bank remap, is in `docs/ColorMap.md`.
+Only the maze wall pens, 12 (outline) and 14 (fill), are written at run time: `SetMazePens` loads them per maze, and the level-end flash is those two palette words. Every other RGB has exactly one pen, and objects that share a color share its pen. The full per-object color map, including the lowered build's per-cell tile bank remap, is in `docs/ColorMap.md`.
 
-### Harness note
+### Power-pill blink
 
-`gen_palette.py` emits the §2 target map (green, tile pink and `COL_POWER` included). Fruit compiled blits prebake bank colors into those pens. Power-pill tiles use pen **14**; `BlinkPowerPills` toggles that palette slot every 10 frames.
+Arcade blinks energizers by toggling **color RAM** between the maze color and black every 10 VBLANKs (`#0C0D` → Ms. Pac `FLASHEN` at `#9524`). Pill pixels are bank pen 1, like the dots.
 
-### Power-pill fade
-
-Arcade blinks energizers by toggling **color RAM** between the maze color and black every 10 VBLANKs (`#0C0D` → Ms. Pac `FLASHEN` at `#9524`). On SHR: pixels use pen **14**; each fade step rewrites `$01/9E00 + 14*2` only. All four pills stay in sync; dots on pen **1** stay steady.
-
-| Item | Choice |
-|------|--------|
-| Pen | **14** (`COL_POWER`) |
-| Full-bright RGB | Same as pen 1 (`$0DDF`) |
-| Asset | Prebake `#14`/`#15` tiles to pen 14 |
-| Timing default | 10-frame envelope (arcade counter `#4DCF` / `#0A`) unless playtest changes it |
-| Maze bank swap | Refresh pen 14’s full-bright base when maze pale changes |
+| Build | How |
+|-------|-----|
+| Lowered | The game's own toggle: a pill cell in bank `#00` resolves to black and redraws |
+| Static harness | `BlinkPowerPills` flips `POWER_FLASH_CNT` bit 7 every 10 frames and queues every `TILE_POWER` cell; `ApplyDirty` draws them blank while the bit is set |
 
 ---
 
@@ -535,7 +528,29 @@ Simulate the arcade **4-way stick** with keyboard **any-key-down** (level-sensit
 
 ## 5. Sound
 
-TBD. Arcade Namco WSG → IIgs Ensoniq DOC (or simpler square/noise approximation for an early milestone). Working notes: phase 4, "Audio", in [MsPacManLift.md](MsPacManLift.md).
+The lowered build (`make iigs-lower`, `make iigs-lower-gsos`) plays the arcade's Namco WSG on the Ensoniq DOC. Code: [`iigs/lower_sound.s`](../iigs/lower_sound.s). Data: `iigs/wave_data.s`, generated by `py/gen_wave_data.py` from the sound PROM `82s126.1m`. The prototype builds (`iigs`, `iigs-game`) stay silent.
+
+**The arcade side.** The WSG has three voices. Each has a 3-bit wave select (`$5045`/`$504A`/`$504F`), a frequency of five nibbles from `$5050` (voice 0, 20 bits) or four (voices 1 and 2, no low nibble), and a 4-bit volume (`$5055`/`$505A`/`$505F`). Each voice plays one of eight 32-sample, 4-bit waves at `F × 96000 / 2^20` Hz. Bit 0 of `$5001` enables sound. Songs and effects both write these registers once per frame: a song picks its wave with the `$F1` command and changes the frequency per note. The DOC side therefore only mirrors register state; it knows nothing about songs.
+
+**DOC layout.**
+
+| Item | Value |
+|------|-------|
+| Wave tables | DOC RAM `$8000`–`$FFFF`, one 4 KB table per wave at `$8000 + wave × $1000`: one cycle, each sample repeated 128 times, as `nib × 16 + 8` (`$08`–`$F8`; never `$00`, which halts an oscillator) |
+| Oscillators | 0, 1, 2 for voices 0, 1, 2. Free-run, no IRQ, channel 0, 4 KB table, resolution 3 (`$C0+o = $23`). Pointer register = `$80 + wave × $10` |
+| Enabled | 4 (`$E1 = $06`), set by `SoundInit`. Scan rate `7159090 / 8 / 6` ≈ 149,148 Hz, above the arcade WSG's 96 kHz. GSSquared resets to one oscillator, so the count is never assumed |
+| Others | All 32 halted at startup, then 0–2 started; 3 stays halted |
+| Master volume | Low nibble of `$C03C` = the system volume at `$E100CA` (Control Panel) |
+
+**Why these choices.** A free-running DOC oscillator wraps one entry short of its table: it subtracts `(size − 1)` from its position, not `size` (MAME, GSSquared, Peter Ferrie's hardware notes). The first version used 256-byte tables holding 8 copies of the wave. It lost one whole sample per pass, a phase hiccup every 8 cycles, heard as a buzz on every sound. With one cycle per 4 KB table, the lost entry is 1/128 of a sample. Its scan rate was 26 kHz with 32 oscillators enabled, so harmonics above 13 kHz (any note above about 820 Hz) folded back as aliasing. With 4 enabled, the folding point is about 75 kHz.
+
+**Frequency.** At resolution R, a table plays `SR × D / 2^(17+R)` cycles a second, whatever its size. So `D = F × 12000 × 2^R / SR` ≈ `F × 0.644` at R = 3. Over the corpus, audible F runs from `$80` (D = 82, within 0.6%) to `$9800` (D = `$61D6`). D saturates at `$FFFF`, which only F above about `$18D00` would reach. F arrives as nibbles, so the 65816 sums five 16-entry lookup tables (24.8 fixed point, plus `$80` to round) and needs no multiply. Playback is nearest-sample, as on the arcade. Changing `SR` (the enabled count), the resolution or the table size means regenerating the tables (`py/gen_wave_data.py` holds all the constants).
+
+**Volume.** DOC volume = WSG volume × 16, or 0 while `$5001` bit 0 is clear. The oscillators never stop; a silent voice has volume 0. The scale is a first guess, to be tuned by ear (`VOL_SCALE_SH`).
+
+**Per frame.** `LowerSound` runs right after the game frame, before `FrameDone`. It computes wave page, D and volume per voice, and writes only the DOC registers that differ from its shadow (at most 12 GLU writes a frame), inside `sei`, polling the GLU busy bit. `SoundOff` (on quit) zeroes the volumes and halts oscillators 0–2.
+
+**Check.** `make lower-iigs-check` reads the DOC through GSSquared's Ensoniq `STATE_GET` (device 22) at every `FrameDone`. It compares oscillators 0–2 (frequency, volume, wave pointer, control, size, resolution), `$E1`, and the output rate with values computed from the frame record's voice registers. It checks the 32 KB of wave tables in DOC RAM once per session.
 
 ---
 
