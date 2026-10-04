@@ -24,6 +24,11 @@ SPRITE_ROM := mspacman/5f
 COLOR_ROM := mspacman/82s123.7f
 PALETTE_ROM := mspacman/82s126.4a
 WAVE_ROM  := mspacman/82s126.1m
+# Hand-cleaned 6x6 tile / 14x12 sprite contact sheets: the game's art.
+CLEAN_ART_DIR := assets
+CLEAN_ART := $(CLEAN_ART_DIR)/tiles_6x6_clean.ppm $(CLEAN_ART_DIR)/sprites_14x12_clean.ppm
+GFX_BINS := $(addprefix $(GFX_DIR)/,tiles6.bin sprites14x12.bin sprites14x12.mask.bin \
+	sprites14x12.odd.bin sprites14x12.odd.mask.bin)
 
 MERLIN32  ?= $(HOME)/src/Merlin32_v1.2_b2/MacOs/Merlin32
 MERLIN_LIB ?= $(HOME)/src/Merlin32_v1.2_b2/Library
@@ -48,7 +53,7 @@ LIFT_SRCS := $(LIFT_DIR)/main.c $(LIFT_DIR)/board.c $(LIFT_DIR)/video.c \
 SDL_CFLAGS := -I/usr/local/include
 SDL_LIBS := -L/usr/local/lib -lSDL3 -Wl,-rpath,/usr/local/lib
 
-.PHONY: all clean verify sjasmplus-check gfx gfx-ppm palette maze tiles-preview \
+.PHONY: all clean verify sjasmplus-check gfx gfx-ppm gfx-rom palette maze tiles-preview \
 	iigs iigs-test iigs-demo iigs-game iigs-game-test iigs-game-demo iigs-gsos \
 	iigs-lower lower-iigs-check iigs-lower-demo iigs-lower-gsos \
 	lift lift-check c c-check c-only-check idiom idiom-check idiom-cov \
@@ -303,13 +308,23 @@ sjasmplus-check:
 verify: $(BIN)
 	python3 py/verify_boots.py $(BIN)
 
-# Scale arcade 5e/5f graphics to IIgs 6x6 tiles / 14x12 even sprites.
-gfx: $(TILE_ROM) $(SPRITE_ROM) palette
-	python3 py/gen_shr_gfx.py --tiles $(TILE_ROM) --sprites $(SPRITE_ROM) --color-rom $(COLOR_ROM) --out $(GFX_DIR)
+# IIgs 6x6 tiles / 14x12 even+odd sprites from the cleaned contact sheets.
+gfx: $(GFX_BINS) palette
 
-# Same as gfx, plus PPM contact sheets under build/gfx/ppm/ for eyeballing.
-gfx-ppm: $(TILE_ROM) $(SPRITE_ROM) palette
-	python3 py/gen_shr_gfx.py --tiles $(TILE_ROM) --sprites $(SPRITE_ROM) --color-rom $(COLOR_ROM) --out $(GFX_DIR) --ppm
+$(GFX_DIR)/tiles6.bin: $(CLEAN_ART) py/gen_shr_gfx.py
+	python3 py/gen_shr_gfx.py --from-ppm $(CLEAN_ART_DIR) --out $(GFX_DIR)
+
+$(filter-out $(GFX_DIR)/tiles6.bin,$(GFX_BINS)): $(GFX_DIR)/tiles6.bin ;
+
+# Same as gfx, plus PPM contact sheets of the cleaned art under build/gfx/ppm/.
+gfx-ppm: $(CLEAN_ART) palette
+	python3 py/gen_shr_gfx.py --from-ppm $(CLEAN_ART_DIR) --out $(GFX_DIR) --ppm
+
+# The ROM scale of 5e/5f (the starting point the sheets were cleaned from),
+# with PPM contact sheets, under build/gfx/rom/. The game does not use it.
+gfx-rom: $(TILE_ROM) $(SPRITE_ROM)
+	python3 py/gen_shr_gfx.py --tiles $(TILE_ROM) --sprites $(SPRITE_ROM) --color-rom $(COLOR_ROM) \
+		--out $(GFX_DIR)/rom --ppm
 
 # SHR palette from 82s123.7f / 82s126.4a (maze pal #1D in slots 0–3),
 # and the arcade tile color banks as SHR pen maps (docs/ColorMap.md).
@@ -359,16 +374,16 @@ $(IIGS_DIR)/compiled_ghosts.s: py/gen_compiled_ghosts.py \
 	python3 py/gen_compiled_ghosts.py --gfx $(GFX_DIR) --palette-rom $(PALETTE_ROM) -o $(IIGS_DIR)/compiled_ghosts.s
 
 $(IIGS_DIR)/compiled_fruits.s: py/gen_compiled_fruits.py \
-		$(SPRITE_ROM) $(COLOR_ROM) $(PALETTE_ROM) py/gen_shr_gfx.py py/gen_palette.py
-	python3 py/gen_compiled_fruits.py --sprites $(SPRITE_ROM) --color-rom $(COLOR_ROM) --palette-rom $(PALETTE_ROM) -o $(IIGS_DIR)/compiled_fruits.s
+		$(GFX_DIR)/sprites14x12.bin $(PALETTE_ROM) py/gen_shr_gfx.py py/gen_palette.py
+	python3 py/gen_compiled_fruits.py --gfx $(GFX_DIR) --palette-rom $(PALETTE_ROM) -o $(IIGS_DIR)/compiled_fruits.s
 
 $(IIGS_DIR)/compiled_points.s: py/gen_compiled_points.py \
-		$(SPRITE_ROM) py/gen_shr_gfx.py
-	python3 py/gen_compiled_points.py --sprites $(SPRITE_ROM) -o $(IIGS_DIR)/compiled_points.s
+		$(GFX_DIR)/sprites14x12.bin py/gen_shr_gfx.py
+	python3 py/gen_compiled_points.py --gfx $(GFX_DIR) -o $(IIGS_DIR)/compiled_points.s
 
 $(IIGS_DIR)/compiled_mspac.s: py/gen_compiled_mspac.py \
-		$(SPRITE_ROM) $(COLOR_ROM) $(PALETTE_ROM) py/gen_shr_gfx.py py/gen_palette.py
-	python3 py/gen_compiled_mspac.py --sprites $(SPRITE_ROM) --color-rom $(COLOR_ROM) --palette-rom $(PALETTE_ROM) -o $(IIGS_DIR)/compiled_mspac.s
+		$(GFX_DIR)/sprites14x12.bin $(PALETTE_ROM) py/gen_shr_gfx.py py/gen_palette.py
+	python3 py/gen_compiled_mspac.py --gfx $(GFX_DIR) --palette-rom $(PALETTE_ROM) -o $(IIGS_DIR)/compiled_mspac.s
 
 $(IIGS_DIR)/ghost_work_blit.s: py/gen_ghost_work_blit.py
 	python3 py/gen_ghost_work_blit.py -o $(IIGS_DIR)/ghost_work_blit.s
@@ -483,8 +498,8 @@ $(IIGS_LOWER_HOST): $(wildcard $(IIGS_DIR)/*.s) $(IIGS_WAVE_DATA) $(LOWER_DIR)/e
 	$(call merlin_in,$(IIGS_LOWER_STAGE)/host,link_lower.s)
 	cp $(IIGS_LOWER_STAGE)/host/lower_host.bin $@
 	@sz=$$(wc -c < $@); \
-		if [ $$sz -ge 40960 ]; then \
-			echo "error: lower_host.bin is $$sz bytes (must be < \$$A000 work RAM)"; exit 1; \
+		if [ $$sz -gt 65536 ]; then \
+			echo "error: lower_host.bin is $$sz bytes (must fit bank \$$02)"; exit 1; \
 		fi; \
 		echo "lower_host.bin $$sz bytes"
 
@@ -512,8 +527,6 @@ iigs-lower-demo: iigs-lower
 IIGS_LOWER_GSOS := $(IIGS_BUILD)/MSPACLOW.SYS16
 IIGS_LOWER_DISK ?= $(IIGS_BUILD)/MsPacLower.2mg
 IIGS_LOWER_GSOS_STAGE := $(IIGS_LOWER_STAGE)/gsos
-GFX_BINS := $(addprefix $(GFX_DIR)/,tiles6.bin sprites14x12.bin sprites14x12.mask.bin \
-	sprites14x12.odd.bin sprites14x12.odd.mask.bin)
 
 $(IIGS_LOWER_GSOS): $(LOWER_ASM) $(LOWER_DIR)/entries.s $(LOWER_DIR)/entry_ids.s \
 		$(wildcard $(IIGS_DIR)/*.s) $(IIGS_WAVE_DATA) $(BIN) $(GFX_BINS) py/omf_fix_align.py \

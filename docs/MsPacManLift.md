@@ -564,7 +564,7 @@ Rendering, palette, sprite blit, HUD chrome, and keyboard handling stay the IIgs
 Stage 3c puts the lowered logic into the IIgs build in place of the `iigs/` prototype logic. `make iigs-lower` builds two images:
 
 - `build/iigs/lower_game.bin`: `lower/*.s` assembled with `iigs/lower_io.s` as `io.s`.
-- `build/iigs/lower_host.bin`: `iigs/all_lower.s` via `iigs/link_lower.s`. It is the renderer, HUD, and sprite blits from `iigs/`, plus `iigs/lower_host.s`. It must stay under 40,960 bytes, below the work RAM at `$A000`.
+- `build/iigs/lower_host.bin`: `iigs/all_lower.s` via `iigs/link_lower.s`. It is the renderer, HUD, and sprite blits from `iigs/`, plus `iigs/lower_host.s`. It may fill bank `$02`; the renderer's work RAM is in bank `$04`, as the GS/OS build keeps it in its own segment.
 
 Both are staged under `build/iigs/stage/`.
 
@@ -572,9 +572,9 @@ Both are staged under `build/iigs/stage/`.
 |------|----------|
 | `$00` | Lowered direct page at `$1E00`; host stack top `$1DFF` |
 | `$01` | SHR |
-| `$02` | `lower_host.bin` at `$0000`, renderer work RAM and adapter shadows from `$A000` |
+| `$02` | `lower_host.bin` at `$0000`, with the adapter shadows (`SH_*`, `CellBank`, `MazeSheet`) at its end |
 | `$03` | Graphics assets |
-| `$04` | Background copy for sprite erase |
+| `$04` | Background copy for sprite erase at `$2000`; renderer work RAM (tilemap, actors, dirty list, HUD, row tables) at `$A000` |
 | `$05` | `lower_game.bin` |
 | `$06` | The game bank: ROM from `build/mspac.bin` at `$0000`–`$3FFF` and `$8000`–`$9FFF`, RAM `$4000`–`$4FFF`, the I/O page as plain RAM, the host block at `$F000` |
 | `$07`+ | The replay input stream, when checking |
@@ -585,7 +585,7 @@ The I/O page is plain RAM. `read_latch0` reads the interrupt enable back from `$
 
 - `LowerTiles`: tile and color RAM into the renderer's tilemap and dirty list. A cell with color 0 is drawn blank. Past 120 dirty cells, it redraws all of them.
 - `LowerSprites`: `sprite_out` and the actor positions into the renderer's actors. Ghost frames, eyes, blue and flashing (their own blits), points, Ms. Pac-Man's poses, the fruit.
-- `LowerHud`: scores, lives, and level into the side HUD.
+- `LowerHud`: scores, lives, level, and credits into the side HUD.
 
 `FrameDone` (host `$0004`) is an `RTS` that exists to carry a breakpoint. `CheckMode` (host `$0003`) is set by the checker and stops the host from clearing the game bank at start.
 
@@ -670,7 +670,7 @@ Still open: tune the volume by ear against `mspac`.
 
 ### Sprites and colors
 
-- Map every sprite code the corpus shows to an asset: Ms. Pac-Man's death animation, the intermission actors (Pac-Man, the stork, the heart, the "act" clapper), and the big Pac-Man parts. Find the codes by scanning `sprite_out` across the corpus frames. Add the missing art to `py/gen_shr_gfx.py`.
+- Map every sprite code the corpus shows to an asset: Ms. Pac-Man's death animation, the intermission actors still missing (the stork, the heart, the act clapper, the junior), and the big Pac-Man parts. Pac-Man and Ms. Pac-Man's act walk poses are in. Find the codes by scanning `sprite_out` across the corpus frames. Add the missing art to `py/gen_shr_gfx.py`.
 - Check per-cell colors against color RAM: maze colors per board, text, and fruit. Decide whether the prebaked tiles are enough, or whether the adapter needs color variants.
 
 ### Remaining checks

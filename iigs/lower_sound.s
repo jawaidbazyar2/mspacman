@@ -286,6 +286,32 @@ LowerSound
 	plp
 	rts
 
+* Volume 0 on oscillators 0-2. They keep running. The shadow is dirtied
+* so the next LowerSound rewrites the DOC instead of matching it and
+* leaving the mute in place.
+SoundMute
+	php
+	sei
+	sep	#$20
+	rep	#$10
+	jsr	GluWait
+	jsr	GluRegs
+	ldx	#2
+]o	txa
+	ora	#$40
+	tay
+	lda	#0
+	jsr	DocPoke			; $40+o: volume 0
+	dex
+	bpl	]o
+	stz	|SndVol
+	stz	|SndVol+1
+	stz	|SndVol+2
+	lda	#$FF
+	sta	|SndOn
+	plp
+	rts
+
 * Quiet and halt oscillators 0-2 (on quit).
 SoundOff
 	php

@@ -159,6 +159,7 @@ Arcade graphics are **2bpp**: each pixel is palette-bank pen 0–3. At runtime t
 | Ghosts `$20–$27` | Sprite color `#01/#03/#05/#07` (body) + eyes | Eye white → pen 1; pupil → pen 15; body → pens **3/7/9/11**; compiled blits bake body color |
 | Frightened `$1C/$1D` | Banks `#11` (blue) / `#12` (flash) | Their own compiled blits: deep blue **15** with a peach **2** face, or pale **1** with a red **3** face |
 | Moving fruit `$00–$07` | Ms. Pac table `#879D` (sprite + color bank) | Even/odd compiled blits with **all four bank pens resolved to SHR indices** (no runtime recolor) |
+| Fruit / ghost points `$08–$0F`, `$28–$2B` | Color `$01` / bank `$18` | `py/gen_compiled_points.py`: opaque ink → SHR pen 1. Eat-fruit writes `fruit_points+2` (`$08–$0E` = 100–5000) |
 | HUD level fruit | Arcade uses tile bases `#90+` + colors at `#3B08` (max **7** icons) | v1 draws the current level's fruit with the same compiled actor blit (§3.4). The lowered build draws the whole 7-icon row with those blits, in two gutter rows of four |
 | Ms. Pac | Yellow bank `#09` (and related) | Prebake yellow / red / blue onto pens **13** / **3** / **15** |
 
@@ -402,16 +403,22 @@ Write SHR through bank `$01` shadow at full CPU speed. Avoid long poke loops int
 
 ### Decision
 
-Generate IIgs tile/sprite bitmaps **automatically** from the arcade graphics ROMs as a build step. Do not hand-author 6×6 / 12×12 sheets as the source of truth.
+The game's tile and sprite art is **two hand-cleaned contact sheets** in `assets/`. They started as the ROM scale below and were touched up by an artist. `make gfx` ingests them (`py/gen_shr_gfx.py --from-ppm assets`). Do not switch the build back to the ROM scale. Fix art by editing the sheets.
 
 | Input | Source | Output |
 |-------|--------|--------|
-| Tiles | `mspacman-orig/5e` (256 × 8×8, 2bpp) | `build/gfx/tiles6.bin` — 256 × **6×6** @ 4bpp (3 bytes/row) |
-| Sprites | `mspacman-orig/5f` (64 × 16×16, 2bpp) | `build/gfx/sprites14x12.bin` + `.mask.bin` — 64 × **14×12** even cells (7 bytes/row) |
+| Tiles | `assets/tiles_6x6_clean.ppm` (256 × 6×6) | `build/gfx/tiles6.bin` — 256 × **6×6** @ 4bpp (3 bytes/row), arcade pens 0–3 |
+| Sprites | `assets/sprites_14x12_clean.ppm` (64 × 14×12) | `build/gfx/sprites14x12.bin` + `.mask.bin` + `.odd.bin` + `.odd.mask.bin` — 64 × **14×12** cells (7 bytes/row) |
 
-Scale factor is \(6/8 = 0.75\) for both (8→6, 16→12). Sprites are then padded to the locked 14×12 masked cell (12 px art left-aligned, 2 transparent columns on the right). **Odd** forms are **not** emitted by the build — the IIgs generates them at startup from the even masters (§3).
+Sheet format (the layout `--ppm` writes for `tiles_6x6.ppm` / `sprites_14x12.ppm`): binary P6, zoom 4 (every pixel a solid 4×4 block), a 1-pixel `(32,32,32)` gutter around each cell, 16 tile columns / 8 sprite columns, in code order. Cell pixels are arcade pens 0–3 drawn as black `(0,0,0)`, red `(255,0,0)`, white `(255,255,255)`, amber `(255,184,0)`. For a ghost, amber is the body and white the pupil. The ingest rejects any other color or a broken block.
 
-### Algorithm
+Every sprite compiler reads the even cells from `sprites14x12.bin`: ghosts, Ms. Pac (flips applied to the 14×12 cell), fruit and points. Each prebakes its color bank and shifts its own odd form.
+
+`make gfx-rom` still writes the ROM scale, with PPM sheets, to `build/gfx/rom/` as the starting point for new art. The game does not use it.
+
+### ROM scale algorithm (`make gfx-rom`)
+
+Scale factor is \(6/8 = 0.75\) for both (8→6, 16→12). Sprites are padded to the locked 14×12 masked cell (art centered, 1 transparent column each side).
 
 1. Decode `5e` / `5f` with the MAME `pacman` char/sprite bit layouts → pen maps (indices 0–3).
 2. **Upright tiles/sprites:** rotate 90° CW (MAME `ROT90`), then **row XOR 3** (`out[i]=in[i^3]` — reverse each 4-row half). That fixes bevel direction without a full V-flip, which would open a black gap through two-tile horizontal walls (`DF`/`E5`). Same transform for sprites so 16→12 scale does not sample empty gap rows.
@@ -426,12 +433,14 @@ Pen 0 remains transparency for sprites. Asset generators **prebake** §2 target 
 ### Build
 
 ```bash
-make gfx        # binaries only
-make gfx-ppm    # binaries + PPM previews (default zoom ×4)
+make gfx        # binaries from assets/*_clean.ppm
+make gfx-ppm    # binaries + PPM previews of the ingested art (zoom ×4)
+make gfx-rom    # ROM scale + PPM sheets under build/gfx/rom/ (not used by the game)
 make tiles-preview              # 8×8 maze + sheet (production upright = CW+row^3)
 make tiles-preview COMPARE=native,cw,upright
 # or:
-python3 py/gen_shr_gfx.py --ppm --out build/gfx
+python3 py/gen_shr_gfx.py --from-ppm assets --out build/gfx
+python3 py/gen_shr_gfx.py --ppm --out build/gfx/rom
 python3 py/preview_tiles_8x8.py --orient upright --compare native,cw
 ```
 
@@ -492,18 +501,19 @@ The 76 px gutters either side of the playfield carry the chrome the arcade puts 
 
 | Gutter | Contents | Origin |
 |--------|----------|--------|
-| Left | `1UP`, P1 score, life icons | `(8,4)` / `(8,12)` / `(8,40)` |
+| Left | `1UP`, P1 score, life icons, `CREDIT nn` or `FREE PLAY` | `(8,4)` / `(8,12)` / `(8,40)` / `(8,58)` |
 | Right | `HIGH SCORE`, high score, level fruit | `(248,4)` / `(248,12)` / `(252,28)` |
 
 - **Text** reuses arcade glyph tiles: score digits `$00–$09`, ASCII `$40–$5B` (`$40` = space). The art is single-ink, so `BlitTileAbs` recolors any nonzero nibble to `R_PEN` (`COL_DIGIT`, pen 1 white, the arcade's bank `#0F`) while blitting the 6×6 cell — one opaque write, so redraws need no clear. Advance is 6 px/glyph.
 - **Scores** are 3 BCD bytes lo/mid/hi like arcade `#4E80` / `#4E88`; `ScoreAdd10` uses 65816 decimal mode where the Z80 chains `add`/`daa` (`j_2a65`). `DrawScoreBCD` blanks up to 4 leading zeros so a fresh score reads `00` (`j_2abe` / `j_2ace`), and `CheckHighScore` copies P1 over the high score on an MSB→LSB win (`j_2a91`).
 - **Life icons** are the compiled Ms. Pac blit (dir W, mouth nearly shut), not tiles; the **level fruit** is the compiled fruit blit clamped at banana like `j_8793`. Both are masked blits over black.
 - **Lowered build fruit row:** `DrawFruitRow` in [`iigs/lower_host.s`](../iigs/lower_host.s) follows `draw_fruit_row` (`$2BEA`): one fruit per level up to seven, cherry first. It starts at the right like the arcade's row, at `(294,28)`, runs left, and wraps after four icons to `(294,40)`. Seven 14 px icons don't fit across the 76 px gutter.
+- **Credits:** the arcade's `show_credits` (`$2BA1`) writes `CREDIT` and the count into the bottom chrome (`$403B`–`$4033`), which `LowerTiles` drops. `LowerHud` diffs `credits` (`$4E6E`) instead and `DrawCredits` repaints the same nine cells in the left gutter: `CREDIT`, a space, the tens digit (blank below 10), the ones digit, or `FREE PLAY` when the count is `$FF`. The digits are text-font glyphs `$30`–`$39`, not the score digits. All nine cells are opaque, so going from 10 to 9 erases the tens digit, which the arcade leaves on screen.
 - **Harness demo only:** score ticks +10 every 300 frames, lives are fixed at 3, and level stays 0 — real game state replaces `InitHUD` later.
 
 Dot eating rides the same seam: `EatDotsAtPac` maps Ms. Pac's `ACT_X`/`ACT_Y` back to a tile, clears `$10`/`$14` from `TILEMAP`, and queues the cell so `ApplyDirty` rewrites it empty into **both** SHR and BCK before the next erase (§3.1).
 
-Host check (MCP `read_mem` / `write_mem`, domain `MAIN`): `FRAME_COUNT` `$02A900`, score+hiscore `$02A908` (6 BCD bytes), `LIVES`/`LEVEL` `$02A90E`, `TILEMAP` `$02A000`. Poke score at `$02A908` to reach the 10000 rollover without waiting 1000 ticks.
+Host check (MCP `read_mem` / `write_mem`, domain `MAIN`): `FRAME_COUNT` `$04A900`, score+hiscore `$04A908` (6 BCD bytes), `LIVES`/`LEVEL` `$04A90E`, `TILEMAP` `$04A000`. Poke score at `$04A908` to reach the 10000 rollover without waiting 1000 ticks.
 
 ---
 
@@ -577,8 +587,9 @@ Living checklist: [`IIgs-LogicPort.md`](IIgs-LogicPort.md).
 
 | Bank / range | Contents |
 |--------------|----------|
-| `$02/0000` | Code (&lt; `$A000`) + tilemap@`$A000` + actors + dirty + HUD |
-| `$02/8460` | **Game only:** arcade `#4D00`–`#4E3F` mirror (`RAM4D`) |
+| `$02/0000` | Code (up to the whole bank) |
+| `$04/A000` | **Static** work RAM: tilemap, actors, dirty list, HUD, row LUTs; GS/OS = OMF data segment `Work` |
+| `$04/A460` | **Game only:** arcade `#4D00`–`#4E3F` mirror (`RAM4D`) |
 | `$03/0000` | Tiles, even/odd sprites+masks, maze, stitched cells |
 | `$01/2000` | SHR (`S_SHR`) — normal shadow |
 | `$04/2000` | **Static** BCK strip (`S_BCK`); GS/OS = OMF data segment `BCK_PIXELS` |

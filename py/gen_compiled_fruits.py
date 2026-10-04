@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Emit compiled 65816 masked blits for Ms. Pac fruit sprites $00–$07.
 
-Decodes 5f ROM (upright + 16→12 + pad 14×12 + odd shift), prebakes each
-fruit's arcade color bank from table #879D into §2 SHR pens, and writes
-Merlin32 routines:
+Reads each fruit's even 14×12 cell from build/gfx sprites14x12.bin (make
+gfx), prebakes its arcade color bank from table #879D into §2 SHR pens,
+shifts the odd form, and writes Merlin32 routines:
 
   index = (ACT_SPR & 7)*2 + (X & 1)  → FruitBlitTable
 
@@ -13,7 +13,7 @@ Adjacent opaque bytes are coalesced into 16-bit ops by py/blit_emit.py.
 
 Usage:
   python3 py/gen_compiled_fruits.py
-  python3 py/gen_compiled_fruits.py --sprites mspacman-orig/5f -o iigs/compiled_fruits.s
+  python3 py/gen_compiled_fruits.py --gfx build/gfx -o iigs/compiled_fruits.s
   python3 py/gen_compiled_fruits.py --no-word16    # 8-bit only, for A/B
 """
 
@@ -28,8 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from blit_emit import BlitStats, check_equivalence, emit_blit  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SPRITE_ROM = ROOT / "mspacman-orig" / "5f"
-DEFAULT_COLOR_ROM = ROOT / "mspacman-orig" / "82s123.7f"
+DEFAULT_GFX = ROOT / "build" / "gfx"
 DEFAULT_PALETTE_ROM = ROOT / "mspacman-orig" / "82s126.4a"
 DEFAULT_OUT = ROOT / "iigs" / "compiled_fruits.s"
 
@@ -77,11 +76,8 @@ def remap_img(img: list[list[int]], shr_map: tuple[int, ...]) -> list[list[int]]
     return [[shr_map[p & 3] for p in row] for row in img]
 
 
-def build_fruit_cell(gfx, rom: bytes, spr_code: int, shr_map: tuple[int, ...]):
-    raw = gfx.decode_sprite(rom, spr_code)
-    # Area resample keeps more fruit mass than nearest subsample (cherries were ~26 px).
-    art = gfx.area_resample(gfx.upright_sprite(raw), gfx.SPRITE_ART, gfx.SPRITE_ART)
-    even = remap_img(gfx.pad_sprite_14x12(art), shr_map)
+def build_fruit_cell(gfx, sheet: bytes, spr_code: int, shr_map: tuple[int, ...]):
+    even = remap_img(gfx.unpack_sprite_arcade(sheet, spr_code), shr_map)
     odd = gfx.shift_odd_cell(even)
     return (
         gfx.pack_4bpp_rows(even),
@@ -93,8 +89,7 @@ def build_fruit_cell(gfx, rom: bytes, spr_code: int, shr_map: tuple[int, ...]):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--sprites", type=Path, default=DEFAULT_SPRITE_ROM)
-    ap.add_argument("--color-rom", type=Path, default=DEFAULT_COLOR_ROM)
+    ap.add_argument("--gfx", type=Path, default=DEFAULT_GFX)
     ap.add_argument("--palette-rom", type=Path, default=DEFAULT_PALETTE_ROM)
     ap.add_argument("-o", "--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument(
@@ -105,11 +100,12 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    if not args.sprites.is_file():
-        raise SystemExit(f"missing sprite ROM {args.sprites}")
+    sheet_path = args.gfx / "sprites14x12.bin"
+    if not sheet_path.is_file():
+        raise SystemExit(f"missing {sheet_path} (run make gfx)")
 
     gfx = _load_gfx()
-    rom = args.sprites.read_bytes()
+    sheet = sheet_path.read_bytes()
 
     lines: list[str] = [
         "*",
@@ -141,7 +137,7 @@ def main() -> int:
 
     for fi, (spr_code, bank, name) in enumerate(FRUITS):
         shr_map = bank_to_shr_map(args.palette_rom, bank)
-        even_s, even_m, odd_s, odd_m = build_fruit_cell(gfx, rom, spr_code, shr_map)
+        even_s, even_m, odd_s, odd_m = build_fruit_cell(gfx, sheet, spr_code, shr_map)
         for tag, spr, msk in (("E", even_s, even_m), ("O", odd_s, odd_m)):
             lab = f"CF{fi}_{tag}"
             if args.word16:

@@ -139,7 +139,7 @@ Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system
   - `py/fix_mangled_prefixes.py` — comment `--HHHH` / `...` overlay artifacts (do not promote to opcodes)
   - `py/fix_boot_mismatches.py` — targeted instruction/stub fixes where listing ≠ boots
   - `py/verify_boots.py` — compare `build/mspac.bin` slices to `boot1`–`boot6`
-  - `py/gen_shr_gfx.py` — scale `5e`/`5f` → IIgs 6×6 tiles / 14×12 sprites (+ optional PPM previews)
+  - `py/gen_shr_gfx.py` — IIgs 6×6 tiles / 14×12 sprites. `make gfx` runs it with `--from-ppm assets`: the artist's cleaned sheets `assets/tiles_6x6_clean.ppm` and `assets/sprites_14x12_clean.ppm` are the game's art (do not switch back to the ROM scale; fix art in the sheets). Without `--from-ppm` it scales `5e`/`5f` (`make gfx-rom` → `build/gfx/rom/`, with PPM sheets as a starting point for new art). The sprite compilers (`gen_compiled_ghosts/mspac/fruits/points.py`) read `build/gfx/sprites14x12.bin`
   - `py/preview_tiles_8x8.py` — native 8×8 maze/tile PPM+PNG to check rotate/flip before scale
   - `py/gen_palette.py` — arcade PROMs → SHR palette 0 + `iigs/palette_data.s` (pen roles and the stable color map: `docs/ColorMap.md`)
  - `py/gen_tile_banks.py [--list]` — arcade color RAM banks → `iigs/tile_bank_data.s` (`TileBankPens` / `TileBankRaw`) for the lowered build's per-cell tile recolor, plus a maze row per bank that puts wall fill and outline on pens 14 and 12 (part of `make palette`)
@@ -155,7 +155,8 @@ Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system
   - `py/lower_diff.py` — `lower/*.c` may differ from `idiom/*.c` only by hooks (part of `make lower-check`)
   - `py/lower_cycles.py` — per-session cycle summary of `build/lower/frame_cycles.txt` (part of `make lower-only-check`)
   - `py/omf_dump.py FILE [--relocs]` — list an OMF load file's segments (kind, length, bank size, ALIGN) and relocation records
-  - `py/omf_fix_align.py FILE Seg=0x10000` — set a segment's ALIGN field; Merlin32 writes 2 for `ali BANK` (part of `make iigs-lower-gsos`)
+  - `py/move_work_addrs.py FILE...` — one-off doc rewrite of work-RAM peek addresses from bank `$02` to `$04` (`$02Axxx` → `$04Axxx`) after the static work block moved out of the code bank
+ - `py/omf_fix_align.py FILE Seg=0x10000` — set a segment's ALIGN field; Merlin32 writes 2 for `ali BANK` (part of `make iigs-lower-gsos`)
   - `py/gs2_*.py` / `py/check_frame_count.py` — Makefile/CI only (`make iigs-test`, `make iigs-demo`, `make lower-iigs-check`, `make iigs-lower-demo`). **Do not** use these (or `gs2debug` / `PYTHONPATH`) for live debugging. One exception: `py/gs2_lower_check.py --play --detach` loads the lowered build (about 90 KB, too much for MCP `write_mem`) and exits with the emulator still running. Then attach the MCP with `connect` to `/tmp/gs2-mspacman-lower.sock`. The emulator takes one debug client at a time, so `--snap` (PNG of a running emulator) works only while the MCP is not attached.
 
 ## GSSquared live debug (MCP)
@@ -185,15 +186,15 @@ Mount disk images on slot 7, drive 1, which is faster than the slot 5 3.5" drive
 
 | Symbol | Address | Size |
 |--------|---------|------|
-| `TILEMAP` | `0x02A000` | 868 |
-| `FRAME_COUNT` | `0x02A900` | 2 |
-| `DEMO_FREEZE` | `0x02A904` | 1 |
-| `SCORE_*` / `HISCORE_*` | `0x02A908` | 6 |
-| `LIVES` / `LEVEL` | `0x02A90E` | 1+1 |
+| `TILEMAP` | `0x04A000` | 868 |
+| `FRAME_COUNT` | `0x04A900` | 2 |
+| `DEMO_FREEZE` | `0x04A904` | 1 |
+| `SCORE_*` / `HISCORE_*` | `0x04A908` | 6 |
+| `LIVES` / `LEVEL` | `0x04A90E` | 1+1 |
 | SHR pixels | `0x012000` | 32000 |
 | SHR palette | `0x019E00` | 32 |
 
-Freeze a completed draw: poke `DEMO_FREEZE=1` at `0x02A904`, `continue_exec`, settle, `pause` again.
+Freeze a completed draw: poke `DEMO_FREEZE=1` at `0x04A904`, `continue_exec`, settle, `pause` again.
 
 Makefile PNG dump (`make iigs-test`) still uses `py/gs2_render_test.py` under the hood — that is CI, not the agent debug path.
 

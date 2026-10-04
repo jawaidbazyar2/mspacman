@@ -8,10 +8,16 @@ optional PPM contact sheets for eyeballing.
 
 For orientation checks *before* scaling, use py/preview_tiles_8x8.py.
 
+--from-ppm DIR skips the ROMs and reads hand-cleaned contact sheets instead:
+DIR/tiles_6x6_clean.ppm and DIR/sprites_14x12_clean.ppm, in the layout --ppm
+writes for tiles_6x6.ppm / sprites_14x12.ppm (zoom 4, 1-pixel gray gutters,
+arcade pens 0-3 drawn in the fallback colors black, red, white, amber).
+
 Usage:
   python3 py/gen_shr_gfx.py
   python3 py/gen_shr_gfx.py --out build/gfx --ppm --zoom 4
   python3 py/gen_shr_gfx.py --tiles-only
+  python3 py/gen_shr_gfx.py --from-ppm assets --out build/gfx
 """
 
 from __future__ import annotations
@@ -229,6 +235,100 @@ def remap_sprite_pens(img: list[list[int]]) -> list[list[int]]:
     return [[_SPRITE_PEN_MAP[p & 3] for p in row] for row in img]
 
 
+_SHEET_TO_ARCADE = {n: p for p, n in enumerate(_SPRITE_PEN_MAP)}
+
+
+def unpack_sprite_arcade(sheet: bytes, code: int) -> list[list[int]]:
+    """Even 14×12 cell `code` of sprites14x12.bin as arcade pens 0–3."""
+    base = code * SPRITE_CELL_H * BYTES_PER_SPRITE_ROW
+    cell = sheet[base : base + SPRITE_CELL_H * BYTES_PER_SPRITE_ROW]
+    if len(cell) != SPRITE_CELL_H * BYTES_PER_SPRITE_ROW:
+        raise IndexError(code)
+    out: list[list[int]] = []
+    for y in range(SPRITE_CELL_H):
+        row: list[int] = []
+        for b in cell[y * BYTES_PER_SPRITE_ROW : (y + 1) * BYTES_PER_SPRITE_ROW]:
+            row.append(_SHEET_TO_ARCADE[b >> 4])
+            row.append(_SHEET_TO_ARCADE[b & 0xF])
+        out.append(row)
+    return out
+
+
+# Cleaned contact sheets: pen colors, zoom and gutter as contact_sheet() writes.
+CLEAN_TILES_PPM = "tiles_6x6_clean.ppm"
+CLEAN_SPRITES_PPM = "sprites_14x12_clean.ppm"
+CLEAN_ZOOM = 4
+CLEAN_PAD = 1
+_CLEAN_RGB_TO_PEN = {rgb: p for p, rgb in enumerate(_FALLBACK_RGB)}
+
+
+def read_ppm(path: Path) -> tuple[int, int, bytes]:
+    """Binary P6 PPM (comments allowed, maxval 255) → (w, h, RGB bytes)."""
+    data = path.read_bytes()
+    fields: list[bytes] = []
+    pos = 0
+    while len(fields) < 4:
+        while pos < len(data) and data[pos : pos + 1].isspace():
+            pos += 1
+        if data[pos : pos + 1] == b"#":
+            pos = data.index(b"\n", pos) + 1
+            continue
+        end = pos
+        while end < len(data) and not data[end : end + 1].isspace():
+            end += 1
+        fields.append(data[pos:end])
+        pos = end
+    if fields[0] != b"P6" or fields[3] != b"255":
+        raise SystemExit(f"{path}: expected binary P6 PPM with maxval 255")
+    w, h = int(fields[1]), int(fields[2])
+    pix = data[pos + 1 :]
+    if len(pix) < w * h * 3:
+        raise SystemExit(f"{path}: truncated ({len(pix)} of {w * h * 3} pixel bytes)")
+    return w, h, pix[: w * h * 3]
+
+
+def read_contact_sheet(
+    path: Path, count: int, cols: int, cell_w: int, cell_h: int
+) -> list[list[list[int]]]:
+    """Cells of a cleaned contact sheet as pen maps (arcade pens 0–3)."""
+    w, h, pix = read_ppm(path)
+    rows = (count + cols - 1) // cols
+    want_w = (cols * cell_w + (cols + 1) * CLEAN_PAD) * CLEAN_ZOOM
+    want_h = (rows * cell_h + (rows + 1) * CLEAN_PAD) * CLEAN_ZOOM
+    if (w, h) != (want_w, want_h):
+        raise SystemExit(f"{path}: expected {want_w}x{want_h}, got {w}x{h}")
+    cells: list[list[list[int]]] = []
+    for i in range(count):
+        r, c = divmod(i, cols)
+        y0 = CLEAN_PAD + r * (cell_h + CLEAN_PAD)
+        x0 = CLEAN_PAD + c * (cell_w + CLEAN_PAD)
+        img: list[list[int]] = []
+        for y in range(cell_h):
+            row: list[int] = []
+            for x in range(cell_w):
+                py0 = (y0 + y) * CLEAN_ZOOM
+                px0 = (x0 + x) * CLEAN_ZOOM
+                o = (py0 * w + px0) * 3
+                rgb = pix[o : o + 3]
+                for dy in range(CLEAN_ZOOM):
+                    line = ((py0 + dy) * w + px0) * 3
+                    if pix[line : line + CLEAN_ZOOM * 3] != rgb * CLEAN_ZOOM:
+                        raise SystemExit(
+                            f"{path}: cell {i:#04x} pixel ({x},{y}) is not a solid "
+                            f"{CLEAN_ZOOM}x{CLEAN_ZOOM} block"
+                        )
+                pen = _CLEAN_RGB_TO_PEN.get(tuple(rgb))
+                if pen is None:
+                    raise SystemExit(
+                        f"{path}: cell {i:#04x} pixel ({x},{y}) color {tuple(rgb)} "
+                        f"is not one of {list(_FALLBACK_RGB)}"
+                    )
+                row.append(pen)
+            img.append(row)
+        cells.append(img)
+    return cells
+
+
 def pack_4bpp_rows(img: list[list[int]]) -> bytes:
     """Pack rows as SHR 320 4bpp: high nibble = left pixel, low = right."""
     out = bytearray()
@@ -337,27 +437,35 @@ def generate(
     zoom: int,
     tiles_only: bool,
     sprites_only: bool,
+    clean_dir: Path | None = None,
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     pen_rgb = default_pen_rgb(color_rom, palette_rom, palette_index)
+    if clean_dir is not None:
+        pen_rgb = list(_FALLBACK_RGB)
 
     tiles8: list[list[list[int]]] = []
     tiles6: list[list[list[int]]] = []
     if not sprites_only:
-        tile_rom = tile_rom_path.read_bytes()
-        if len(tile_rom) != 4096:
-            raise SystemExit(f"{tile_rom_path}: expected 4096 bytes, got {len(tile_rom)}")
+        if clean_dir is not None:
+            tiles6 = read_contact_sheet(
+                clean_dir / CLEAN_TILES_PPM, NUM_TILES, 16, TILE_DST, TILE_DST
+            )
+        else:
+            tile_rom = tile_rom_path.read_bytes()
+            if len(tile_rom) != 4096:
+                raise SystemExit(f"{tile_rom_path}: expected 4096 bytes, got {len(tile_rom)}")
+            for i in range(NUM_TILES):
+                if i in (0x10, 0x11):
+                    t8 = make_centered_pellet(TILE_SRC)
+                elif i in (0x14, 0x15):
+                    t8 = make_power_pill(TILE_SRC)
+                else:
+                    t8 = upright_tile(decode_tile(tile_rom, i))
+                tiles8.append(t8)
+                tiles6.append(subsample_symmetric(t8, _TILE_SCALE_IDX))
         tile_blob = bytearray()
-        for i in range(NUM_TILES):
-            if i in (0x10, 0x11):
-                t8 = make_centered_pellet(TILE_SRC)
-            elif i in (0x14, 0x15):
-                t8 = make_power_pill(TILE_SRC)
-            else:
-                t8 = upright_tile(decode_tile(tile_rom, i))
-            t6 = subsample_symmetric(t8, _TILE_SCALE_IDX)
-            tiles8.append(t8)
-            tiles6.append(t6)
+        for t6 in tiles6:
             packed = pack_4bpp_rows(t6)
             if len(packed) != TILE_DST * BYTES_PER_TILE_ROW:
                 raise RuntimeError("tile pack size mismatch")
@@ -369,24 +477,29 @@ def generate(
     sprites12: list[list[list[int]]] = []
     sprites14: list[list[list[int]]] = []
     if not tiles_only:
-        sprite_rom = sprite_rom_path.read_bytes()
-        if len(sprite_rom) != 4096:
-            raise SystemExit(f"{sprite_rom_path}: expected 4096 bytes, got {len(sprite_rom)}")
+        if clean_dir is not None:
+            sprites14 = read_contact_sheet(
+                clean_dir / CLEAN_SPRITES_PPM, NUM_SPRITES, 8, SPRITE_CELL_W, SPRITE_CELL_H
+            )
+        else:
+            sprite_rom = sprite_rom_path.read_bytes()
+            if len(sprite_rom) != 4096:
+                raise SystemExit(f"{sprite_rom_path}: expected 4096 bytes, got {len(sprite_rom)}")
+            for i in range(NUM_SPRITES):
+                s16 = upright_sprite(decode_sprite(sprite_rom, i))
+                s12 = subsample_symmetric(s16, _SPR_SCALE_IDX)
+                sprites16.append(s16)
+                sprites12.append(s12)
+                sprites14.append(pad_sprite_14x12(s12))
         spr_blob = bytearray()
         mask_blob = bytearray()
         spr_odd = bytearray()
         mask_odd = bytearray()
-        for i in range(NUM_SPRITES):
-            s16 = upright_sprite(decode_sprite(sprite_rom, i))
-            s12 = subsample_symmetric(s16, _SPR_SCALE_IDX)
-            s14 = pad_sprite_14x12(s12)
+        for s14 in sprites14:
             m14 = mask_from_pens(s14)
             s14r = remap_sprite_pens(s14)
             s14o = shift_odd_cell(s14r)
             m14o = mask_from_pens(shift_odd_cell(s14))  # mask from pre-remap art
-            sprites16.append(s16)
-            sprites12.append(s12)
-            sprites14.append(s14r)
             packed = pack_4bpp_rows(s14r)
             mpacked = pack_4bpp_rows(m14)
             if len(packed) != SPRITE_CELL_H * BYTES_PER_SPRITE_ROW:
@@ -411,38 +524,17 @@ def generate(
 
     if write_ppm_flag:
         ppm_dir = out_dir / "ppm"
-        if tiles8:
-            write_ppm(
-                ppm_dir / "tiles_8x8.ppm",
-                contact_sheet(tiles8, pen_rgb, cols=16),
-                zoom=zoom,
-            )
-            write_ppm(
-                ppm_dir / "tiles_6x6.ppm",
-                contact_sheet(tiles6, pen_rgb, cols=16),
-                zoom=zoom,
-            )
-            print(f"wrote {ppm_dir / 'tiles_8x8.ppm'} and tiles_6x6.ppm (zoom={zoom})")
-        if sprites16:
-            write_ppm(
-                ppm_dir / "sprites_16x16.ppm",
-                contact_sheet(sprites16, pen_rgb, cols=8),
-                zoom=zoom,
-            )
-            write_ppm(
-                ppm_dir / "sprites_12x12.ppm",
-                contact_sheet(sprites12, pen_rgb, cols=8),
-                zoom=zoom,
-            )
-            write_ppm(
-                ppm_dir / "sprites_14x12.ppm",
-                contact_sheet(sprites14, pen_rgb, cols=8),
-                zoom=zoom,
-            )
-            print(
-                f"wrote {ppm_dir / 'sprites_16x16.ppm'}, "
-                f"sprites_12x12.ppm, sprites_14x12.ppm (zoom={zoom})"
-            )
+        sheets = (
+            ("tiles_8x8.ppm", tiles8, 16),
+            ("tiles_6x6.ppm", tiles6, 16),
+            ("sprites_16x16.ppm", sprites16, 8),
+            ("sprites_12x12.ppm", sprites12, 8),
+            ("sprites_14x12.ppm", sprites14, 8),
+        )
+        for name, images, cols in sheets:
+            if images:
+                write_ppm(ppm_dir / name, contact_sheet(images, pen_rgb, cols=cols), zoom=zoom)
+                print(f"wrote {ppm_dir / name} (zoom={zoom})")
 
 
 def main() -> int:
@@ -467,6 +559,12 @@ def main() -> int:
     ap.add_argument("--zoom", type=int, default=4, help="nearest-neighbor zoom for PPM (default 4)")
     ap.add_argument("--tiles-only", action="store_true")
     ap.add_argument("--sprites-only", action="store_true")
+    ap.add_argument(
+        "--from-ppm",
+        type=Path,
+        metavar="DIR",
+        help=f"read {CLEAN_TILES_PPM} / {CLEAN_SPRITES_PPM} from DIR instead of the ROMs",
+    )
     args = ap.parse_args()
     if args.tiles_only and args.sprites_only:
         raise SystemExit("choose at most one of --tiles-only / --sprites-only")
@@ -484,6 +582,7 @@ def main() -> int:
         zoom=args.zoom,
         tiles_only=args.tiles_only,
         sprites_only=args.sprites_only,
+        clean_dir=args.from_ppm,
     )
     return 0
 

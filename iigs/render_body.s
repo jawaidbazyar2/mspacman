@@ -742,13 +742,18 @@ DrawSprite
 	bne	:ghostish
 	brl	:pacBlit
 :ghostish
-* Eat-ghost freeze: FLAG_POINTS → sprites $28–$2B (compiled bank $18)
+* Eat-ghost freeze: FLAG_POINTS → sprites $28–$2B (compiled bank $18).
+* FLAG_CHAR: Act 1 parks Pac-Man and Ms. Pac-Man on a ghost slot.
 	lda	<R_BASE
 	tax
 	lda	>ACTORS+ACT_FLAGS,x
 	and	#$00FF
-	and	#FLAG_POINTS
+	bit	#FLAG_POINTS
 	bne	:pointsBlit
+	bit	#FLAG_CHAR
+	beq	:ghostBody
+	brl	:pacBlit
+:ghostBody
 * Ghost: index = ACT_COLOR*16 + (ACT_SPR&7)*2 + (X&1)
 	lda	>ACTORS+ACT_COLOR,x
 	and	#$0007
@@ -770,7 +775,7 @@ DrawSprite
 	lda	<R_DEST
 	tay
 	jsr	GhostBlitGo
-	bra	:blitDone
+	brl	:blitDone
 :pointsBlit
 * Points: index = (ACT_SPR&3)*2 + (X&1)
 	lda	>ACTORS+ACT_SPR,x
@@ -787,9 +792,13 @@ DrawSprite
 	jsr	PointsBlitGo
 	bra	:blitDone
 :fruitBlit
-* Fruit: index = (ACT_SPR&7)*2 + (X&1)
 	lda	<R_BASE
 	tax
+	lda	>ACTORS+ACT_FLAGS,x
+	and	#$00FF
+	and	#FLAG_POINTS
+	bne	:fruitPts
+* Fruit: index = (ACT_SPR&7)*2 + (X&1)
 	lda	>ACTORS+ACT_SPR,x
 	and	#$0007
 	asl				; type*2
@@ -803,12 +812,30 @@ DrawSprite
 	tay
 	jsr	FruitBlitGo
 	bra	:blitDone
+:fruitPts
+* Fruit score $08-$0F: index = (4+(ACT_SPR&7))*2 + (X&1)
+	lda	>ACTORS+ACT_SPR,x
+	and	#$0007
+	clc
+	adc	#4
+	asl				; slot*2
+	sta	<R_OFF
+	lda	<R_X
+	and	#$0001
+	ora	<R_OFF
+	asl				; word index
+	tax
+	lda	<R_DEST
+	tay
+	jsr	PointsBlitGo
+	bra	:blitDone
 :pacBlit
-* Ms. Pac: index = (ACT_SPR & $0F)*2 + (X&1); ACT_SPR = dir*3+mouth
+* Ms. Pac / Pac-Man: index = (ACT_SPR & $1F)*2 + (X&1).
+* ACT_SPR = dir*3+mouth; Pac-Man's poses are 12..23.
 	lda	<R_BASE
 	tax
 	lda	>ACTORS+ACT_SPR,x
-	and	#$000F
+	and	#$001F
 	asl				; slot*2
 	sta	<R_OFF
 	lda	<R_X

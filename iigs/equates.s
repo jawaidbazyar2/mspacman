@@ -90,7 +90,7 @@ FRUIT_PERIOD   equ 360		; frames between fruit-type changes
 FRUIT_TILE_X   equ 14		; fixed demo tile (below ghost house)
 FRUIT_TILE_Y   equ 17
 PAC_RAIL_START equ 24		; Ms. Pac rail waypoint (mid-path visibility)
-* Working RAM starts at $A000 so compiled blits may grow through $9xxx.
+* Working RAM is outside the code bank (static $04/A000, GS/OS Work segment).
 * Erase restores from BCK strip — no per-actor save-under.
 * SHADOW $B7: inhibit text/HGR/aux/TEXT2; bit3=0 → SHR on; bit6=0 → IOLC intact.
 
@@ -122,7 +122,8 @@ ACT_DEST       equ 12		; SHR offset cached at DrawSprite
 ACT_BDEST      equ 14		; BCK offset cached at DrawSprite (EraseSprite)
 FLAG_DRAWN     equ $01
 FLAG_NODRAW    equ $02		; skip DrawSprite (inactive fruit, tunnel / Y clip)
-FLAG_POINTS    equ $04		; eat-ghost freeze: blit $28–$2B points (not body)
+FLAG_POINTS    equ $04		; points blit: ghost $28–$2B or fruit $08–$0F
+FLAG_CHAR      equ $08		; cutscene Pac / Ms. Pac on a ghost slot: MsPacBlitTable
 
 * Ghost blit slots (ACT_COLOR), py/gen_compiled_ghosts.py
 COL_BLINKY     equ 0		; red
@@ -162,6 +163,9 @@ HUD_HISCORE_X  equ 248
 HUD_HISCORE_Y  equ 12
 HUD_FRUIT_X    equ 252
 HUD_FRUIT_Y    equ 28
+HUD_CREDIT_X   equ 8		; CREDIT nn / FREE PLAY, under the life icons
+HUD_CREDIT_Y   equ 58
+TEXT_DIGIT0    equ $30		; '0' in the text font (credit digits)
 MSPAC_LIFE_SPR equ 7		; dir W, mouth nearly shut ($2D+H) — HUD life icon
 MAX_FRUIT_TYPE equ 7		; arcade j_8793 clamps level fruit at banana
 START_LIVES    equ 3

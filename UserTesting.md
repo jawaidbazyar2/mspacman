@@ -73,12 +73,12 @@ State check without eyeballing pixels: MCP `pause` + `wait_stopped` + `read_mem`
 
 | What | Address | Length |
 |------|---------|--------|
-| `FRAME_COUNT` | `0x02A900` | 2 |
-| score + high score (BCD) | `0x02A908` | 6 |
-| `LIVES` / `LEVEL` | `0x02A90E` | 1+1 |
-| `TILEMAP` (dots eaten vs `maze1_28x31.bin`) | `0x02A000` | 868 |
+| `FRAME_COUNT` | `0x04A900` | 2 |
+| score + high score (BCD) | `0x04A908` | 6 |
+| `LIVES` / `LEVEL` | `0x04A90E` | 1+1 |
+| `TILEMAP` (dots eaten vs `maze1_28x31.bin`) | `0x04A000` | 868 |
 
-Poke P1 score to hit the 10000 high-score copy without waiting 1000 ticks: `write_mem` at `0x02A908`.
+Poke P1 score to hit the 10000 high-score copy without waiting 1000 ticks: `write_mem` at `0x04A908`.
 
 ## MCP tools (live debug)
 

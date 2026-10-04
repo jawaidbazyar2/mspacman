@@ -109,7 +109,7 @@ already palette-0 nibbles, so they never consult color RAM at run time.
 | Flashing `$1C/$1D` | `#12` | body → 1, face → 3 | same |
 | Eyes | — | Walk frames with the body dropped | same |
 | Fruit | `#879D` table: `#14` cherry/apple, `#0F` strawberry, `#15` orange/pear, `#07` pretzel, `#16` banana | Stable map (§4) | `py/gen_compiled_fruits.py` |
-| Points (100–5000) | — | Ink → 1 | `py/gen_compiled_points.py` |
+| Points (100–5000 fruit `$08–$0F`, 200–1600 ghost `$28–$2B`) | — | Ink → 1 | `py/gen_compiled_points.py` |
 
 **Ghost blit slots.** `ACT_COLOR` holds the slot, and the blit index is
 `ACT_COLOR*16 + (ACT_SPR & 7)*2 + (X & 1)`:
@@ -303,8 +303,8 @@ arcade's top bar painted `#0F` at `$24EB`. This applies to every build.
 - **Static harness** (`make iigs`, `make iigs-game`) has no color RAM, so
   its text stays in `#1D` colors and it only draws the level-1 maze.
 - **Lowered static build size.** `MazeSheet` (4,608 bytes) lives in
-  `lower_host.bin`, which must stay below the work RAM at `$02/A000`.
-  The GS/OS build has no such limit.
+  `lower_host.bin`, which may fill bank `$02` (work RAM is in bank `$04`,
+  as the GS/OS build's is in its own segment).
 
 ## 9. Generators, build hooks, verification
 
