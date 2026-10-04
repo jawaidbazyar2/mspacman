@@ -12,7 +12,7 @@
 *            dirty list (color 0 blanks a cell)
 *   sprites  sprite codes and colors at $4C02 plus the actor and fruit
 *            positions, into ACTORS
-*   HUD      the BCD scores, lives and level, into the side HUD
+*   HUD      the BCD scores, lives, level and credits, into the side HUD
 *   input    the keyboard into the IN0/IN1 bytes of the host block
 *   sound    the voice registers at $5040 into DOC oscillators 0-2
 *            (lower_sound.s)
@@ -42,11 +42,17 @@ G_COLOR	equ	GAME+$4440
 G_SPRITE	equ	GAME+$4C00	; code, color by slot (flips in bits 7-6)
 G_POS	equ	GAME+$4D00	; actor positions, y then x
 G_PAC_DIR	equ	GAME+$4D30
+G_PAC_DEATH	equ	GAME+$4DA5	; pac_death_anim, 0 while alive
 G_FRUIT_POS	equ	GAME+$4DD2
 G_LEVEL	equ	GAME+$4E13
 G_LIVES	equ	GAME+$4E15
 G_SCORE1	equ	GAME+$4E80	; 3 bytes BCD, low first
 G_HISCORE	equ	GAME+$4E88
+G_CREDITS	equ	GAME+$4E6E	; BCD, $FF free play
+G_MODE	equ	GAME+$4E00	; game_mode
+G_SUB2	equ	GAME+$4E03	; game_mode_sub2 (press-start step)
+G_EFFNUM	equ	GAME+$4E9C	; effect channel 1 request bits
+G_EFFCUR	equ	GAME+$4E9E	; effect channel 1 bit now playing
 G_HB	equ	GAME+$F000
 G_IN0	equ	GAME+$F010
 G_IN1	equ	GAME+$F011
@@ -114,7 +120,10 @@ MainLoop
 * One color per activity (BRD_* in equates.s). Erase, draw and sort paint
 * their own; everything else is painted here so a color cannot stick
 * past the routine that owns it. FrameDone is the check breakpoint and
-* stays on the sound color.
+* stays on the sound color. Check mode mirrors the DOC before that
+* breakpoint. In play, CoinSoundGate holds a new credit silent until
+* the push-start blit has finished, so the opening is not stretched
+* across it.
 	sep	#$20
 	jsr	LowerKeys
 	bcc	:run
@@ -122,7 +131,9 @@ MainLoop
 :run	rep	#$30
 	lda	>DEMO_FREEZE
 	and	#$00FF
-	bne	:frozen
+	beq	:live
+	brl	:frozen
+:live
 	jsr	EraseAllSprites		; purple
 	lda	#BRD_TILES
 	jsr	SetBorder
@@ -134,13 +145,30 @@ MainLoop
 	lda	#BRD_TICK
 	jsr	SetBorder
 	jsr	CallFrame
+	lda	|CheckMode
+	and	#$00FF
+	bne	:chk
+	lda	#BRD_DIFF
+	jsr	SetBorder
+	jsr	LowerTiles
+	jsr	CoinSoundGate
+	bcs	:held
 	lda	#BRD_SOUND
+	jsr	SetBorder
+	jsr	LowerSound
+	bra	:fd
+:held	lda	#BRD_SOUND
+	jsr	SetBorder
+:fd	jsr	FrameDone
+	bra	:adapt
+:chk	lda	#BRD_SOUND
 	jsr	SetBorder
 	jsr	LowerSound
 	jsr	FrameDone
 	lda	#BRD_DIFF
 	jsr	SetBorder
 	jsr	LowerTiles
+:adapt
 	lda	#BRD_ACTOR
 	jsr	SetBorder
 	jsr	LowerSprites
@@ -151,8 +179,9 @@ MainLoop
 	jsr	SortActorsByY		; yellow
 	lda	>G_REPLAY
 	and	#$00FF
-	bne	MainLoop
-	jsr	WaitVBL			; black
+	beq	:vbl
+	brl	MainLoop
+:vbl	jsr	WaitVBL			; black
 	brl	MainLoop
 * Hold white across the blank. WaitVBL would paint black immediately.
 :frozen	lda	#BRD_FREEZE
@@ -656,7 +685,100 @@ LowerApplyTiles
 	sta	<R_TY
 	cmp	#PF_ROWS
 	bcc	]y
+	jsr	ReleaseCoinSound
 	plp
+	rts
+
+* The credit chime (effect channel 1, bit 1) is requested a couple of
+* frames before draw_prompt's screen clear, and the hardware registers
+* the DOC mirrors lag the engine by one frame. Left alone, the opening
+* slice is what the DOC is playing while LowerApplyTiles repaints every
+* cell, so that slice is held for the whole blit.
+*
+* In play, hold the DOC silent from the request until that blit
+* finishes, then clear the channel's current bit so the engine reloads
+* the effect. The release frame's mirror is the pre-reload registers;
+* skip it. The next frame's mirror is the first slice, with the
+* push-start screen already up. A credit once that screen is up
+* (press-start step already running) plays immediately. Check mode
+* never calls this.
+*
+* Carry set: leave the DOC alone. Carry clear: call LowerSound.
+* M and X are preserved.
+	mx	%00
+CREDIT_BIT	equ	$02
+MODE_PRESS_START	equ	2
+CoinSoundGate
+	php
+	sep	#$20
+	lda	>G_EFFNUM
+	and	#CREDIT_BIT
+	bne	:on
+	stz	|CreditOn
+	lda	|SoundHold
+	beq	:out
+	stz	|SoundHold
+	bra	:out
+:on	lda	|CreditOn
+	bne	:busy
+	lda	#1
+	sta	|CreditOn
+	lda	>G_MODE
+	cmp	#MODE_PRESS_START
+	bne	:arm
+	lda	>G_SUB2
+	beq	:arm
+	bra	:play
+:arm	lda	#1
+	sta	|SoundHold
+	stz	|HoldTimer
+	jsr	SoundMute
+	bra	:skip
+:busy	lda	|SoundHold
+	beq	:play
+	cmp	#3
+	beq	:once
+	cmp	#1
+	bne	:skip
+	lda	|FULL_REDRAW
+	beq	:tick
+	lda	#2
+	sta	|SoundHold
+	bra	:skip
+:tick	inc	|HoldTimer
+	lda	|HoldTimer
+	cmp	#8
+	bcc	:skip
+	lda	#3
+	sta	|SoundHold
+	lda	#0
+	sta	>G_EFFCUR
+	bra	:skip
+:once	stz	|SoundHold
+	bra	:skip
+:play	stz	|SoundHold
+:out	plp
+	clc
+	rts
+:skip	plp
+	sec
+	rts
+
+* Called at the end of a full redraw. State 2 means this blit is the
+* one the credit chime was waiting on: restart the effect and skip the
+* stale mirror later this frame.
+ReleaseCoinSound
+	php
+	sep	#$20
+	lda	|SoundHold
+	cmp	#2
+	bne	:no
+	lda	#3
+	sta	|SoundHold
+	stz	|HoldTimer
+	lda	#0
+	sta	>G_EFFCUR
+:no	plp
 	rts
 
 * ApplyDirty, with each cell drawn through its bank.
@@ -972,6 +1094,8 @@ LS_SLOT	equ	$34	; renderer DP is free from $34 to $E9
 LS_CODE	equ	$36
 LS_COLOR	equ	$38
 LS_BASE	equ	$3A
+LS_FR	equ	$3C
+PP	equ	12		; Pac-Man poses follow Ms. Pac's 12 in MsPacBlitTable
 
 LowerSprites
 	php
@@ -1040,7 +1164,7 @@ LowerSprites
 	jsr	ActorTunnelVis
 	sep	#$20
 	lda	>ACTORS+ACT_FLAGS,x
-	and	#$FF-FLAG_POINTS
+	and	#$FF-FLAG_POINTS-FLAG_CHAR
 	sta	>ACTORS+ACT_FLAGS,x
 	lda	<LS_COLOR
 	bne	:vis
@@ -1056,8 +1180,12 @@ LowerSprites
 	rep	#$20
 	rts
 
-* Ghost: walking frames $20-$27 in the ghost's colors, eyes, points, or
-* frightened ($1C-$1D): color $11 blue, $12 the flash's white.
+* Ghost: walking frames $20-$27, eyes, points, or frightened ($1C-$1D):
+* color $11 blue, $12 the flash's white. Body color follows the sprite
+* color byte ($01/$03/$05/$07), and bits 7/6 mirror the frame, so a
+* cutscene ghost on another slot keeps its own color and facing.
+* Pac-Man and Ms. Pac-Man in the acts use these same slots; their codes
+* publish FLAG_CHAR and a pose in MsPacBlitTable.
 :ghost	ldx	<LS_BASE
 	sep	#$20
 	lda	<LS_CODE
@@ -1065,18 +1193,55 @@ LowerSprites
 	cmp	#$28
 	bcs	:pts
 	cmp	#$1C
-	bcc	:gone
+	bcs	:chkFright
+	jmp	:maybeChar
+:chkFright
 	cmp	#$1E
-	bcc	:blue
+	bcs	:notBlue
+	jmp	:blue
+:notBlue
 	cmp	#$20
-	bcc	:gone
+	bcs	:walk
+	jmp	:gone
+:walk	sec
+	sbc	#$20
+	tay
+	lda	<LS_CODE
+	and	#$C0
+	lsr
+	lsr
+	lsr
+	sta	<LS_FR
+	tya
+	clc
+	adc	<LS_FR
+	tay
+	lda	|:flipTab,y
+	clc
+	adc	#$20
 	sta	>ACTORS+ACT_SPR,x
 	lda	<LS_COLOR
 	cmp	#$19
 	beq	:eyes
+	cmp	#$01
+	beq	:red
+	cmp	#$03
+	beq	:pink
+	cmp	#$05
+	beq	:inky
+	cmp	#$07
+	beq	:clyde
 	lda	<LS_SLOT
 	clc
 	adc	#COL_BLINKY
+	bra	:col
+:red	lda	#COL_BLINKY
+	bra	:col
+:pink	lda	#COL_PINKY
+	bra	:col
+:inky	lda	#COL_INKY
+	bra	:col
+:clyde	lda	#COL_CLYDE
 	bra	:col
 :eyes	lda	#COL_EYES
 	bra	:col
@@ -1092,20 +1257,143 @@ LowerSprites
 	rts
 	mx	%10
 :pts	cmp	#$2C
-	bcs	:gone
+	bcs	:maybeChar
 	sta	>ACTORS+ACT_SPR,x
 	lda	>ACTORS+ACT_FLAGS,x
 	ora	#FLAG_POINTS
 	sta	>ACTORS+ACT_FLAGS,x
 	rep	#$20
 	rts
+	mx	%10
+:maybeChar
+	jsr	:charSpr
+	bcs	:gotChar
+	jmp	:gone
+:gotChar
+	sta	>ACTORS+ACT_SPR,x
+	lda	>ACTORS+ACT_FLAGS,x
+	ora	#FLAG_CHAR
+	sta	>ACTORS+ACT_FLAGS,x
+	rep	#$20
+	rts
+	mx	%10
+* A = index (code & $3F). X preserved. SEC and A = blit pose, or CLC.
+* Bit 7 of LS_CODE is an upright H flip, bit 6 an upright V flip.
+* Pac mouth order is wide, partial, closed. Ms. Pac poses are 0..11.
+:charSpr
+	cmp	#$32
+	beq	:cClosed
+	cmp	#$19
+	beq	:c19
+	cmp	#$1A
+	beq	:c1A
+	cmp	#$1B
+	beq	:c1B
+	cmp	#$2E
+	beq	:c2E
+	cmp	#$2D
+	beq	:c2D
+	cmp	#$2F
+	beq	:c2F
+	cmp	#$37
+	beq	:c37
+	cmp	#$31
+	beq	:c31
+	cmp	#$33
+	beq	:c33
+	cmp	#$34
+	beq	:c34
+	cmp	#$35
+	beq	:c35
+	cmp	#$36
+	bne	:cNo
+	lda	#10			; $36 north, open
+	bra	:cYes
+:c34	lda	#3			; $34 south, closed
+	bra	:cYes
+:c35	lda	#6			; $35 west, closed
+	bra	:cYes
+:cClosed
+	lda	#PP+2			; $32 circle
+	bra	:cYes
+:c19	lda	#PP+1			; $19 east partial; +H west
+	ldy	#PP+7
+	bra	:cH
+:c1B	lda	#PP			; $1B east wide; +H west
+	ldy	#PP+6
+	bra	:cH
+:c1A	lda	#PP+3			; $1A south wide; +V north
+	ldy	#PP+9
+	bra	:cV
+:c2E	lda	#PP+4			; $2E south partial; +V north
+	ldy	#PP+10
+	bra	:cV
+:c2D	lda	#2			; $2D east; +H west
+	ldy	#7
+	bra	:cH
+:c2F	lda	#0			; $2F east; +H west
+	ldy	#8
+	bra	:cH
+:c37	lda	#1			; $37 east closed; +H west closed
+	ldy	#6
+	bra	:cH
+:c31	lda	#4			; $31 south; +HV north
+	ldy	#11
+	bra	:cHV
+:c33	lda	#5			; $33 south; +HV north
+	ldy	#9
+:cHV	bit	<LS_CODE
+	bpl	:cYes
+	bvc	:cYes
+	tya
+	bra	:cYes
+:cH	bit	<LS_CODE
+	bpl	:cYes
+	tya
+	bra	:cYes
+:cV	bit	<LS_CODE
+	bvc	:cYes
+	tya
+:cYes	sec
+	rts
+:cNo	clc
+	rts
 :gone	rep	#$20
 	jmp	:hide
+* frame 0..7 is E0,E1,S0,S1,W0,W1,N0,N1. Groups: none, V, H, HV.
+:flipTab
+	db	0,1,2,3,4,5,6,7
+	db	0,1,6,7,4,5,2,3
+	db	4,5,2,3,0,1,6,7
+	db	4,5,6,7,0,1,2,3
 
 * Ms. Pac-Man: the pose for her direction, closed or one of the open
-* mouths. Codes outside the walk set (death, cutscenes) show closed.
+* mouths. While she is dying, codes $34-$3F are the spin. The ROM
+* stores that as south, west, north, east, repeated, and $3F holds
+* north. An index below $20 is a cutscene prop on her slot (the act
+* clapper); hide it.
 :pac	ldx	<LS_BASE
-	lda	>G_PAC_DIR
+	lda	<LS_CODE
+	and	#$003F
+	cmp	#$0020
+	bcs	:body
+	jmp	:hide
+:body	lda	>G_PAC_DEATH
+	and	#$00FF
+	beq	:dir
+	lda	<LS_CODE
+	and	#$003F
+	cmp	#$34
+	bcc	:dir
+	sec
+	sbc	#$34
+	tay
+	sep	#$20
+	lda	|:spin,y
+	sta	>ACTORS+ACT_SPR,x
+	rep	#$20
+	rts
+:dir	lda	>G_PAC_DIR
 	and	#$0003
 	asl
 	asl
@@ -1148,23 +1436,34 @@ LowerSprites
 	db	3,4,5,0
 	db	6,7,8,0
 	db	10,11,9,0
+* $34-$3F: S W N E, S W N E, S W N, and $3F holds north (poses 3,6,10,1).
+:spin	db	3,6,10,1,3,6,10,1,3,6,10,10
 
-* Fruit: codes $00-$07.
+* Fruit: codes $00-$07. Eat-fruit score is fruit_points+2 → $08-$0F
+* (100/200/500/700/1000/2000/5000); FLAG_POINTS selects those blits.
 :fruit	ldx	<LS_BASE
 	sep	#$20
 	lda	<LS_CODE
 	and	#$3F
 	cmp	#8
+	bcc	:fok
+	cmp	#$10
 	bcs	:fgone
 	sta	>ACTORS+ACT_SPR,x
+	lda	>ACTORS+ACT_FLAGS,x
+	ora	#FLAG_POINTS
+	sta	>ACTORS+ACT_FLAGS,x
+	rep	#$20
+	rts
+:fok	sta	>ACTORS+ACT_SPR,x
 	rep	#$20
 	rts
 :fgone	rep	#$20
 	jmp	:hide
 
 *------------------------------------------------------------------
-* Side HUD: player 1's score, the high score, lives and level, redrawn
-* when they change.
+* Side HUD: player 1's score, the high score, lives, level and credits,
+* redrawn when they change.
 *------------------------------------------------------------------
 LowerHud
 	php
@@ -1219,7 +1518,7 @@ LowerHud
 	sep	#$30
 :level	lda	>G_LEVEL
 	cmp	|SH_HUD+7
-	beq	:done
+	beq	:credit
 	sta	|SH_HUD+7
 	sta	>LEVEL
 	rep	#$30
@@ -1232,6 +1531,15 @@ LowerHud
 	ldy	#FRUIT_ROW_WIDE*SPR_CELL_W
 	jsr	ClearHud
 	jsr	DrawFruitRow
+	sep	#$30
+* show_credits writes the bottom chrome, which LowerTiles drops.
+:credit	lda	>G_CREDITS
+	cmp	|SH_HUD+8
+	beq	:done
+	sta	|SH_HUD+8
+	sta	>CREDITS
+	rep	#$30
+	jsr	DrawCredits
 :done	plp
 	rts
 
@@ -1325,7 +1633,13 @@ ClearHud
 * Adapter state, read with absolute addressing in the program bank.
 LowerDP	dw	0	; lower.bin's direct page, bank $00
 FULL_REDRAW	dw	0	; redraw every cell next pass
-SH_HUD	ds	16	; score1 x3, hiscore x3, lives, level
+* Credit chime vs the push-start blit. 0 play. 1 mute until a full
+* redraw is requested. 2 mute until that redraw is applied. 3 skip the
+* stale voice-register mirror on the release frame.
+SoundHold	db	0
+CreditOn	db	0	; effect channel 1's credit bit has been seen
+HoldTimer	db	0
+SH_HUD	ds	16	; score1 x3, hiscore x3, lives, level, credits
 SH_TILE	ds	$400	; last tile codes seen, 896 used
 SH_COLOR	ds	$400	; last colors seen
 MazeBank	dw	$FFFF	; LowerMazeBank: this level's maze bank (none yet)
