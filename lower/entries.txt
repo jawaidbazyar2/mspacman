@@ -1,0 +1,229 @@
+# Phase 3 entry manifest. py/gen_lower_entries.py turns this into
+# lower/entries.s and lower/host/entries.h.
+#
+# [file] groups name the .c / .s pair. Each line:  name result params...
+# result: v void, b byte/bool, w word, c Coord
+# params: B Board*, R WorkRam* (neither passed), b byte, w word,
+#         c Coord, p pointer into Board.mem
+
+[selftest]
+st_add      b  b b
+st_bcd      b  b b
+st_store16  v  w w
+st_load16   w  w
+
+[board]
+lift_random_byte  b  B
+
+[rng]
+rom_random  b  B
+
+[actor]
+dir_step  c  B b
+coord_add  c  c c
+coord_eq  b  c c
+coord_word  w  c
+word_coord  c  w
+pos_to_tile  c  c
+tile_cell  w  c
+tile_at  b  B c
+color_at  b  B c
+is_wall  b  b
+tunnel_wrap  b  R b
+speed_tick  b  p
+
+[task]
+queue_task  v  B b b
+task_next_level_state  v  B b
+
+[difficulty]
+load_difficulty  v  B b
+update_elroy  v  B
+
+[siren]
+siren_update  v  B
+
+[draw]
+draw_block  v  B w b
+draw_icon  v  B w b
+draw_fruit_row  v  B
+draw_message  v  B b
+draw_tile_list  v  B w
+text_task  v  B b
+
+[hud]
+draw_1up  v  B
+draw_2up  v  B
+clear_label  v  B w
+update_lamps  v  B b
+hud_blink  v  B
+
+[score]
+draw_score  v  B w p b
+draw_player_score  v  B R
+draw_lives  v  B b
+award_life  v  B R p
+add_score  v  B b
+draw_lives_row  v  B
+draw_bonus_digits  v  B
+read_dip_switches  v  B
+draw_scores  v  B
+show_credits  v  B
+
+[attract]
+draw_midway_logo  v  B
+marquee_bulbs  v  B
+show_card  v  B b
+open_marquee  v  B
+attract_step  v  B
+
+[maze]
+maze_word  w  B w
+power_pill_cell  w  B b
+flash_power_pills  v  B
+pill_bitmap=pill_bitmap_task  v  B
+reset_pills  v  B
+draw_pills  v  B
+erase_pills  v  B
+clear_colors  v  B
+clear_screen  v  B b
+draw_maze  v  B
+wall_color  b  B b
+maze_colors  v  B b
+demo_mode  v  B
+clear_actors  v  B
+house_timer  v  B b
+place_actors  v  B b
+
+[coin]
+add_coin  v  B
+coin_meter  v  B
+coin_inputs  v  B
+
+[clock]
+clock_tick  v  B
+advance_level_state  v  B
+advance_play_state  v  B
+advance_attract_state  v  B
+advance_eaten_ghost_anim  v  B
+clear_ready  v  B
+advance_cutscene1  v  B
+advance_cutscene2  v  B
+advance_cutscene3  v  B
+timers_run  v  B
+queue_timed  b  B b b b
+
+[fruit]
+clear_fruit  v  B
+clear_fruit_pos  v  B
+choose_path  w  B w
+release_fruit  v  B
+next_bounce  v  B b
+end_of_path  v  B
+move_fruit  v  B
+
+[target]
+best_dir  b  B c c b
+random_dir  b  B c b
+random_corner  c  B
+aim_red  v  B
+aim_pink  v  B
+aim_blue  v  B
+aim_orange  v  B
+demo_steer  v  B
+
+[fright]
+color_eyes  v  B
+start_fright  v  B
+fright_countdown  v  B
+flash_ghosts  v  B
+ghost_hit  v  B b
+tile_collision  v  B
+pixel_collision  v  B
+show_eaten_ghost  v  B
+
+[ghost]
+move_ghosts  v  B
+return_all_eyes  v  B
+mark_eaten_ghost  v  B
+move_in_house  v  B
+release_by_pills  v  B
+count_house_pill  v  B
+release_idle_ghost  v  B
+ghost_anim_tick  v  B
+reversal_timer  v  B
+
+[pac]
+wall_ahead  b  B c
+eat_pill  v  B
+arrive  v  B c
+pac_step  v  B
+adopt  v  B b
+try_turn  v  B b
+want  v  B b
+face  v  B b
+demo_move  v  B
+steer  v  B b b
+move_pac  v  B
+clear_actor_positions  v  B
+pac_death  v  B
+
+[sound]
+sound_effects  v  B
+sound_songs  v  B
+
+[cutscene]
+cutscene2_sprites  v  B
+cutscene1_positions  v  B
+cutscene3_sprites  v  B
+cutscene1_sprites  v  B
+load_scripts  v  B b
+run_cutscene  v  B b
+run_act  v  B b
+
+[sprite]
+sprites_upright  v  B
+sprites_cocktail  v  B
+
+[play]
+play_pass  v  B
+play_frame  v  B
+
+[start]
+draw_prompt  v  B R
+begin_game  v  B R
+wait_start  v  B R
+set_up_game  v  B R
+start_play  v  B R
+press_start  v  B
+
+[mode]
+flip_for_player  v  B
+wait_level_state  v  B b
+swap_players  v  B
+new_game  v  B
+opening  v  B
+playing  v  B
+life_lost  v  B
+next_turn  v  B
+game_over  v  B
+get_ready  v  B
+board_clear  v  B
+flash_maze  v  B b
+clear_board  v  B
+intermission  v  B
+next_board  v  B
+level_step  v  B
+power_on  v  B
+attract  v  B
+game_mode_step  v  B
+
+[sched]
+game_start  v  B
+sched_tasks  w  B
+
+[vblank]
+vblank  v  B
+
+[conly]
+c_only_frame  v  B

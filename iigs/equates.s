@@ -113,7 +113,7 @@ COL_CLYDE      equ 11		; orange
 COL_EYES       equ 0		; ghost blit slot 4 — body→transparent (eyes only)
 COL_POWER      equ 14		; energizer fade (palette poke only)
 BODY_PEN       equ 6		; marker in sprite assets
-COL_DIGIT      equ 13		; yellow ink for HUD glyphs (tile art is pen 3)
+COL_DIGIT      equ 1		; white ink for HUD glyphs (arcade bank #0F pen 3)
 
 * Side HUD — the 76px gutters either side of the 168px playfield (§1 design).
 * Glyphs are 6×6 tiles blitted at absolute screen XY (SHR only: sprites never

@@ -16,6 +16,8 @@ Port arcade Ms. Pac-Man to the **Apple IIgs**.
 |------|------|
 | `mspac.asm` | **LOCKED** — read-only master annotated disassembly (Scott Lawrence listing). Documentation + commentary ground truth. |
 | `src/mspac.asm` | **LOCKED** — verified assemblable Z80 working source (real instructions + author comments). |
+| `lift/` | **LOCKED** — phase 1 Z80 host. |
+| `idiom/` | **LOCKED** — phase 2.5 idiomatic C, the reference for phase 3. Phase 3 edits the copy in `lower/`. |
 | `boot1` … `boot6` | **LOCKED** — golden `mspacmab` CPU ROMs (byte truth). |
 | Other golden ROM binaries | **LOCKED** unless explicitly requested. |
 
@@ -106,7 +108,9 @@ Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system
 | `mspac.asm`, `src/mspac.asm` | **LOCKED** — reference only for IIgs work |
 | `src/ram.inc` | Generated RAM/I/O symbols; treat as Z80-side support (avoid drive-by edits) |
 | `docs/IIgs-Design.md` | IIgs display / render / input decisions |
-| `idiom/` | Idiomatic C game logic, no Z80 core (phase 2.5 of `docs/MsPacManLift.md`). Gate: `make idiom-check` replays `corpus/c-*` clean; `make idiom-cov` for coverage. Phase 3 lowers this tree |
+| `lift/` | **LOCKED** — phase 1 Z80 host. Read-only |
+| `idiom/` | **LOCKED** — idiomatic C game logic, no Z80 core (phase 2.5 of `docs/MsPacManLift.md`). Read-only reference. `make idiom-check` replays `corpus/c-*` clean and must keep doing so; `make idiom-cov` for coverage |
+| `lower/` | Phase 3 working tree. Starts as a copy of `idiom/`; the `.c` files get entry hooks only, and each game-logic `.c` gets a Merlin32 `.s` twin. The `mspac-lower` harness (GSSquared 65816 core only) is in `lower/host/`. Gates: `make lower-check` (shadow comparison of every hooked function), `make lower-only-check` (65816 only, plus the cycle report), and `make lower-iigs-check` (the IIgs build under GSSquared). `make iigs-lower` builds the IIgs images (`iigs/lower_host.s`, `iigs/lower_io.s`, `iigs/all_lower.s`). `make iigs-lower-demo` plays it. `make iigs-lower-gsos` builds the GS/OS application `build/iigs/MSPACLOW.SYS16` on its own 800K disk, `build/iigs/MsPacLower.2mg`. With `IIGS_LOWER_GSOS_INSTALL=1` it is also copied onto `IIGS_GSOS_DISK`. See phases 3 and 4 of `docs/MsPacManLift.md` |
 | New IIgs code | New paths (e.g. under `iigs/` or as agreed) — do not overwrite locked Z80 artifacts |
 
 ## Python helpers (`py/`)
@@ -136,12 +140,19 @@ Prefer invoking the **local** binary (`sjasmplus/build/sjasmplus`), not a system
   - `py/verify_boots.py` — compare `build/mspac.bin` slices to `boot1`–`boot6`
   - `py/gen_shr_gfx.py` — scale `5e`/`5f` → IIgs 6×6 tiles / 14×12 sprites (+ optional PPM previews)
   - `py/preview_tiles_8x8.py` — native 8×8 maze/tile PPM+PNG to check rotate/flip before scale
-  - `py/gen_palette.py` — arcade PROMs → SHR palette 0 + `iigs/palette_data.s`
+  - `py/gen_palette.py` — arcade PROMs → SHR palette 0 + `iigs/palette_data.s` (pen roles and the stable color map: `docs/ColorMap.md`)
+ - `py/gen_tile_banks.py [--list]` — arcade color RAM banks → `iigs/tile_bank_data.s` (`TileBankPens` / `TileBankRaw`) for the lowered build's per-cell tile recolor (part of `make palette`)
   - `py/gen_maze1.py` — level-1 upright 28×31 tilemap + stitched 6×6 cells
-  - `py/gen_idiom_ram.py` — generates `idiom/ram.h` / `idiom/ram.c` (packed `WorkRam` overlay with offset asserts, field names for corpus diffs)
+  - `py/gen_idiom_ram.py` — generated `idiom/ram.h` / `idiom/ram.c` (packed `WorkRam` overlay with offset asserts, field names for corpus diffs). `idiom/` is locked: do not run it against `idiom/` again; phase 3 points it at `lower/`
   - `py/frame_overruns.py` — list corpus frames whose record did not end in the idle spin
   - `py/scan_sound_tables.py` — decode the ROM's effect, song and cutscene sound tables (which envelope types and song commands are reachable)
-  - `py/gs2_*.py` / `py/check_frame_count.py` — Makefile/CI only (`make iigs-test`, `make iigs-demo`). **Do not** use these (or `gs2debug` / `PYTHONPATH`) for live debugging.
+  - `py/gen_lower_entries.py` — `lower/entries.txt` → `lower/entries.s`, `lower/entry_ids.s`, `lower/host/entries.h` (run by `make lower`)
+  - `py/add_hooks.py FILE [--skip F1,F2]` — add `LOWER_HOOK` lines to `lower/FILE.c` (bare name, not a path) and its manifest group
+  - `py/lower_diff.py` — `lower/*.c` may differ from `idiom/*.c` only by hooks (part of `make lower-check`)
+  - `py/lower_cycles.py` — per-session cycle summary of `build/lower/frame_cycles.txt` (part of `make lower-only-check`)
+  - `py/omf_dump.py FILE [--relocs]` — list an OMF load file's segments (kind, length, bank size, ALIGN) and relocation records
+  - `py/omf_fix_align.py FILE Seg=0x10000` — set a segment's ALIGN field; Merlin32 writes 2 for `ali BANK` (part of `make iigs-lower-gsos`)
+  - `py/gs2_*.py` / `py/check_frame_count.py` — Makefile/CI only (`make iigs-test`, `make iigs-demo`, `make lower-iigs-check`, `make iigs-lower-demo`). **Do not** use these (or `gs2debug` / `PYTHONPATH`) for live debugging. One exception: `py/gs2_lower_check.py --play --detach` loads the lowered build (about 90 KB, too much for MCP `write_mem`) and exits with the emulator still running. Then attach the MCP with `connect` to `/tmp/gs2-mspacman-lower.sock`. The emulator takes one debug client at a time, so `--snap` (PNG of a running emulator) works only while the MCP is not attached.
 
 ## GSSquared live debug (MCP)
 
@@ -159,6 +170,10 @@ Addresses: [`iigs/mem_static.s`](iigs/mem_static.s). Binaries from `make gfx maz
 4. `write_mem` inject: harness `0x020000`, tiles `0x030000`, sprites `0x031200`, masks `0x032700`, odd sprites `0x033C00`, odd masks `0x035100`, maze `0x036600`, cells `0x037000`.
 5. Trampoline at `0x000300`: `18 FB 5C 00 00 02` (`CLC` / `XCE` / `JML $020000`).
 6. `continue_exec`, then `type_text` `"CALL 768\n"` with `delay_s` ~0.25 (GS2 drops keys if typed too fast after reset).
+
+### Booting a GS/OS disk
+
+Mount disk images on slot 7, drive 1, which is faster than the slot 5 3.5" drive: `launch` with `extra_args` `["-ds7d1=/abs/path/disk.2mg"]`. A GS/OS volume with no `System:Start` boots straight into the first S16 application in its root. To test `MSPACLOW.SYS16` that way, copy `IIGS_GSOS_DISK` into `build/`, swap the application in with `cp2`, and boot the copy. Do not modify the original disk.
 
 ### Peek while running
 
@@ -180,7 +195,7 @@ Makefile PNG dump (`make iigs-test`) still uses `py/gs2_render_test.py` under th
 
 ## Working conventions for agents
 
-1. **Never modify** locked `mspac.asm`, `src/mspac.asm`, `boot1`–`boot6`, or other golden ROM binaries unless the user explicitly requests it.
+1. **Never modify** locked `mspac.asm`, `src/mspac.asm`, `boot1`–`boot6`, other golden ROM binaries, `lift/`, or `idiom/` unless the user explicitly requests it.
 2. IIgs port code, tools, and docs go in new or agreed paths — do not overwrite locked Z80 artifacts. Prefer `docs/` for design, `py/` for helpers, and a dedicated IIgs tree for 65816 work.
 3. **Save Python helpers to `py/` before running them** (see above).
 4. Z80 verification (when touching unlocked Z80): assemble → mapped image → byte-compare to `boot1`–`boot6` (`make verify` / `py/verify_boots.py`).

@@ -39,15 +39,15 @@ MP00_E
 	rep	#$20
 	lda	$2143,y
 	and	#$0F00
-	ora	#$D05D
+	ora	#$D03D
 	sta	$2143,y
-	lda	#$5D55
+	lda	#$3D33
 	sta	$21E2,y
-	lda	#$5D55
+	lda	#$3D33
 	sta	$2281,y
 	lda	$2322,y
 	and	#$0F0F
-	ora	#$F050
+	ora	#$F030
 	sta	$2322,y
 	lda	$23C2,y
 	and	#$0F00
@@ -61,7 +61,7 @@ MP00_E
 	sta	$2502,y
 	lda	$25A3,y
 	and	#$0F00
-	ora	#$50DD
+	ora	#$30DD
 	sta	$25A3,y
 	lda	$2643,y
 	and	#$0F00
@@ -70,19 +70,19 @@ MP00_E
 	sep	#$20
 	lda	$20A2,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$20A2,y
 	lda	$2142,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2142,y
 	lda	$21E4,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$21E4,y
 	lda	$2321,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2321,y
 	lda	$23C1,y
 	and	#$F0
@@ -102,17 +102,17 @@ MP00_E
 MP00_O
 	php
 	rep	#$20
-	lda	#$DD55
+	lda	#$DD33
 	sta	$2143,y
-	lda	#$D555
+	lda	#$D333
 	sta	$21E3,y
 	lda	$2282,y
 	and	#$0F00
-	ora	#$D055
+	ora	#$D033
 	sta	$2282,y
 	lda	$2322,y
 	and	#$F000
-	ora	#$0F55
+	ora	#$0F33
 	sta	$2322,y
 	lda	#$DDDD
 	sta	$23C2,y
@@ -124,7 +124,7 @@ MP00_O
 	and	#$0F00
 	ora	#$D0DD
 	sta	$2503,y
-	lda	#$D5DD
+	lda	#$D3DD
 	sta	$25A3,y
 	lda	$2643,y
 	and	#$00F0
@@ -133,15 +133,15 @@ MP00_O
 	sep	#$20
 	lda	$20A3,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$20A3,y
 	lda	$21E2,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$21E2,y
 	lda	$2281,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2281,y
 	lda	$2502,y
 	and	#$F0
@@ -155,17 +155,17 @@ MP01_E
 	rep	#$20
 	lda	$2143,y
 	and	#$0F00
-	ora	#$D05D
+	ora	#$D03D
 	sta	$2143,y
-	lda	#$DD5D
+	lda	#$DD3D
 	sta	$21E3,y
-	lda	#$5D55
+	lda	#$3D33
 	sta	$2281,y
-	lda	#$D5DD
+	lda	#$D3DD
 	sta	$2283,y
 	lda	$2322,y
 	and	#$F000
-	ora	#$0D5D
+	ora	#$0D3D
 	sta	$2322,y
 	lda	$23C2,y
 	and	#$0F00
@@ -190,21 +190,21 @@ MP01_E
 	sep	#$20
 	lda	$20A2,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$20A2,y
 	lda	$2142,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2142,y
-	lda	#$55
+	lda	#$33
 	sta	$21E2,y
 	lda	$2285,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$2285,y
 	lda	$2321,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2321,y
 	lda	$23C1,y
 	and	#$F0
@@ -222,19 +222,19 @@ MP01_E
 MP01_O
 	php
 	rep	#$20
-	lda	#$DD55
+	lda	#$DD33
 	sta	$2143,y
 	lda	$21E2,y
 	and	#$00F0
-	ora	#$5505
+	ora	#$3303
 	sta	$21E2,y
 	lda	$21E4,y
 	and	#$0F00
 	ora	#$D0DD
 	sta	$21E4,y
-	lda	#$DD55
+	lda	#$DD33
 	sta	$2282,y
-	lda	#$55DD
+	lda	#$33DD
 	sta	$2284,y
 	lda	$2323,y
 	and	#$0F0F
@@ -261,13 +261,13 @@ MP01_O
 	sep	#$20
 	lda	$20A3,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$20A3,y
 	lda	$2281,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2281,y
-	lda	#$55
+	lda	#$33
 	sta	$2322,y
 	lda	#$DD
 	sta	$2462,y
@@ -283,17 +283,17 @@ MP02_E
 	rep	#$20
 	lda	$2143,y
 	and	#$0F00
-	ora	#$D05D
+	ora	#$D03D
 	sta	$2143,y
-	lda	#$DD5D
+	lda	#$DD3D
 	sta	$21E3,y
-	lda	#$5D55
+	lda	#$3D33
 	sta	$2281,y
 	lda	#$DDDD
 	sta	$2283,y
 	lda	$2322,y
 	and	#$F00F
-	ora	#$0D50
+	ora	#$0D30
 	sta	$2322,y
 	lda	#$DDDD
 	sta	$2324,y
@@ -305,7 +305,7 @@ MP02_E
 	sta	$23C3,y
 	lda	$23C5,y
 	and	#$0F00
-	ora	#$50DD
+	ora	#$30DD
 	sta	$23C5,y
 	lda	$2461,y
 	and	#$0FF0
@@ -328,13 +328,13 @@ MP02_E
 	sep	#$20
 	lda	$20A2,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$20A2,y
 	lda	$2142,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2142,y
-	lda	#$55
+	lda	#$33
 	sta	$21E2,y
 	lda	$2285,y
 	and	#$0F
@@ -342,7 +342,7 @@ MP02_E
 	sta	$2285,y
 	lda	$2321,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2321,y
 	lda	#$DD
 	sta	$2463,y
@@ -356,17 +356,17 @@ MP02_E
 MP02_O
 	php
 	rep	#$20
-	lda	#$DD55
+	lda	#$DD33
 	sta	$2143,y
 	lda	$21E2,y
 	and	#$00F0
-	ora	#$5505
+	ora	#$3303
 	sta	$21E2,y
 	lda	$21E4,y
 	and	#$0F00
 	ora	#$D0DD
 	sta	$21E4,y
-	lda	#$DD55
+	lda	#$DD33
 	sta	$2282,y
 	lda	#$DDDD
 	sta	$2284,y
@@ -374,7 +374,7 @@ MP02_O
 	sta	$2324,y
 	lda	#$DDDD
 	sta	$23C3,y
-	lda	#$D5DD
+	lda	#$D3DD
 	sta	$23C5,y
 	lda	$2462,y
 	and	#$F000
@@ -397,13 +397,13 @@ MP02_O
 	sep	#$20
 	lda	$20A3,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$20A3,y
 	lda	$2281,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2281,y
-	lda	#$55
+	lda	#$33
 	sta	$2322,y
 	lda	$2326,y
 	and	#$0F
@@ -427,21 +427,21 @@ MP10_E
 	rep	#$20
 	lda	$2143,y
 	and	#$0F00
-	ora	#$50D5
+	ora	#$30D3
 	sta	$2143,y
-	lda	#$55D5
+	lda	#$33D3
 	sta	$21E3,y
 	lda	$2281,y
 	and	#$0FF0
 	ora	#$D00D
 	sta	$2281,y
-	lda	#$55D5
+	lda	#$33D3
 	sta	$2284,y
 	lda	#$DDDD
 	sta	$2321,y
 	lda	$2324,y
 	and	#$0F00
-	ora	#$50D5
+	ora	#$30D3
 	sta	$2324,y
 	lda	#$DDDD
 	sta	$23C1,y
@@ -464,7 +464,7 @@ MP10_E
 	sep	#$20
 	lda	$20A4,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$20A4,y
 	lda	$2142,y
 	and	#$F0
@@ -482,7 +482,7 @@ MP10_E
 	and	#$F0
 	ora	#$0D
 	sta	$23C3,y
-	lda	#$5D
+	lda	#$3D
 	sta	$2504,y
 	lda	$25A2,y
 	and	#$0F
@@ -490,7 +490,7 @@ MP10_E
 	sta	$25A2,y
 	lda	$25A4,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$25A4,y
 	plp
 	rts
@@ -498,7 +498,7 @@ MP10_E
 MP10_O
 	php
 	rep	#$20
-	lda	#$55DD
+	lda	#$33DD
 	sta	$2143,y
 	lda	$21E2,y
 	and	#$00F0
@@ -506,19 +506,19 @@ MP10_O
 	sta	$21E2,y
 	lda	$21E4,y
 	and	#$0F00
-	ora	#$5055
+	ora	#$3033
 	sta	$21E4,y
 	lda	$2282,y
 	and	#$F000
 	ora	#$0DDD
 	sta	$2282,y
-	lda	#$55DD
+	lda	#$33DD
 	sta	$2284,y
 	lda	#$DDDD
 	sta	$2322,y
 	lda	$2324,y
 	and	#$00F0
-	ora	#$550D
+	ora	#$330D
 	sta	$2324,y
 	lda	$23C2,y
 	and	#$0F00
@@ -536,16 +536,16 @@ MP10_O
 	sta	$2464,y
 	lda	$2504,y
 	and	#$0FF0
-	ora	#$D005
+	ora	#$D003
 	sta	$2504,y
 	sep	#$20
 	lda	$20A4,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$20A4,y
 	lda	$2286,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$2286,y
 	lda	$2321,y
 	and	#$F0
@@ -563,7 +563,7 @@ MP10_O
 	sta	$25A2,y
 	lda	$25A4,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$25A4,y
 	plp
 	rts
@@ -573,21 +573,21 @@ MP11_E
 	rep	#$20
 	lda	$2143,y
 	and	#$0F00
-	ora	#$50D5
+	ora	#$30D3
 	sta	$2143,y
-	lda	#$55D5
+	lda	#$33D3
 	sta	$21E3,y
 	lda	$2282,y
 	and	#$0F0F
 	ora	#$D0D0
 	sta	$2282,y
-	lda	#$55D5
+	lda	#$33D3
 	sta	$2284,y
 	lda	#$DDDD
 	sta	$2321,y
 	lda	$2324,y
 	and	#$0F00
-	ora	#$50D5
+	ora	#$30D3
 	sta	$2324,y
 	lda	#$DDDD
 	sta	$23C1,y
@@ -614,7 +614,7 @@ MP11_E
 	sep	#$20
 	lda	$20A4,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$20A4,y
 	lda	$2142,y
 	and	#$F0
@@ -644,7 +644,7 @@ MP11_E
 	sta	$25A4,y
 	lda	$26E3,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$26E3,y
 	plp
 	rts
@@ -652,7 +652,7 @@ MP11_E
 MP11_O
 	php
 	rep	#$20
-	lda	#$55DD
+	lda	#$33DD
 	sta	$2143,y
 	lda	$21E2,y
 	and	#$00F0
@@ -660,7 +660,7 @@ MP11_O
 	sta	$21E2,y
 	lda	$21E4,y
 	and	#$0F00
-	ora	#$5055
+	ora	#$3033
 	sta	$21E4,y
 	lda	$2283,y
 	and	#$F0F0
@@ -668,13 +668,13 @@ MP11_O
 	sta	$2283,y
 	lda	$2285,y
 	and	#$0F00
-	ora	#$5055
+	ora	#$3033
 	sta	$2285,y
 	lda	#$DDDD
 	sta	$2322,y
 	lda	$2324,y
 	and	#$00F0
-	ora	#$550D
+	ora	#$330D
 	sta	$2324,y
 	lda	#$DDDD
 	sta	$23C2,y
@@ -699,7 +699,7 @@ MP11_O
 	sep	#$20
 	lda	$20A4,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$20A4,y
 	lda	#$DD
 	sta	$2282,y
@@ -717,7 +717,7 @@ MP11_O
 	sta	$25A2,y
 	lda	$26E3,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$26E3,y
 	plp
 	rts
@@ -727,21 +727,21 @@ MP12_E
 	rep	#$20
 	lda	$2143,y
 	and	#$0F00
-	ora	#$50D5
+	ora	#$30D3
 	sta	$2143,y
-	lda	#$55D5
+	lda	#$33D3
 	sta	$21E3,y
 	lda	$2282,y
 	and	#$0F0F
 	ora	#$D0D0
 	sta	$2282,y
-	lda	#$55D5
+	lda	#$33D3
 	sta	$2284,y
 	lda	#$DFDD
 	sta	$2322,y
 	lda	$2324,y
 	and	#$0FF0
-	ora	#$5005
+	ora	#$3003
 	sta	$2324,y
 	lda	$23C1,y
 	and	#$0F00
@@ -753,12 +753,12 @@ MP12_E
 	sta	$23C4,y
 	lda	$2464,y
 	and	#$0FF0
-	ora	#$D005
+	ora	#$D003
 	sta	$2464,y
 	sep	#$20
 	lda	$20A4,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$20A4,y
 	lda	$2142,y
 	and	#$F0
@@ -772,7 +772,7 @@ MP12_E
 	sta	$2281,y
 	lda	#$DD
 	sta	$2321,y
-	lda	#$D5
+	lda	#$D3
 	sta	$2461,y
 	plp
 	rts
@@ -780,7 +780,7 @@ MP12_E
 MP12_O
 	php
 	rep	#$20
-	lda	#$55DD
+	lda	#$33DD
 	sta	$2143,y
 	lda	$21E2,y
 	and	#$00F0
@@ -788,7 +788,7 @@ MP12_O
 	sta	$21E2,y
 	lda	$21E4,y
 	and	#$0F00
-	ora	#$5055
+	ora	#$3033
 	sta	$21E4,y
 	lda	$2283,y
 	and	#$F0F0
@@ -796,13 +796,13 @@ MP12_O
 	sta	$2283,y
 	lda	$2285,y
 	and	#$0F00
-	ora	#$5055
+	ora	#$3033
 	sta	$2285,y
 	lda	#$DDDD
 	sta	$2322,y
 	lda	$2324,y
 	and	#$000F
-	ora	#$55F0
+	ora	#$33F0
 	sta	$2324,y
 	lda	$23C1,y
 	and	#$00F0
@@ -810,12 +810,12 @@ MP12_O
 	sta	$23C1,y
 	lda	$2461,y
 	and	#$0FF0
-	ora	#$500D
+	ora	#$300D
 	sta	$2461,y
 	sep	#$20
 	lda	$20A4,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$20A4,y
 	lda	#$DD
 	sta	$2282,y
@@ -825,7 +825,7 @@ MP12_O
 	sta	$2321,y
 	lda	#$DD
 	sta	$23C5,y
-	lda	#$5D
+	lda	#$3D
 	sta	$2465,y
 	plp
 	rts
@@ -835,17 +835,17 @@ MP20_E
 	rep	#$20
 	lda	$2143,y
 	and	#$0F00
-	ora	#$50D5
+	ora	#$30D3
 	sta	$2143,y
-	lda	#$55D5
+	lda	#$33D3
 	sta	$21E3,y
-	lda	#$DD5D
+	lda	#$DD3D
 	sta	$2282,y
-	lda	#$55D5
+	lda	#$33D3
 	sta	$2284,y
 	lda	$2324,y
 	and	#$0F00
-	ora	#$50D5
+	ora	#$30D3
 	sta	$2324,y
 	lda	$23C4,y
 	and	#$0F00
@@ -870,7 +870,7 @@ MP20_E
 	sep	#$20
 	lda	$20A4,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$20A4,y
 	lda	$2142,y
 	and	#$F0
@@ -880,7 +880,7 @@ MP20_E
 	sta	$21E2,y
 	lda	$2281,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2281,y
 	lda	$2323,y
 	and	#$0F
@@ -902,7 +902,7 @@ MP20_E
 MP20_O
 	php
 	rep	#$20
-	lda	#$55DD
+	lda	#$33DD
 	sta	$2143,y
 	lda	$21E2,y
 	and	#$00F0
@@ -910,11 +910,11 @@ MP20_O
 	sta	$21E2,y
 	lda	$21E4,y
 	and	#$0F00
-	ora	#$5055
+	ora	#$3033
 	sta	$21E4,y
-	lda	#$DD55
+	lda	#$DD33
 	sta	$2282,y
-	lda	#$55DD
+	lda	#$33DD
 	sta	$2284,y
 	lda	$2323,y
 	and	#$F0F0
@@ -941,13 +941,13 @@ MP20_O
 	sep	#$20
 	lda	$20A4,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$20A4,y
 	lda	$2286,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$2286,y
-	lda	#$55
+	lda	#$33
 	sta	$2325,y
 	lda	#$DD
 	sta	$2465,y
@@ -963,23 +963,23 @@ MP21_E
 	rep	#$20
 	lda	$2143,y
 	and	#$0F00
-	ora	#$50D5
+	ora	#$30D3
 	sta	$2143,y
-	lda	#$55D5
+	lda	#$33D3
 	sta	$21E3,y
 	lda	#$DDDD
 	sta	$2282,y
-	lda	#$55D5
+	lda	#$33D3
 	sta	$2284,y
 	lda	#$DDDD
 	sta	$2321,y
 	lda	$2324,y
 	and	#$0FF0
-	ora	#$5005
+	ora	#$3003
 	sta	$2324,y
 	lda	$23C0,y
 	and	#$00F0
-	ora	#$DD05
+	ora	#$DD03
 	sta	$23C0,y
 	lda	#$DDDD
 	sta	$23C2,y
@@ -1008,7 +1008,7 @@ MP21_E
 	sep	#$20
 	lda	$20A4,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$20A4,y
 	lda	$2142,y
 	and	#$F0
@@ -1036,7 +1036,7 @@ MP21_E
 MP21_O
 	php
 	rep	#$20
-	lda	#$55DD
+	lda	#$33DD
 	sta	$2143,y
 	lda	$21E2,y
 	and	#$00F0
@@ -1044,11 +1044,11 @@ MP21_O
 	sta	$21E2,y
 	lda	$21E4,y
 	and	#$0F00
-	ora	#$5055
+	ora	#$3033
 	sta	$21E4,y
 	lda	#$DDDD
 	sta	$2282,y
-	lda	#$55DD
+	lda	#$33DD
 	sta	$2284,y
 	lda	#$DDDD
 	sta	$2322,y
@@ -1077,19 +1077,19 @@ MP21_O
 	sep	#$20
 	lda	$20A4,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$20A4,y
 	lda	$2286,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$2286,y
 	lda	$2321,y
 	and	#$F0
 	ora	#$0D
 	sta	$2321,y
-	lda	#$55
+	lda	#$33
 	sta	$2325,y
-	lda	#$5D
+	lda	#$3D
 	sta	$23C1,y
 	lda	$2461,y
 	and	#$F0
@@ -1107,15 +1107,15 @@ MP22_E
 	rep	#$20
 	lda	$2143,y
 	and	#$0F00
-	ora	#$50D5
+	ora	#$30D3
 	sta	$2143,y
-	lda	#$55D5
+	lda	#$33D3
 	sta	$21E3,y
-	lda	#$55D5
+	lda	#$33D3
 	sta	$2284,y
 	lda	$2324,y
 	and	#$0FF0
-	ora	#$5005
+	ora	#$3003
 	sta	$2324,y
 	lda	$23C4,y
 	and	#$0F00
@@ -1138,7 +1138,7 @@ MP22_E
 	sep	#$20
 	lda	$20A4,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$20A4,y
 	lda	$2142,y
 	and	#$F0
@@ -1146,7 +1146,7 @@ MP22_E
 	sta	$2142,y
 	lda	$21E2,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$21E2,y
 	lda	$2323,y
 	and	#$F0
@@ -1162,7 +1162,7 @@ MP22_E
 	sta	$2463,y
 	lda	$25A2,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$25A2,y
 	plp
 	rts
@@ -1170,17 +1170,17 @@ MP22_E
 MP22_O
 	php
 	rep	#$20
-	lda	#$55DD
+	lda	#$33DD
 	sta	$2143,y
-	lda	#$555D
+	lda	#$333D
 	sta	$21E3,y
 	lda	$2285,y
 	and	#$0F00
-	ora	#$5055
+	ora	#$3033
 	sta	$2285,y
 	lda	$2324,y
 	and	#$000F
-	ora	#$55F0
+	ora	#$33F0
 	sta	$2324,y
 	lda	#$DDDD
 	sta	$23C4,y
@@ -1192,7 +1192,7 @@ MP22_O
 	and	#$0F00
 	ora	#$D0DD
 	sta	$2504,y
-	lda	#$DD5D
+	lda	#$DD3D
 	sta	$25A3,y
 	lda	$2643,y
 	and	#$0F00
@@ -1201,11 +1201,11 @@ MP22_O
 	sep	#$20
 	lda	$20A4,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$20A4,y
 	lda	$21E5,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$21E5,y
 	lda	$2284,y
 	and	#$F0
@@ -1223,7 +1223,7 @@ MP30_E
 	rep	#$20
 	lda	$2281,y
 	and	#$0FF0
-	ora	#$500D
+	ora	#$300D
 	sta	$2281,y
 	lda	$2321,y
 	and	#$0FF0
@@ -1235,24 +1235,24 @@ MP30_E
 	sta	$2324,y
 	lda	$23C1,y
 	and	#$0FF0
-	ora	#$5005
+	ora	#$3003
 	sta	$23C1,y
 	lda	#$DDDD
 	sta	$23C4,y
-	lda	#$5D55
+	lda	#$3D33
 	sta	$2461,y
 	lda	$2464,y
 	and	#$0FF0
 	ora	#$D00D
 	sta	$2464,y
-	lda	#$DD5D
+	lda	#$DD3D
 	sta	$2503,y
 	lda	$25A3,y
 	and	#$0F00
-	ora	#$D05D
+	ora	#$D03D
 	sta	$25A3,y
 	sep	#$20
-	lda	#$5D
+	lda	#$3D
 	sta	$2285,y
 	lda	#$FD
 	sta	$23C3,y
@@ -1260,15 +1260,15 @@ MP30_E
 	and	#$F0
 	ora	#$0D
 	sta	$2463,y
-	lda	#$55
+	lda	#$33
 	sta	$2502,y
 	lda	$25A2,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$25A2,y
 	lda	$2642,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2642,y
 	plp
 	rts
@@ -1278,7 +1278,7 @@ MP30_O
 	rep	#$20
 	lda	$2285,y
 	and	#$0FF0
-	ora	#$D005
+	ora	#$D003
 	sta	$2285,y
 	lda	$2325,y
 	and	#$0F00
@@ -1286,13 +1286,13 @@ MP30_O
 	sta	$2325,y
 	lda	$23C2,y
 	and	#$F000
-	ora	#$0F55
+	ora	#$0F33
 	sta	$23C2,y
 	lda	#$DDDD
 	sta	$23C4,y
 	lda	$2461,y
 	and	#$00F0
-	ora	#$5505
+	ora	#$3303
 	sta	$2461,y
 	lda	$2463,y
 	and	#$0F0F
@@ -1300,16 +1300,16 @@ MP30_O
 	sta	$2463,y
 	lda	$2502,y
 	and	#$00F0
-	ora	#$5505
+	ora	#$3303
 	sta	$2502,y
 	lda	$2504,y
 	and	#$0F00
 	ora	#$D0DD
 	sta	$2504,y
-	lda	#$DD55
+	lda	#$DD33
 	sta	$25A3,y
 	sep	#$20
-	lda	#$D5
+	lda	#$D3
 	sta	$2282,y
 	lda	#$DD
 	sta	$2322,y
@@ -1321,7 +1321,7 @@ MP30_O
 	sta	$2465,y
 	lda	$2643,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$2643,y
 	plp
 	rts
@@ -1349,32 +1349,32 @@ MP31_E
 	sta	$2324,y
 	lda	$23C2,y
 	and	#$F000
-	ora	#$0D5D
+	ora	#$0D3D
 	sta	$23C2,y
 	lda	#$DDDD
 	sta	$23C4,y
-	lda	#$DD5D
+	lda	#$DD3D
 	sta	$2462,y
 	lda	$2464,y
 	and	#$0FF0
 	ora	#$D00D
 	sta	$2464,y
-	lda	#$DD5D
+	lda	#$DD3D
 	sta	$2503,y
 	lda	$25A3,y
 	and	#$0F00
-	ora	#$D05D
+	ora	#$D03D
 	sta	$25A3,y
 	sep	#$20
 	lda	$2142,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2142,y
 	lda	$2144,y
 	and	#$F0
 	ora	#$0D
 	sta	$2144,y
-	lda	#$D5
+	lda	#$D3
 	sta	$21E2,y
 	lda	$2321,y
 	and	#$F0
@@ -1382,19 +1382,19 @@ MP31_E
 	sta	$2321,y
 	lda	$23C1,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$23C1,y
-	lda	#$55
+	lda	#$33
 	sta	$2461,y
-	lda	#$55
+	lda	#$33
 	sta	$2502,y
 	lda	$25A2,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$25A2,y
 	lda	$2642,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2642,y
 	plp
 	rts
@@ -1404,7 +1404,7 @@ MP31_O
 	rep	#$20
 	lda	$21E2,y
 	and	#$0FF0
-	ora	#$500D
+	ora	#$300D
 	sta	$21E2,y
 	lda	$2282,y
 	and	#$0F00
@@ -1422,11 +1422,11 @@ MP31_O
 	sta	$2325,y
 	lda	$23C2,y
 	and	#$0F00
-	ora	#$D055
+	ora	#$D033
 	sta	$23C2,y
 	lda	#$DDDD
 	sta	$23C4,y
-	lda	#$DD55
+	lda	#$DD33
 	sta	$2462,y
 	lda	$2464,y
 	and	#$000F
@@ -1434,18 +1434,18 @@ MP31_O
 	sta	$2464,y
 	lda	$2502,y
 	and	#$00F0
-	ora	#$5505
+	ora	#$3303
 	sta	$2502,y
 	lda	$2504,y
 	and	#$0F00
 	ora	#$D0DD
 	sta	$2504,y
-	lda	#$DD55
+	lda	#$DD33
 	sta	$25A3,y
 	sep	#$20
 	lda	$2143,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$2143,y
 	lda	$2145,y
 	and	#$0F
@@ -1463,11 +1463,11 @@ MP31_O
 	sta	$23C6,y
 	lda	$2461,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2461,y
 	lda	$2643,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$2643,y
 	plp
 	rts
@@ -1499,26 +1499,26 @@ MP32_E
 	sta	$2324,y
 	lda	$23C2,y
 	and	#$F000
-	ora	#$0D5D
+	ora	#$0D3D
 	sta	$23C2,y
 	lda	#$DDDD
 	sta	$23C4,y
-	lda	#$5D55
+	lda	#$3D33
 	sta	$2461,y
 	lda	$2464,y
 	and	#$0FF0
 	ora	#$D00D
 	sta	$2464,y
-	lda	#$DD5D
+	lda	#$DD3D
 	sta	$2503,y
 	lda	$25A3,y
 	and	#$0F00
-	ora	#$D05D
+	ora	#$D03D
 	sta	$25A3,y
 	sep	#$20
 	lda	$2003,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2003,y
 	lda	$2142,y
 	and	#$F0
@@ -1534,21 +1534,21 @@ MP32_E
 	sta	$2321,y
 	lda	$23C1,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$23C1,y
 	lda	$2463,y
 	and	#$F0
 	ora	#$0D
 	sta	$2463,y
-	lda	#$55
+	lda	#$33
 	sta	$2502,y
 	lda	$25A2,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$25A2,y
 	lda	$2642,y
 	and	#$F0
-	ora	#$05
+	ora	#$03
 	sta	$2642,y
 	plp
 	rts
@@ -1578,13 +1578,13 @@ MP32_O
 	sta	$2324,y
 	lda	$23C2,y
 	and	#$0F00
-	ora	#$D055
+	ora	#$D033
 	sta	$23C2,y
 	lda	#$DDDD
 	sta	$23C4,y
 	lda	$2461,y
 	and	#$00F0
-	ora	#$5505
+	ora	#$3303
 	sta	$2461,y
 	lda	$2463,y
 	and	#$0F0F
@@ -1592,18 +1592,18 @@ MP32_O
 	sta	$2463,y
 	lda	$2502,y
 	and	#$00F0
-	ora	#$5505
+	ora	#$3303
 	sta	$2502,y
 	lda	$2504,y
 	and	#$0F00
 	ora	#$D0DD
 	sta	$2504,y
-	lda	#$DD55
+	lda	#$DD33
 	sta	$25A3,y
 	sep	#$20
 	lda	$2004,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$2004,y
 	lda	$2145,y
 	and	#$0F
@@ -1621,7 +1621,7 @@ MP32_O
 	sta	$2465,y
 	lda	$2643,y
 	and	#$0F
-	ora	#$50
+	ora	#$30
 	sta	$2643,y
 	plp
 	rts

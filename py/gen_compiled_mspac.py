@@ -52,22 +52,25 @@ FRAMES = (
     (3, 2, 0x31, True, True, "N2"),
 )
 
-# Color-ROM index → preferred SHR pen (§2; same map as fruit)
+# Color-ROM index → SHR pen (§2). Same stable aliases as fruit.
+# Bank #09 is black / deep blue / red / yellow. The red bow is 2bpp pen 2
+# (color ROM 1). Pens 5/7/9/11 are ghost bodies; FrightPaletteUpdate
+# rewrites those slots blue or white, so the bow uses pen 3 ($0F00).
 _ROM_TO_SHR = {
     0: 0,
-    1: 5,
+    1: 3,   # red bow — stable alias of Blinky red
     2: 6,
-    3: 7,
+    3: 8,   # pink — stable alias of Pinky
     4: 0,
     5: 9,
     6: 10,
-    7: 11,
+    7: 12,  # orange — stable alias of Clyde, unused by bank #09
     8: 0,
     9: 13,
     10: 0,
     11: 15,
     12: 4,
-    13: 8,
+    13: 10,  # teal has no pen; nearest light blue
     14: 2,
     15: 1,
 }

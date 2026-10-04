@@ -50,6 +50,7 @@ All three phases share one logical machine image:
 | 2 | C, one Z80 routine at a time | Every lifted routine is C, and replay of the phase 1 corpus matches per frame |
 | 2.5 | Idiomatic C, no Z80 machinery | The C-only corpus replays per frame with registers and stack masked, and no Z80 register, flag, PC, or stack access remains |
 | 3 | 65816, one C routine at a time | Every lifted routine is 65816, and replay of the same corpus matches per frame |
+| 4 | Finish the IIgs target | The IIgs build holds one frame per VBLANK in normal play, plays the arcade's sound on the DOC, and draws every sprite the game shows |
 
 Phase 1 data is the only acceptance oracle. Later phases do not invent a second corpus.
 
@@ -348,31 +349,334 @@ A version 2 session can be rewritten as version 3 on the Z80 host: `./build/c/ms
 
 ## Phase 3 — C to 65816, one routine at a time
 
-Lower the idiomatic C in `idiom/` (phase 2.5) to 65816 until the logic is all 65816. The source is `idiom/`, not `c/`. The oracle is the C-only corpus (`corpus/c-*`) with the same mask `make idiom-check` uses: the per-frame records minus the Z80 register bytes and the stack.
+Lower the idiomatic C from phase 2.5 to 65816 until the logic is all 65816. The source is that C, not `c/`. The oracle is the C-only corpus (`corpus/c-*`) with the same mask `make idiom-check` uses: the per-frame records minus the Z80 register bytes and the stack.
 
-### Mixed execution, again
+### Locked trees
 
-The workstation host stays the test harness. A routine under conversion runs as 65816; its callees and callers stay C until they are lowered. Both use the same `mem[]`.
+`idiom/` and `lift/` are locked and read-only for phase 3. Nothing in either is edited, regenerated, or reformatted.
 
-At each call, snapshot, run the C function, save the result, restore, run the 65816, compare, commit the C result. The trajectory stays on the recorded path, and one replay lists every lowered routine that diverged. Acceptance, after the routine is flipped to 65816-only, is a full unthrottled replay of the C-only corpus.
+- `idiom/` is the finished phase 2.5 reference. `make idiom-check` on it must keep passing, unchanged.
+- `lift/` is the phase 1 Z80 host.
 
-The 65816 execution vehicle for this phase is in-process on the workstation (a small 65816 core, or an equivalent that runs the assembled bytes against `mem[]`). Per-routine comparison does not depend on GSSquared frame timing. GSSquared is for the integrated IIgs build, where the existing SHR renderer draws and the lowered logic is what advances `$4D00`–`$4E3F` and the rest of the work RAM.
+Phase 3 works in `lower/`, which starts as a byte-identical copy of `idiom/` (all `*.c` and `*.h`). Everything phase 3 needs in C (entry hooks, the harness's link to the 65816, fixes to host code) is done in `lower/`. If phase 3 turns up a bug in the C logic, it is fixed in `lower/` and the fix is noted against the locked `idiom/` function in the commit message. `idiom/` is not touched.
+
+`diff idiom/X.c lower/X.c` for a logic file must show only entry hooks, so the C that shadow comparison runs is the C that `make idiom-check` proved. Any other difference is a deliberate fix and is listed at the top of the `lower/` file.
+
+The work has three stages, each with its own gate:
+
+| Stage | Runs | Done when |
+|-------|------|-----------|
+| 3a. Mixed | Workstation harness. Lowered functions run on the 65816 core, everything else is C | Every logic function is lowered and passes shadow comparison across the corpus |
+| 3b. 65816-only | Workstation harness. The whole frame is 65816; the host only supplies inputs and checks records | Every C-only session replays clean with no game-logic C linked |
+| 3c. Integrated | GSSquared, real IIgs build with the SHR renderer | The same sessions replay clean on the IIgs build |
+
+### Layout
+
+| Path | Role |
+|------|------|
+| `idiom/` | **Locked.** The phase 2.5 reference. Read, never edited |
+| `lower/*.c`, `lower/*.h` | The working copy of `idiom/`. The source for lowering, and the C half of shadow comparison. Each `.c` stays after its `.s` exists, as the reference for that file |
+| `lower/*.s` | One Merlin32 source file per game-logic `.c`, same base name (`lower/score.c` → `lower/score.s`) |
+| `lower/link.s`, `lower/all.s` | Merlin32 link file and the file that puts every `lower/*.s` in order. The entry table comes first |
+| `lower/entries.txt` | The entry manifest: every hooked function, its result kind, and its parameter kinds, grouped by file |
+| `lower/entries.s`, `lower/entry_ids.s`, `lower/host/entries.h` | Generated from the manifest by `py/gen_lower_entries.py`: the stub table, `LE_<name>` equates for the IIgs host, and the C side's ids and marshalling |
+| `lower/dp.s` | Direct-page map, host-block equates, I/O equates, task numbers, the `FAIL_*` codes |
+| `lower/util.s` | Shared helpers (`copyb`, `fillb`, `iofill`, `iocopy`). Not hooked; checked through callers |
+| `lower/io.s` | Input ports and the IRQ latch for the harness (`read_in0`, `read_in1`, `read_dsw1`, `read_latch0`). The IIgs build replaces it with `iigs/lower_io.s` |
+| `lower/ram.s` | Equates for work RAM, generated from the same table as `ram.h` |
+| `lower/host/` | New harness code: the GSSquared CPU core glue, the stub memory map, the C↔65816 bridge, and shadow comparison |
+| `build/lower/` | `lower.bin` (assembled logic) and `mspac-lower` (the harness) |
+
+`py/gen_idiom_ram.py` writes `idiom/ram.h` and `idiom/ram.c`, so it is not run against `idiom/` again. It gets an output-directory option, and phase 3 runs it against `lower/` to write `lower/ram.h`, `lower/ram.c`, and `lower/ram.s` together. The generated `ram.h` must stay identical to `idiom/ram.h`.
+
+Only game-logic files get a `.s` twin: `actor`, `attract`, `clock`, `coin`, `cutscene`, `difficulty`, `draw`, `fright`, `fruit`, `ghost`, `hud`, `maze`, `mode`, `pac`, `play`, `rng`, `sched`, `score`, `siren`, `sound`, `sprite`, `start`, `target`, `task`, and `vblank`. `conly.c` also gets a twin, `conly.s`, holding `c_only_frame` (the VBLANK work, then the task list until it is empty). That is the one entry the 65816-only harness and the IIgs host call per frame. The other host files (`board.c`, `corpus.c`, `video.c`, `audio.c`, `input.c`, `main.c`, `ram.c`) stay C in the harness. On the IIgs their jobs belong to `iigs/`.
+
+The existing game-build logic in `iigs/*.s` is a prototype. It is not edited during phase 3 and is replaced at stage 3c.
+
+### The harness
+
+`mspac-lower` is the idiomatic host, built from `lower/`, with a 65816 attached. It links:
+
+- The GSSquared 65816 core from `$(HOME)/src/gssquared/src/cpus/` (`cpu_65816.cpp` and the `base_6502.cpp` template it includes), and nothing else from GSSquared. The core reaches memory only through `cpu->mmu->read` / `write` / `vp_read`, so the harness supplies a stub MMU and a stub `NClock`, plus header shims where `cpu.hpp` pulls in SDL3 and the debugger.
+- The host files from `lower/` (board, corpus, input, video, audio, main).
+- The `lower/` logic files, for every function not yet lowered, and as the C half of shadow comparison.
+- `lower/host/`.
+- `lower.bin`, assembled by Merlin32 (`MERLIN32` in the Makefile) and loaded into the core's memory at start-up.
+
+Nothing in the build reads from `idiom/` or `lift/`.
+
+Using the same core the IIgs build runs on means stage 3c cannot disagree with stage 3a about what an instruction does.
+
+The core counts cycles. The harness reports cycles per lowered call and per frame. The IIgs has roughly 46,000 cycles per 60 Hz frame at 2.8 MHz, and rendering takes a share of that. The logic's cost is tracked from the first routine, not discovered at integration.
+
+The harness's 65816 sees three banks (`lower/host/l65.h`):
+
+| Bank | Contents |
+|------|----------|
+| `$00` | Direct page `$0000`–`$00FF`, the stack (top `$0FFF`), and the call stub at `$0300` |
+| `$01` | The game bank, served by bus callbacks on the `Board` |
+| `$02` | `lower.bin`, read-only |
+
+The call stub is `JSL` to the entry, then `WDM $01`, which returns control to the host. `WDM $02` is the fail trap that `sched.c`'s `fail()` lowers to: A holds the reason (`FAIL_BAD_TASK`, `FAIL_NOT_EMPTY`), X the detail. The harness records the failure and execution continues, as the C does. `WDM` is a two-byte no-op on a real 65816, so the same code runs on the IIgs.
+
+Make targets: `make lower` builds `lower.bin` and `mspac-lower`. `make lower-check` replays every `corpus/c-*` session through the harness with shadow comparison on every lowered function, then runs `py/lower_diff.py` to check that `lower/*.c` differs from `idiom/*.c` only by hooks. `make lower-cov` is the coverage build.
+
+### Memory map
+
+The game's 64 KB arcade image lives whole in one 65816 bank, the game bank. The data bank register points at it whenever lowered code runs, and lowered code reaches it with absolute (16-bit) addressing at the arcade addresses. `LDA $4E00` reads the game mode, exactly as `mem[0x4E00]` does in C. So:
+
+- Work RAM offsets in `lower/ram.s` are the `ram.h` offsets. A work-RAM image from the 65816 compares byte for byte with a frame record.
+- ROM tables the C reads through `rom_byte()` / `rom_word()` (maze data, speed tables, songs, scripts) are the `boot1`–`boot6` bytes, loaded at their arcade offsets in the game bank. Lowered code reads them in place; nothing is copied out into `.s` data.
+- Lowered code never hard-codes the game bank number. It uses the data bank register, so stage 3c can put the bank wherever the IIgs memory map allows.
+
+| Game bank range | Harness behavior |
+|-----------------|------------------|
+| `$0000`–`$3FFF`, `$8000`–`$9FFF` | Program ROM. Reads return the boot bytes, writes are an error |
+| `$4000`–`$47FF` | Tile and color RAM |
+| `$4C00`–`$4FFF` | Work RAM |
+| `$5000`–`$50FF` | I/O. Every access goes through `board_mem_read` / `board_mem_write`, so input reads come from the corpus `inputs` stream and latch, voice, sprite-position, and watchdog writes have their side effects |
+| Anything else | An error, reported with the PC. This includes the arcade mirrors: the C's text writer may land at `$C000` and reach video RAM through the mirror, but lowered code writes the real `$4000` address, because the IIgs has no mirror |
+
+The direct page and the stack are in bank 0, where the 65816 requires them. The direct page holds scratch: locals, arguments past the third, and long pointers. Nothing the frame record can see lives there.
+
+Board state that is not in `mem[]` but that game logic reads or writes gets a fixed slot in a host block at `$F000` of the game bank. The harness serves those addresses from the `Board` fields.
+
+| Address | Field |
+|---------|-------|
+| `$F000` | `int_enabled` |
+| `$F001` | `restart` |
+| `$F002` | `started` |
+| `$F003` | `stop` (the C-only frame loop's end of session) |
+| `$F004` | Generator state, 4 bytes, little-endian |
+| `$F008` | `latch[0..7]`, read-only |
+| `$F010`–`$F013` | IIgs host only: `IN0`, `IN1`, `DSW1`, and the replay flag that `iigs/lower_io.s` reads |
+
+I/O rules:
+
+- The ports are read only through `io.s` (`jsr read_in0` and the others), never with a bare `LDA IN0`. The routines return the value in A with N and Z set from it, and keep X and Y. The harness's `io.s` reads the bus; the IIgs version reads the replay stream or the keyboard bytes the host wrote. Lowered code stays the same in both builds.
+- GSSquared's core does a dummy read at the target of every indexed store. A read of `IN0` or `IN1` consumes a replay input, so an indexed store into `$5000`–`$50FF` would eat input. Stores to the I/O page go through `iofill` / `iocopy`, which store with `STA (dp)`, which does no dummy read.
+
+The generator is lowered as real 65816: the 32-bit step `state * 1664525 + 1013904223` on the host-block state, returning the high byte. It must be bit-exact, because the generator state is in every frame record. It runs a few times a frame at most, so its cost does not matter.
+
+### Calling convention
+
+One convention for every lowered function, so the harness can check it mechanically:
+
+- Entry and exit in native mode with 8-bit A and 16-bit X and Y (`MX %10` in Merlin32). A routine that changes widths restores them before it returns. Y is the usual 16-bit index into the game bank.
+- Arguments in the order of the C parameters. A byte takes the first free of A, X, Y, then one direct-page byte. A word, a `Coord` (y low, x high), or a pointer takes the first free of X and Y, then two direct-page bytes. Direct-page arguments start at `$00`. The C function's `Board *b` and `WorkRam *ram` parameters have no 65816 counterpart.
+- A pointer argument must point into `Board.mem`, and is passed as its 16-bit game-bank address. A function that takes a pointer to a C local or a string cannot be marshalled. It gets no hook and is checked through its callers.
+- A byte result in A. A word or `Coord` result in X. A C `bool` result is A = 0 or 1, not a flag. A routine may also leave the carry meaningful, but no caller relies on it unless the C did.
+- Internal calls are `JSR` / `RTS`: all lowered logic sits in one code bank. The direct page register, the data bank register, and the stack pointer are the same on exit as on entry.
+- `JMP (tab,x)` and `JSR (tab,x)` read their table from the program bank, not the data bank. Function-pointer tables are `da` lists in the code. ROM data tables are read in the game bank, as above.
+
+Direct page (`lower/dp.s`):
+
+| Range | Use |
+|-------|-----|
+| `$00`–`$0F` | Arguments past the registers |
+| `$10`–`$1F` | `T0`–`T15`, scratch. Any `JSR` may change them |
+| `$20`–`$6F` | Per-file locals, kept across calls into other files. Each file owns its range, listed in its header (`score` `$28`–`$2F`, `sched` `$68`–`$6D`, and so on) |
+| `$70`–`$72` | IIgs only: `IO_PTR`, the 24-bit replay read pointer of `iigs/lower_io.s` |
+
+Entry table: `lower/entries.txt` lists every hooked function under a `[file]` header, with its result kind (`v`, `b`, `w`, `c`) and one kind per parameter (`B`, `R`, `b`, `w`, `c`, `p`). `name=label` hooks C function `name` to assembly label `label`, for C names that clash with a RAM symbol (`pill_bitmap=pill_bitmap_task`). `py/gen_lower_entries.py` writes `lower/entries.s` (entry n at `$4*n`: `JSR fn`, `RTL`), `lower/entry_ids.s`, and `lower/host/entries.h`. The harness calls a function with `JSL` to its stub, so it never parses Merlin32 symbol output. `py/add_hooks.py FILE` adds the hooks to `lower/FILE.c` and its group to the manifest. It takes the bare file name, and `--skip` names the functions to leave out.
+
+Merlin32 notes:
+
+- Write `mx` again wherever paths that run at different widths join. Merlin tracks widths by position in the file, not by flow.
+- No nested `put`. `all.s` and the IIgs `all_lower.s` put every file from the top level.
+
+### Entry hooks
+
+Shadow comparison needs every call to a switched-on function to pass through the harness. A link-level wrapper cannot do that: about 125 of the logic functions are `static`, and calls within one file never leave it. So each logic function in `lower/*.c` gets a one-line hook as its first statement:
+
+```c
+uint8_t score_add(Board *b, uint8_t points)
+{
+	LOWER_HOOK1(score_add, uint8_t, points);
+	...
+}
+```
+
+The hook macros live in `lower/host/hook.h`. With the function switched off, or while the harness is running the C half of its own comparison (a per-function re-entry guard), the hook does nothing and the C body runs. With it switched on, the hook hands the arguments to shadow comparison and returns the committed result. The hook's argument list is also the record of which registers carry which argument in the calling convention.
+
+Hooks are the only edit made to a logic file when its `.s` is started. They are added a file at a time, as that file is lowered.
+
+### Order of lowering
+
+A function is lowered only after every function it calls has been lowered. Then 65816 code only ever calls 65816 code, and the harness needs a bridge in one direction only: C calling 65816. There is no 65816-calling-C path.
+
+The order comes from the call graph of `lower/*.c`: leaves first (`rng`, `actor`, `difficulty`, `score`, `draw`, `hud`, `siren`, `sprite`, `task`), then the subsystems built on them (`maze`, `sound`, `clock`, `coin`, `target`, `fruit`, `fright`, `pac`, `ghost`, `cutscene`, `attract`, `start`, `mode`), and the dispatchers last (`play`, `sched`, `vblank`). A dispatcher that indexes a function-pointer table is lowered after every function in its table. While the dispatcher is still C, it reaches a lowered entry through the bridge like any other caller.
+
+### Writing and switching
+
+Write a whole file's `.s` in one pass. A file is a subsystem; its functions share state and are easier to write together. Then switch functions to 65816 one at a time (or a few at a time) with `--asm=` on the harness:
+
+```bash
+./build/lower/mspac-lower --replay corpus/c-play1 --asm=score_add,score_draw
+./build/lower/mspac-lower --replay corpus/c-play1 --asm='score.*'
+```
+
+A function that is not switched on runs as C even if its `.s` exists.
+
+### Shadow comparison
+
+Every call into a switched-on function runs both versions:
+
+1. Snapshot the `LowerState`: everything logic can change. That is `mem[$4000-$50FF]`, the latches, the sprite and voice registers, `int_enabled`, `restart`, `started`, `stop`, the generator state, and the replay's read position and reads this frame. Copying the whole `Board` per call would be far too slow.
+2. Run the C function under the re-entry guard. Save its result and its `LowerState`.
+3. Restore the snapshot. The game bank is the `Board`, through the bus callbacks, so nothing is copied.
+4. Run the 65816 from the entry stub until the `WDM $01` return.
+5. Compare the two `LowerState`s, the results, any `WDM $02` failure, and the exit state: the M and X width flags, the direct page register, the data bank register, and the stack pointer.
+6. Commit the C result and continue.
+
+The game stays on the recorded path no matter how wrong the 65816 is, and one replay reports every function that diverged, with the frame number, the arguments, and the first differing address and field name from `ram.h`. For the first failing call of each function the harness writes a 65816 instruction trace of that call alone.
+
+Fix one function at a time, starting with the earliest failure in the replay. Do not switch on a function's callers until it passes.
+
+### 65816-only
+
+Once every logic function is lowered and passes shadow comparison across the corpus, stage 3b drops the C. With `--asm=all` the frame loop of `conly.c` itself runs as 65816: the VBLANK work, then the task list until it is empty. The host's frame is:
+
+1. At the first frame only, load the replay's starting record into the game bank and the host block. After that the 65816 owns them, and the host copies nothing in.
+2. Call the frame entry with `JSL`. Input reads come through the I/O traps as they arrive.
+3. Pack the frame record from the game bank and the host block, and compare it with the corpus.
+
+Gate: `mspac-lower` builds with no `lower/*.c` logic file linked, and every C-only session replays clean, with the same mask as `make idiom-check`.
+
+`make lower-only` builds a second harness (objects in `build/lower/only/`) with `-DLOWER_ONLY`: the logic files are left out, and `lower/host/only.c` supplies a `c_only_frame` that calls entry `c_only_frame` on the 65816. `make lower-only-check` replays every C-only session. It appends each frame's cycle count to `build/lower/frame_cycles.txt` (`--frame-log`), and `py/lower_cycles.py` summarizes it per session: mean, 99th percentile, max, and frames over the 46,666-cycle budget.
 
 ### Lowering rules
 
-The C function and its contract row are the source. The 65816 routine must produce the same `mem[]` writes and the same explicit results. Match 8-bit wrap. Match BCD. Keep little-endian 16-bit stores so a work-RAM image from the IIgs is comparable byte for byte with phase 1.
+The C function and its contract comment are the source. The 65816 routine must produce the same `mem[]` writes and the same explicit results. Match 8-bit wrap. Match BCD: decimal mode (`SED` / `CLD`) is allowed for score arithmetic, but the stored bytes must equal the C's, and `CLD` comes before anything else runs. Keep little-endian 16-bit stores so a work-RAM image from the IIgs compares byte for byte with the corpus.
 
-Do not restructure a function in the same pass that lowers it. A mismatch would have two causes. Ugly 65816 that matches the frame records is the input to a later cleanup.
+Do not restructure a function in the same pass that lowers it. A mismatch would have two causes. Ugly 65816 that matches is the input to a later cleanup, and that cleanup runs under shadow comparison too.
 
-The stack-surgery list from phase 2 is lowered by hand. `JSL` / `RTL` get a normal frame. The return-code convention from the C side is the one that carries over.
+Each `.s` function keeps the C function's name as its label and a short contract comment: the C function it lowers, the RAM it reads and writes, its arguments and result registers, and the Z80 address from the C comment.
 
-Rendering, palette, sprite blit, HUD chrome, and keyboard latch stay the IIgs code described in [IIgs-Design.md](IIgs-Design.md). Phase 3 does not port video RAM into SHR. It ports the logic that decides what the next frame's actors, dots, scores, and mode are. The existing game-build logic in `iigs/*.s` is the prototype this phase replaces once the traces match.
+The return-code convention from the stack-surgery routines carries over unchanged. `JSR` / `RTS` get a normal frame.
+
+Code that `make idiom-cov` reports as never run by the corpus is not checked by shadow comparison either. Its 65816 is still written, and the function's comment lists it as unverified.
+
+Rendering, palette, sprite blit, HUD chrome, and keyboard handling stay the IIgs code described in [IIgs-Design.md](IIgs-Design.md). Phase 3 does not port video RAM into SHR. It ports the logic that decides what the next frame's actors, dots, scores, and mode are.
+
+### Integration
+
+Stage 3c puts the lowered logic into the IIgs build in place of the `iigs/` prototype logic. `make iigs-lower` builds two images:
+
+- `build/iigs/lower_game.bin`: `lower/*.s` assembled with `iigs/lower_io.s` as `io.s`.
+- `build/iigs/lower_host.bin`: `iigs/all_lower.s` via `iigs/link_lower.s`. It is the renderer, HUD, and sprite blits from `iigs/`, plus `iigs/lower_host.s`. It must stay under 40,960 bytes, below the work RAM at `$A000`.
+
+Both are staged under `build/iigs/stage/`.
+
+| Bank | Contents |
+|------|----------|
+| `$00` | Lowered direct page at `$1E00`; host stack top `$1DFF` |
+| `$01` | SHR |
+| `$02` | `lower_host.bin` at `$0000`, renderer work RAM and adapter shadows from `$A000` |
+| `$03` | Graphics assets |
+| `$04` | Background copy for sprite erase |
+| `$05` | `lower_game.bin` |
+| `$06` | The game bank: ROM from `build/mspac.bin` at `$0000`–`$3FFF` and `$8000`–`$9FFF`, RAM `$4000`–`$4FFF`, the I/O page as plain RAM, the host block at `$F000` |
+| `$07`+ | The replay input stream, when checking |
+
+The I/O page is plain RAM. `read_latch0` reads the interrupt enable back from `$5000` bit 0, since the IIgs has no separate latch. Inputs come from the host block: the host writes `IN0`, `IN1`, and `DSW1` to `$F010`–`$F012` from the keyboard before the frame. Keys: arrows or A/Z to move, 5 or C for a coin, 1 and 2 to start, Control-S for the rack test (skip to the next level), Esc to pause, Q to quit. When the replay flag at `$F013` is set, `read_in0` and `read_in1` instead take the next byte of the stream at `[IO_PTR]`.
+
+`lower_host.s` frame loop: keyboard, erase sprites, apply tile changes, draw sprites, call `c_only_frame` (D = `$1E00`, DBR = `$06`, `MX %10`, `JSL` through `LE_c_only_frame`), `FrameDone`, then the adapters, then wait for VBLANK. Each adapter diffs the game bank against a shadow:
+
+- `LowerTiles`: tile and color RAM into the renderer's tilemap and dirty list. A cell with color 0 is drawn blank. Past 120 dirty cells, it redraws all of them.
+- `LowerSprites`: `sprite_out` and the actor positions into the renderer's actors. Ghost frames, eyes, blue and flashing (by palette poke), points, Ms. Pac-Man's poses, the fruit.
+- `LowerHud`: scores, lives, and level into the side HUD.
+
+`FrameDone` (host `$0004`) is an `RTS` that exists to carry a breakpoint. `CheckMode` (host `$0003`) is set by the checker and stops the host from clearing the game bank at start.
+
+Checking: `make lower-iigs-check` runs `py/gs2_lower_check.py`. It spawns GSSquared, injects both images, the assets, and the ROM. It loads each session's start record into the game bank, its input stream into bank `$07`, and the stream pointer into `IO_PTR`. Then it breaks at `FrameDone` every frame and compares the game bank with the frame record, masked as in stage 3b, along with how far the input pointer advanced. `LOWER_IIGS_SESSIONS` and `LOWER_IIGS_FRAMES` (default 600; 0 for all) choose the work. `make iigs-lower-demo` boots a fresh game to play by hand.
+
+GS/OS build: `make iigs-lower-gsos` links `MSPACLOW.SYS16`, an S16 application, from `iigs/link_gsos_lower.s`, and puts it on its own 800K ProDOS disk, `build/iigs/MsPacLower.2mg`. Its segments:
+- **Code:** `gsos_entry.s`, then the host and renderer.
+- **Game bank** (`seg_game_lower.s`): 64 KB, bank-aligned. It holds `build/mspac.bin` at `$0000` and `lower.bin` assembled at `$A000`, so lowered code runs with the game bank as both its program and data bank.
+- **Background strip** for sprite erase.
+- **Art.**
+- **Renderer work RAM.**
+
+The loader relocates every reference to `GAME`, including the bank byte `CallFrame` loads into DBR. `lower.bin`'s direct page is a locked bank-0 page from the Memory Manager (`AllocLowerDP`). Merlin32 writes 2 into the OMF ALIGN field for `ali BANK`, so the build corrects it with `py/omf_fix_align.py`. Q quits to the launcher. The script's `--png`, `--detach` (leave it running for the gs2-debug MCP), and `--snap` options are for looking at the screen.
 
 ### Phase 3 exit
 
-- Every lifted routine is 65816, running in the integrated IIgs build.
-- Every C-only corpus session, applied to that build's input latch, produces the same frame records (registers and stack masked).
+- Every game-logic function in `lower/*.c` has a 65816 twin in `lower/*.s`, and `mspac-lower` replays every C-only session clean 65816-only.
+- `idiom/` and `lift/` are unchanged from the start of phase 3, and `make idiom-check` still passes.
+- The integrated IIgs build runs `lower.bin`, and every C-only session, fed to that build's input latch, produces the same frame records (registers and stack masked).
 - Attract, death, energizer, fruit, 10,000-point life, intermissions, and later-level speed changes all pass on those traces.
+- The harness's per-frame cycle report for the corpus is recorded, so the logic's share of the IIgs frame is known.
+
+Status: met, except the IIgs replay of every session in full. `make lower-iigs-check` has passed the first 600 frames of three sessions. The full run moves to phase 4.
+
+---
+
+## Phase 4 — Finish the IIgs target
+
+Notes, not yet a plan. Phase 3 ends with the lowered logic driving the IIgs renderer (`make iigs-lower`). The game logic matches the corpus, but the IIgs build is not yet a finished game. Phase 4 closes the gaps. The phase 3 gates stay green throughout: `make lower-check`, `make lower-only-check`, and `make lower-iigs-check`.
+
+### Starting point
+
+- `make lower-iigs-check` passes the first 600 frames of `c-shakedown`, `c-attract`, and `c-play1`. It takes about 72 seconds per session, so full sessions have not been run.
+- Sound is silent. The lowered logic writes the voice registers at `$5040`–`$505F` of the game bank every frame, and nothing reads them.
+- The sprite adapter in `iigs/lower_host.s` handles ghosts (body, eyes, blue, flashing, points), Ms. Pac-Man's walk poses, and the fruit. Codes outside those sets are hidden or shown as closed-mouth Ms. Pac-Man. That covers her death animation and the intermission actors.
+- Color RAM is used only to blank cells. Per-cell colors come from the prebaked tiles.
+- Nobody has played the IIgs build by hand (`make iigs-lower-demo`).
+
+### Frame budget
+
+The IIgs frame is 46,666 cycles: 2.8 MHz over 60 Hz, before slow-RAM and refresh stalls. The phase 3 cycle report (`make lower-only-check`, then `py/lower_cycles.py`) measures the game logic alone. Over 124,997 corpus frames it averages 9,764 cycles, and its 99th percentile is 19,338. 157 frames (0.13%) go over budget. Those are the maze draws, at about 105,000 cycles each.
+
+The logic is not the main cost in the attract marquee. The host's loop goes erase sprites, apply tile changes, draw sprites, then the game frame. The marquee bulbs rewrite many cells every frame. Past `DIRTY_MAX` (120 cells) the adapter falls back to redrawing all 868 cells while the sprites are erased. The frame overruns, and the sprites are off screen for most of it.
+
+Steps:
+
+1. Measure before changing anything. Add a host cycle breakdown per frame: game frame, `LowerTiles`, `LowerApplyTiles`, sprite erase and draw, `LowerHud`. Read GSSquared's cycle counter at breakpoints, in the same style as `make lower-iigs-check`. Report per session, as `py/lower_cycles.py` does.
+2. Fix the host side first. Candidates:
+   - Keep the marquee bulbs off the full-redraw path. Options are a bigger dirty list, a bulb-specific path, or palette cycling.
+   - Erase and redraw only the sprites that overlap changed cells.
+   - Split the 868-cell redraw across frames when the game does not need it at once.
+3. Then the logic's worst frames. The arcade already spreads the maze draw over deferred tasks. Find which tasks land in the over-budget frames before rewriting any 65816.
+4. Every change to `lower/*.s` runs under `make lower-check` and `make lower-only-check`, as phase 3 cleanups do. Every change to the host runs under `make lower-iigs-check`.
+
+Gate: in normal play every corpus frame fits one VBLANK. Exceptions are listed by name: level start and the maze draw may take two. Overruns in the arcade itself are covered in phase 2.5, under "Did normal play exceed a frame?".
+
+### Audio
+
+Fills in [IIgs-Design.md](IIgs-Design.md) §5, which is TBD today.
+
+The arcade uses Namco's WSG: three voices, each with a 4-bit volume and a frequency accumulator (20 bits on voice 0, 16 on voices 1 and 2). Each voice plays one of eight 32-sample, 4-bit waveforms from the sound PROM `82s126.1m`. The output frequency is `freq × 96000 / 2^20` Hz. Bit 0 of `$5001` enables sound. `lower/audio.c` is the reference mixer, and the phase 1 SDL host (`mspac`) is the reference by ear.
+
+The IIgs plays them on the Ensoniq DOC, through the sound GLU (`$C03C`–`$C03F`):
+
+- At startup, load the eight waveforms into DOC RAM. Each 32-nibble table becomes 8-bit samples in the DOC's smallest table (256 bytes). No sample byte may be `$00`, because zero stops a DOC oscillator.
+- Give each arcade voice one free-running oscillator.
+- After each game frame, beside `LowerTiles`, an adapter reads the voice registers from the game bank. It sets each oscillator's table pointer from the wave select, its frequency from the WSG frequency, and its volume from the 4-bit volume. A voice is silent when its volume is 0 or sound is disabled. Registers are written only when they change, through a shadow, as the tile adapter does.
+- Frequency conversion depends on the DOC scan rate, which depends on how many oscillators are enabled. Take the formula from the IIgs Hardware Reference, check it against GSSquared's ENSONIQ emulation, and use a table or one multiply per voice.
+
+Testing: sample-exact audio is still out of scope. The check is at the register level. During `make lower-iigs-check`, read the DOC registers (gs2-debug `ENSONIQ` domain, or a host shadow), and compare them per frame with values computed from the corpus's voice registers. The DOC state is a pure function of those bytes. By ear: play `make iigs-lower-demo` beside `mspac`.
+
+Open questions: table interpolation versus nearest sample, the volume curve, aliasing at high frequencies, and which oscillators stay free for the DOC's own use.
+
+### Sprites and colors
+
+- Map every sprite code the corpus shows to an asset: Ms. Pac-Man's death animation, the intermission actors (Pac-Man, the stork, the heart, the "act" clapper), and the big Pac-Man parts. Find the codes by scanning `sprite_out` across the corpus frames. Add the missing art to `py/gen_shr_gfx.py`.
+- Check per-cell colors against color RAM: maze colors per board, text, and fruit. Decide whether the prebaked tiles are enough, or whether the adapter needs color variants.
+
+### Remaining checks
+
+- Run `make lower-iigs-check` on every C-only session in full. Run it at night, or split sessions across emulator instances.
+- Do a hand play-test of `make iigs-lower-demo`: coins, both starts, all three intermissions, and a game over.
+- Retire the prototype logic builds (`iigs`, `iigs-game`, `iigs-gsos`). The lowered game already has its GS/OS build (`make iigs-lower-gsos`; see stage 3c).
+
+### Phase 4 exit
+
+- Every corpus frame, outside the named exceptions, fits one VBLANK on the IIgs build.
+- The DOC plays all three voices, and the register-level audio check passes on the corpus.
+- Every sprite code in the corpus draws with its own art.
+- Every C-only session passes `make lower-iigs-check` in full.
+- `IIgs-Design.md` §5 is written, and this spec and `AGENTS.md` match the build.
 
 ---
 
@@ -392,6 +696,7 @@ Replay is a pure function of the `frames` header (DIP byte, interrupt period, ge
 ## Out of scope for this spec
 
 - Writing a Z80 CPU emulator. The CPU is the [Z80 library](https://github.com/redcode/Z80) submodule; this project emulates the board
+- Writing a 65816 CPU emulator. Phase 3 links GSSquared's core
 - Editing locked `mspac.asm`, `src/mspac.asm`, or `boot1`–`boot6`
 - Re-implementing the SHR renderer, palette, or sprite blit
 - Sample-exact WSG audio as an acceptance test. SDL3 plays the voices; the frame record stores the voice registers
@@ -514,3 +819,9 @@ Steps 1–4 are mechanical and can each be done in one pass. Steps 5–7 are mos
 - Every function has a descriptive name, typed parameters and results, and a contract comment naming the RAM it touches and its Z80 address.
 - Work RAM is reached through `ram.h`, with offsets checked at compile time. Magic numbers in game logic are named.
 - `c/` and `mspac-c` still pass their own phase 2 regression, unchanged.
+
+# Third Party Corpus
+
+http://replay.marpirc.net/r/(mspacman)
+
+That site has a lot of MAME-recorded corpora . however, they are not likely to work the same due to difference in how random number generation works.

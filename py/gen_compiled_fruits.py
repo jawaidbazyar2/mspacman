@@ -55,7 +55,7 @@ _ROM_TO_SHR = {
     0: 0,
     1: 3,   # red (cherry/strawberry/apple) — not COL_BLINKY
     2: 6,
-    3: 7,
+    3: 8,   # pink — stable alias of Pinky
     4: 0,
     5: 9,
     6: 10,
@@ -65,7 +65,7 @@ _ROM_TO_SHR = {
     10: 0,
     11: 15,
     12: 4,
-    13: 8,
+    13: 10,  # teal has no pen; nearest light blue
     14: 2,
     15: 1,
 }

@@ -6,6 +6,6 @@
 PalTable
 	dw	$0000,$0DDF,$0FBA,$0F00
 	dw	$00F0,$0F00,$0D95,$0FBF
-	dw	$04BA,$00FF,$04BF,$0FB5
+	dw	$0FBF,$00FF,$04BF,$0FB5
 	dw	$0FB5,$0FF0,$0DDF,$022F
 

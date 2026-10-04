@@ -159,8 +159,8 @@ Arcade graphics are **2bpp**: each pixel is palette-bank pen 0–3. At runtime t
 | Ghosts `$20–$27` | Sprite color `#01/#03/#05/#07` (body) + eyes | Eye white → pen 1; pupil → pen 15; body → pens **5/7/9/11** (`COL_*`); compiled blits bake body color |
 | Frightened `#11`/`#12` | Blue / flash banks | Prebake or swap body pens to the matching PROM RGBs already in the table |
 | Moving fruit `$00–$07` | Ms. Pac table `#879D` (sprite + color bank) | Even/odd compiled blits with **all four bank pens resolved to SHR indices** (no runtime recolor) |
-| HUD level fruit | Arcade uses tile bases `#90+` + colors at `#3B08` (max **7** icons) | v1 draws the current level's fruit with the same compiled actor blit (§3.4); the 7-icon strip would need precolored HUD tiles |
-| Ms. Pac | Yellow bank `#09` (and related) | Prebake yellow / red / blue accents onto pens **13** / **5** / **15** etc. |
+| HUD level fruit | Arcade uses tile bases `#90+` + colors at `#3B08` (max **7** icons) | v1 draws the current level's fruit with the same compiled actor blit (§3.4). The lowered build draws the whole 7-icon row with those blits, in two gutter rows of four |
+| Ms. Pac | Yellow bank `#09` (and related) | Prebake yellow / red / blue onto pens **13** / **3** / **15**. The bow is color-ROM red; pen **3** keeps it red while fright rewrites pen **5** |
 
 Harness today still uses a partial pack (`gen_palette.py` maze `#1D` in 0–3 + color-ROM 0–11 in 4–15, omitting green/teal). That is demo scaffolding. The **target** is: one fixed RGB→pen map covering all 12 chromatic colors; generators emit correct indices; runtime almost never remaps pixels.
 
@@ -173,13 +173,13 @@ Decoded with MAME `pacman` weights from `82s123.7f`. Color-ROM indices in bracke
 | **0** | `$0000` | `(0,0,0)` | 0/4/8/10 | Black, empty path, sprite transparency |
 | **1** | `$0DDF` | `(222,222,255)` | 15 | Dots, eye white, fruit highlight, many maze pen1s |
 | **2** | `$0FBA` | `(255,184,174)` | 14 | Maze `#1D` wall fill; some chrome / frightened accents |
-| **3** | `$0F00` | `(255,0,0)` | 1 | Maze `#1D` wall ink; **fruit red** (cherry / strawberry / apple) — same RGB as pen 5, not fright-poked |
+| **3** | `$0F00` | `(255,0,0)` | 1 | Maze `#1D` wall ink; **fruit red** (cherry / strawberry / apple); **Ms. Pac bow** — same RGB as pen 5, not fright-poked |
 | **4** | `$00F0` | `(0,255,0)` | 12 | **Green** — strawberry leaf, peach leaf, pear, frightened-bank accents |
 | **5** | `$0F00` | `(255,0,0)` | 1 | `COL_BLINKY` only (fright palette poke → blue/white) |
 | **6** | `$0D95` | `(222,151,81)` | 2 | Brown — fruit stems, maze `#14` accents; ghost `BODY_PEN` marker when needed |
-| **7** | `$0FBF` | `(255,184,255)` | 3 | `COL_PINKY`; maze `#18` pink |
-| **8** | `$04BA` | `(71,184,174)` | 13 | **Teal** — pear HUD bank `#17` |
-| **9** | `$00FF` | `(0,255,255)` | 5 | `COL_INKY`; maze `#18` cyan |
+| **7** | `$0FBF` | `(255,184,255)` | 3 | `COL_PINKY` only (fright palette poke) |
+| **8** | `$0FBF` | `(255,184,255)` | 3 | **Tile pink** — Pinky RGB alias for the ghost-house door, PINKY text and maze `#18`; not fright-poked. Teal (color ROM 13, only the undrawn HUD pear bank `#17`) has no pen and falls back to pen 10 |
+| **9** | `$00FF` | `(0,255,255)` | 5 | `COL_INKY`; cyan text and maze `#18` cyan (fright-poked, see `docs/ColorMap.md`) |
 | **10** | `$04BF` | `(71,184,255)` | 6 | Light blue — banana / maze `#16` |
 | **11** | `$0FB5` | `(255,184,81)` | 7 | `COL_CLYDE` only (fright palette poke) |
 | **12** | `$0FB5` | `(255,184,81)` | 7 | **Fruit orange** (peach / pretzel) — Clyde RGB alias; not fright-poked |
@@ -193,14 +193,14 @@ Decoded with MAME `pacman` weights from `82s123.7f`. Color-ROM indices in bracke
 | Dots | 0, **1** |
 | Power pills | 0, **14** |
 | Ghosts | 0, 1, 15, body **5/7/9/11** |
-| Fruit (actor + HUD) | baked mix of 1, **3**, 4, 6, 8, 10, **12**, 13, 15 (never ghost body pens) |
-| Ms. Pac | 0, 13 (yellow), plus 5 / 15 accents as bank `#09` requires |
+| Fruit (actor + HUD) | baked mix of 1, **3**, 4, 6, 10, **12**, 13, 15 (never ghost body pens) |
+| Ms. Pac | 0, **3** (bow), 13 (yellow), 15 (blue). Bow stays off ghost body pens **5/7/9/11** |
 
-Pens **3**/**5** (red) and **11**/**12** (orange) share RGB so fruit stays stable while fright pokes only ghost body pens **5/7/9/11**.
+Pens **3**/**5** (red), **8**/**7** (pink) and **12**/**11** (orange) share RGB so fruit, Ms. Pac and tiles stay stable while fright pokes only ghost body pens **5/7/9/11**. The full per-object color map, including the lowered build's per-cell tile bank remap, is in `docs/ColorMap.md`.
 
 ### Harness note
 
-`gen_palette.py` emits the §2 target map (green/teal/`COL_POWER` included). Fruit compiled blits prebake bank colors into those pens. Power-pill tiles use pen **14**; `BlinkPowerPills` toggles that palette slot every 10 frames.
+`gen_palette.py` emits the §2 target map (green, tile pink and `COL_POWER` included). Fruit compiled blits prebake bank colors into those pens. Power-pill tiles use pen **14**; `BlinkPowerPills` toggles that palette slot every 10 frames.
 
 ### Power-pill fade
 
@@ -294,7 +294,7 @@ SHR **320** mode stores **two pixels per byte** (4 bits each). That constrains h
 ### Blit implementation sequence
 
 1. **Ghosts:** build-time **compiled** masked blits (`py/gen_compiled_ghosts.py`) for walk frames `$20–$27` × 4 body colors × even/odd; erase restores from `$01` BCK strip.
-2. **Fruit (demo):** `py/gen_compiled_fruits.py` — 8 types × even/odd, colors prebaked from `#879D`. Harness actor 4 sits at fixed tile (14,17); `AdvanceFruit` cycles `ACT_SPR` every 360 frames. The same blits draw the HUD level fruit (§3.4); the arcade's 7-icon strip stays TBD.
+2. **Fruit (demo):** `py/gen_compiled_fruits.py` — 8 types × even/odd, colors prebaked from `#879D`. Harness actor 4 sits at fixed tile (14,17); `AdvanceFruit` cycles `ACT_SPR` every 360 frames. The same blits draw the HUD level fruit (§3.4), and the lowered build's 7-icon row.
 3. **Ms. Pac (walk):** `py/gen_compiled_mspac.py` — 4 dirs × 3 mouths × even/odd (24 blits), bank `#09` prebaked; west/north apply H / HV flips. Harness actor 5 on rails; `ACT_SPR = dir*3 + mouth` from arcade `#869C` phase tables. Death frames later.
 
 ```mermaid
@@ -399,7 +399,7 @@ Write SHR through bank `$01` shadow at full CPU speed. Avoid long poke loops int
 
 ### Non-goals (still)
 
-- Arcade's 7-icon level-fruit strip (`#3B08`) — the HUD shows the current level's fruit only.
+- Arcade's 7-icon level-fruit strip (`#3B08`) in the static build — its HUD shows the current level's fruit only. The lowered build draws the strip (§3.4).
 - No beam-trailing plan beyond “measure first, then consider.”
 - Attract / coin / intermission VMs (game build is maze-play first; see §6).
 
@@ -502,9 +502,10 @@ The 76 px gutters either side of the playfield carry the chrome the arcade puts 
 | Left | `1UP`, P1 score, life icons | `(8,4)` / `(8,12)` / `(8,40)` |
 | Right | `HIGH SCORE`, high score, level fruit | `(248,4)` / `(248,12)` / `(252,28)` |
 
-- **Text** reuses arcade glyph tiles: score digits `$00–$09`, ASCII `$40–$5B` (`$40` = space). The art is single-ink, so `BlitTileAbs` recolors any nonzero nibble to `R_PEN` (`COL_DIGIT`, pen 13) while blitting the 6×6 cell — one opaque write, so redraws need no clear. Advance is 6 px/glyph.
+- **Text** reuses arcade glyph tiles: score digits `$00–$09`, ASCII `$40–$5B` (`$40` = space). The art is single-ink, so `BlitTileAbs` recolors any nonzero nibble to `R_PEN` (`COL_DIGIT`, pen 1 white, the arcade's bank `#0F`) while blitting the 6×6 cell — one opaque write, so redraws need no clear. Advance is 6 px/glyph.
 - **Scores** are 3 BCD bytes lo/mid/hi like arcade `#4E80` / `#4E88`; `ScoreAdd10` uses 65816 decimal mode where the Z80 chains `add`/`daa` (`j_2a65`). `DrawScoreBCD` blanks up to 4 leading zeros so a fresh score reads `00` (`j_2abe` / `j_2ace`), and `CheckHighScore` copies P1 over the high score on an MSB→LSB win (`j_2a91`).
 - **Life icons** are the compiled Ms. Pac blit (dir W, mouth nearly shut), not tiles; the **level fruit** is the compiled fruit blit clamped at banana like `j_8793`. Both are masked blits over black.
+- **Lowered build fruit row:** `DrawFruitRow` in [`iigs/lower_host.s`](../iigs/lower_host.s) follows `draw_fruit_row` (`$2BEA`): one fruit per level up to seven, cherry first. It starts at the right like the arcade's row, at `(294,28)`, runs left, and wraps after four icons to `(294,40)`. Seven 14 px icons don't fit across the 76 px gutter.
 - **Harness demo only:** score ticks +10 every 300 frames, lives are fixed at 3, and level stays 0 — real game state replaces `InitHUD` later.
 
 Dot eating rides the same seam: `EatDotsAtPac` maps Ms. Pac's `ACT_X`/`ACT_Y` back to a tile, clears `$10`/`$14` from `TILEMAP`, and queues the cell so `ApplyDirty` rewrites it empty into **both** SHR and BCK before the next erase (§3.1).
@@ -534,7 +535,7 @@ Simulate the arcade **4-way stick** with keyboard **any-key-down** (level-sensit
 
 ## 5. Sound
 
-TBD. Arcade Namco WSG → IIgs Ensoniq DOC (or simpler square/noise approximation for an early milestone).
+TBD. Arcade Namco WSG → IIgs Ensoniq DOC (or simpler square/noise approximation for an early milestone). Working notes: phase 4, "Audio", in [MsPacManLift.md](MsPacManLift.md).
 
 ---
 

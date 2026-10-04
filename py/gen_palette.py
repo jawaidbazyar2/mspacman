@@ -7,7 +7,7 @@ Writes:
 
 Target pen map (docs/IIgs-Design.md §2):
   0 black, 1 pale, 2 peach, 3 maze red, 4 green, 5 Blinky red, 6 brown,
-  7 Pinky, 8 teal, 9 Inky, 10 light blue, 11 Clyde,
+  7 Pinky, 8 tile pink (= Pinky RGB; not fright-poked), 9 Inky, 10 light blue, 11 Clyde,
   12 fruit orange (= Clyde RGB; fright pokes leave this alone), 13 yellow,
   14 COL_POWER (pale), 15 pupil blue.
 
@@ -42,7 +42,7 @@ TARGET_COLOR_ROM = (
     1,   # 5 Blinky red (fright-poked)
     2,   # 6 brown
     3,   # 7 Pinky
-    13,  # 8 teal
+    3,   # 8 tile pink (alias of Pinky RGB; not fright-poked)
     5,   # 9 Inky
     6,   # 10 light blue
     7,   # 11 Clyde (fright-poked)
@@ -51,6 +51,18 @@ TARGET_COLOR_ROM = (
     15,  # 14 COL_POWER (= pale)
     11,  # 15 pupil blue
 )
+
+
+# Color-ROM index -> the SHR pen holding that RGB that no runtime palette
+# poke touches (docs/ColorMap.md). Red is pen 3, pink pen 8 and orange
+# pen 12, the aliases of the ghost body pens 5, 7 and 11. Cyan (9) has no
+# spare alias; the fright poke changes it while a ghost is blue. Teal (13)
+# has no pen and takes light blue 10; only the undrawn HUD pear bank #17
+# uses it.
+STABLE_ROM_TO_SHR = {
+    0: 0, 1: 3, 2: 6, 3: 8, 4: 0, 5: 9, 6: 10, 7: 12,
+    8: 0, 9: 13, 10: 0, 11: 15, 12: 4, 13: 10, 14: 2, 15: 1,
+}
 
 
 def load_prom_colors(color_rom: Path) -> list[tuple[int, int, int]]:
