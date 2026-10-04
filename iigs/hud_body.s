@@ -16,6 +16,13 @@ HudStrHighScore
 	db	$48,$49,$47,$48,$40	; "HIGH "
 	db	$53,$43,$4F,$52,$45	; "SCORE"
 	db	$FF
+* The arcade's nine-cell credit band ($403B down to $4033): CREDIT, a
+* space, then the two digits; or FREE PLAY across all nine.
+HudStrCredit
+	db	$43,$52,$45,$44,$49,$54,$40,$FF	; "CREDIT "
+HudStrFreePlay
+	db	$46,$52,$45,$45,$40		; "FREE "
+	db	$50,$4C,$41,$59,$FF		; "PLAY"
 
 InitHUD
 * Demo state: no score, 10000 to beat, three lives, level 1 (cherry).
@@ -28,6 +35,7 @@ InitHUD
 	sta	>HISCORE_LO
 	sta	>HISCORE_MID
 	sta	>LEVEL
+	sta	>CREDITS
 	lda	#$01
 	sta	>HISCORE_HI		; BCD 01/00/00 = 10000
 	lda	#START_LIVES
@@ -65,6 +73,55 @@ DrawHudChrome
 	sta	<R_Y
 	ldx	#HudStrHighScore
 	jsr	DrawHudString
+	jsr	DrawCredits
+	plp
+	rts
+
+DrawCredits
+* CREDITS (BCD, $FF free play) as the arcade's show_credits ($2BA1) draws
+* it. All nine cells are painted opaque each time, so switching between
+* the two forms or dropping from 10 to 9 leaves nothing behind.
+	php
+	rep	#$30
+	lda	#COL_DIGIT
+	sta	<R_PEN
+	lda	#HUD_CREDIT_X
+	sta	<R_X
+	lda	#HUD_CREDIT_Y
+	sta	<R_Y
+	lda	>CREDITS
+	and	#$00FF
+	cmp	#$00FF
+	bne	:count
+	ldx	#HudStrFreePlay
+	jsr	DrawHudString
+	plp
+	rts
+:count	ldx	#HudStrCredit
+	jsr	DrawHudString
+	lda	>CREDITS
+	and	#$00F0
+	beq	:space
+	lsr
+	lsr
+	lsr
+	lsr
+	clc
+	adc	#TEXT_DIGIT0
+	bra	:tens
+:space	lda	#TILE_EMPTY
+:tens	sta	<R_TILE
+	jsr	BlitTileAbs
+	lda	<R_X
+	clc
+	adc	#HUD_GLYPH_W
+	sta	<R_X
+	lda	>CREDITS
+	and	#$000F
+	clc
+	adc	#TEXT_DIGIT0
+	sta	<R_TILE
+	jsr	BlitTileAbs
 	plp
 	rts
 
