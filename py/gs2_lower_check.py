@@ -412,7 +412,7 @@ def main() -> int:
                 print(f"wrote {args.png}")
                 client.quit()
                 return 0
-            print("running: keys arrows, WASD, or keypad 8/4/6/2, 5 coin, 1/2 start, Esc pause, Q quit")
+            print("running: keys arrows, WASD, or keypad 8/4/6/2, 5 coin, 1/2 start, Esc pause, Open Apple-Q quit")
             if args.detach:
                 print(f"detached; attach the gs2-debug MCP to {args.socket}")
                 return 0

@@ -289,7 +289,8 @@ LowerSound
 * Volume 0 on oscillators 0-2. They keep running. The shadow is dirtied
 * so the next LowerSound rewrites the DOC instead of matching it and
 * leaving the mute in place. The rack-test skip (Control-S, RackMute)
-* holds that mute until the intermission.
+* holds that mute until the intermission; the Esc pause holds it until
+* the resume.
 SoundMute
 	php
 	sei

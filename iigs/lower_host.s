@@ -393,7 +393,8 @@ LowerInit
 * (8 up, 4 left, 6 right, 2 down) steer. 5 or C is coin 1, 1 and 2
 * are the start buttons, Control-S is the rack test (clears the
 * board; the main loop mutes the DOC until the intermission), Esc
-* pauses, Q quits (carry set). Directions use any-key-down so a
+* pauses and mutes the DOC (the first LowerSound after the resume
+* restores the voices), Open Apple-Q quits (carry set). Directions use any-key-down so a
 * held key holds the stick.
 *
 * The keypad and the number row produce the same ASCII. KEYMOD bit 4
@@ -423,7 +424,12 @@ LowerKeys
 	beq	:qq
 	cmp	#'q'
 	bne	:case
-:qq	brl	:quit
+:qq	pha
+	lda	>BUTN0
+	asl				; Open Apple (bit 7) into carry
+	pla
+	bcc	:case			; plain Q is not quit
+	brl	:quit
 :case	cmp	#$60
 	bcc	:kst
 	sbc	#$20			; lower case to upper
@@ -478,6 +484,8 @@ LowerKeys
 	lda	>DEMO_FREEZE
 	eor	#1
 	sta	>DEMO_FREEZE
+	beq	:done
+	jsr	SoundMute
 	bra	:done
 :quit	lda	>KBDSTRB
 	plp

@@ -92,13 +92,15 @@ The audio in PacMan/Ms PacMan is a wavetable based, though each wave is relative
 
 There is a key mapped to each arcade Pac-Man input: the stick, the 1- and 2-player start buttons, insert coin, and a rack-test switch that skips a level. The stick is the arrow keys, WASD, or the numeric keypad (8 up, 4 left, 6 right, 2 down). The keypad shares ASCII codes with the number row, so the IIgs keypad bit tells them apart: number-row 1, 2, and 5 stay the buttons below, and those same keys on the keypad do not.
 
-C or 5: Insert coin
-1: Start 1-player game
-2: Start 2-player game
-WASD, arrows, or keypad 8/4/6/2: steer Pac-Man
-Control-S: skip to the next level
-Esc: pause
-Q: quit 
+| Key | Action |
+|-----|--------|
+| C or 5 | Insert coin |
+| 1 | Start 1-player game |
+| 2 | Start 2-player game |
+| WASD, arrows, or keypad 8/4/6/2 | Steer Pac-Man |
+| Control-S | Skip to the next level |
+| Esc | Pause |
+| Open Apple-Q | Quit |
 
 # Conclusion
 

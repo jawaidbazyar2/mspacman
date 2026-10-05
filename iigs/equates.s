@@ -16,6 +16,7 @@ KBD            equ $E0C000	; bit7=strobe; 0–6=key
 KBDSTRB        equ $E0C010	; read: clear strobe; bit7=AKD (IIe/IIgs); 0–6=key
 KEYMOD         equ $E0C025	; modifiers; bit4 = key in the latch is from the keypad
 KEYMOD_PAD     equ $10
+BUTN0          equ $E0C061	; bit7 = Open Apple (button 0) down
 BORDCOLOR      equ $E0C034	; low nibble = border
 TXTCLR         equ $E0C050
 * Sound GLU (the DOC's window). SOUNDCTL: bit 7 busy, bit 6 RAM (vs
