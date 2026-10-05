@@ -62,11 +62,27 @@ Then we render that to the GS screen through a "iigs host" layer.
 
 All coordinates of the monsters, PacMan, motion etc are calculated using original-game-pixels, then scaled to IIgs coordinates. So the timing of movement is identical to original, with the exception that original was 60Hz and the IIgs is of course 59.9226Hz. 
 
-The sprites are all compiled, so instead of trying to copy pixel data, it’s just a 816 subroutine that writes a sprite to RAM
+The original Ms PacMan screen is a normal 4:3 NTSC display but it's rotated so it's portrait mode. It's 28 x 36 tiles of 8x8, so 224 x 288 pixels. 
 
-The graphics scaling is 6/8, which if I did my math right provides same aspect ratio as the original game. But it does mean I can write whole bytes and not mess with 4-bit updates which would be S L O W.
+The original game also has a tiles+sprites system, with 16x16 sprites that can be drawn anywhere on screen, as well as flipped on the H or V axes or both. Each tile location on screen can have one of a number of 4 color palettes, as can each sprite.
 
-Credit to fatdog for cleaning up the rescaled tiles and sprites.
+The IIgs screen is normal 4:3 and 320x200, and is a bare frame buffer with no sprites. Also, the 16-color palette is for the entire display, so we clearly have a challenge fitting the display here.
+
+First, color mapping is done. We use palette color flipping in only one place, at the end of a level where the maze flashes, which is done by erasing the sprites and dot tiles, then changing the two palette entries. 
+
+All other sprite/tile palette colors are mapped into the 16-color IIgs palette. Some of the entries change per level.
+
+I chose to scale the graphics 6/8, which if I did my math right provides same aspect ratio as the original game. But it does mean I can write whole bytes and not mess with 4-bit updates which would be S L O W. On the IIgs 320 mode, one byte is two pixels. So this scale maintains the aspect ratio and keeps all writes byte-aligned.
+
+The sprites are all compiled, so instead of trying to copy pixel data, it’s just a 816 subroutine that writes a sprite to RAM, performing overlay and transparency (with color 0).
+
+Python programs generate the various compiled sprites from ppm source files.
+
+Tiles are only ever drawn on 6-pixel boundaries. Sprites, however, can be drawn at arbitrary pixel locations. So, I generate two routines for each sprite, one at even pixel, one at odd pixel, and, the 12x12 sprite is inside a 14x12 container, so we still have a byte boundary no matter the sprite position.
+
+Another key optimization is that the maze (tiles) is rendered first to a backing store. Sprites have to be drawn, then erased and drawn at new location if they moved. The erase is done by just copying the backing store pixels back into the frame buffer. Each new level, a new backing store is generated.
+
+Credit to fatdog for cleaning up the rescaled tiles and sprites. Going from 8x8 to 6x6 is not easy, but he is a master at this!
 
 ## Audio
 
@@ -74,7 +90,15 @@ The audio in PacMan/Ms PacMan is a wavetable based, though each wave is relative
 
 ## Input
 
-There is a key mapped to each arcade PacMan input: arrows to what was joystick on the game; 1 and 2 player start buttons, insert Coin; and a Rack Test switch that skips a level.
+There is a key mapped to each arcade Pac-Man input: the stick, the 1- and 2-player start buttons, insert coin, and a rack-test switch that skips a level. The stick is the arrow keys, WASD, or the numeric keypad (8 up, 4 left, 6 right, 2 down). The keypad shares ASCII codes with the number row, so the IIgs keypad bit tells them apart: number-row 1, 2, and 5 stay the buttons below, and those same keys on the keypad do not.
+
+C or 5: Insert coin
+1: Start 1-player game
+2: Start 2-player game
+WASD, arrows, or keypad 8/4/6/2: steer Pac-Man
+Control-S: skip to the next level
+Esc: pause
+Q: quit 
 
 # Conclusion
 

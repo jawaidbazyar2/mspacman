@@ -534,6 +534,8 @@ Simulate the arcade **4-way stick** with keyboard **any-key-down** (level-sensit
 - Game build (`input_adapt.s`): IIgs keyboard is strobe-based, so directions are **latched** on key events into soft `STICK_IN0` (active-low like arcade `IN0`). Esc/Q quits. Demo build still exits on any key.
 - Start / coin (credit) / pause remain TBD; joystick hardware can be added later without changing this keyboard map.
 
+The lowered host (`iigs/lower_host.s`) uses a different map: arrows, WASD, and keypad 8/4/6/2. A and Z are not direction keys. Number-row 1, 2, and 5 are still start and coin; the keypad forms of those ASCII codes are not, because `$C025` bit 4 marks a keypad key.
+
 ---
 
 ## 5. Sound

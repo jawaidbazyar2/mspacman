@@ -389,12 +389,23 @@ LowerInit
 	rts
 
 *------------------------------------------------------------------
-* Keyboard -> IN0 / IN1 (active low). Arrows or A/Z steer, 5 or C is
-* coin 1, 1 and 2 are the start buttons, Control-S is the rack test
-* (clears the board; the main loop mutes the DOC until the intermission),
-* Esc pauses, Q quits (carry set). Directions use
-* any-key-down so a held key holds the stick.
+* Keyboard -> IN0 / IN1 (active low). Arrows, WASD, or the keypad
+* (8 up, 4 left, 6 right, 2 down) steer. 5 or C is coin 1, 1 and 2
+* are the start buttons, Control-S is the rack test (clears the
+* board; the main loop mutes the DOC until the intermission), Esc
+* pauses, Q quits (carry set). Directions use any-key-down so a
+* held key holds the stick.
+*
+* The keypad and the number row produce the same ASCII. KEYMOD bit 4
+* is set when the strobed key came from the keypad, so number-row 1,
+* 2 and 5 stay start and coin, and keypad 1 and 5 do not. That bit is
+* valid only while the strobe is set. KBDSTRB clears it, and KEYMOD
+* then reads as the live modifiers with the keypad bit gone, so the
+* pair is kept in KeyAscii/KeyPad for as long as the key is held.
 *------------------------------------------------------------------
+KS_ANY	equ	0		; either keyboard
+KS_MAIN	equ	1		; number row / letters, not the keypad
+KS_PAD	equ	2		; numeric keypad only
 	mx	%10
 LowerKeys
 	php
@@ -406,29 +417,44 @@ LowerKeys
 	bpl	:akd
 	and	#$7F
 	cmp	#KEY_ESC
-	beq	:pause
-	cmp	#'Q'
-	beq	:quit
+	bne	:nesc
+	brl	:pause
+:nesc	cmp	#'Q'
+	beq	:qq
 	cmp	#'q'
-	beq	:quit
+	bne	:case
+:qq	brl	:quit
+:case	cmp	#$60
+	bcc	:kst
+	sbc	#$20			; lower case to upper
+:kst	sta	|KeyAscii
+	lda	>KEYMOD
+	and	#KEYMOD_PAD
+	sta	|KeyPad
 :akd	lda	>KBDSTRB
 	bpl	:done
 	and	#$7F
 	cmp	#$60
 	bcc	:upper
 	sbc	#$20			; lower case to upper
-:upper	ldx	#0
-]k	cmp	|:keys,x
-	beq	:hit
-	inx
-	inx
-	inx
-	cpx	#:keys_end-:keys
-	bcc	]k
-:done	plp
-	clc
-	rts
-:hit	lda	|:keys+2,x
+:upper	sta	|KeyNow
+	cmp	|KeyAscii
+	beq	:scan
+	stz	|KeyPad			; not the strobed key; don't inherit its source
+:scan	ldx	#0
+]k	lda	|KeyNow
+	cmp	|:keys,x
+	bne	:adv
+	lda	|:keys+3,x
+	beq	:apply
+	cmp	#KS_PAD
+	beq	:onpad
+	lda	|KeyPad
+	beq	:apply			; main-only, and this key is not from the keypad
+	bra	:adv
+:onpad	lda	|KeyPad
+	beq	:adv
+:apply	lda	|:keys+2,x
 	beq	:in1
 	eor	#$FF
 	and	>G_IN0
@@ -439,6 +465,15 @@ LowerKeys
 	and	>G_IN1
 	sta	>G_IN1
 	bra	:done
+:adv	inx
+	inx
+	inx
+	inx
+	cpx	#:keys_end-:keys
+	bcc	]k
+:done	plp
+	clc
+	rts
 :pause	lda	>KBDSTRB
 	lda	>DEMO_FREEZE
 	eor	#1
@@ -448,18 +483,24 @@ LowerKeys
 	plp
 	sec
 	rts
-* key, IN1 bit, IN0 bit (one of the two is zero)
-:keys	db	$0B,0,$01		; up arrow
-	db	KEY_A,0,$01
-	db	KEY_LEFT,0,$02
-	db	KEY_RIGHT,0,$04
-	db	$0A,0,$08		; down arrow
-	db	KEY_Z,0,$08
-	db	'5',0,$20		; coin 1
-	db	'C',0,$20
-	db	'1',$20,0		; start 1
-	db	'2',$40,0		; start 2
-	db	$13,0,$10		; Control-S: rack test
+* key, IN1 bit, IN0 bit (one of the two is zero), source
+:keys	db	$0B,0,$01,KS_ANY	; up arrow
+	db	'W',0,$01,KS_ANY
+	db	'8',0,$01,KS_PAD
+	db	KEY_LEFT,0,$02,KS_ANY
+	db	'A',0,$02,KS_ANY
+	db	'4',0,$02,KS_PAD
+	db	KEY_RIGHT,0,$04,KS_ANY
+	db	'D',0,$04,KS_ANY
+	db	'6',0,$04,KS_PAD
+	db	$0A,0,$08,KS_ANY	; down arrow
+	db	'S',0,$08,KS_ANY
+	db	'2',0,$08,KS_PAD
+	db	'5',0,$20,KS_MAIN	; coin 1
+	db	'C',0,$20,KS_ANY
+	db	'1',$20,0,KS_MAIN	; start 1
+	db	'2',$40,0,KS_MAIN	; start 2
+	db	$13,0,$10,KS_ANY	; Control-S: rack test
 :keys_end
 	mx	%00
 
@@ -1770,6 +1811,11 @@ SoundHold	db	0
 * Control-S during play. The DOC stays at volume 0 through the maze
 * flash and board clear, and lifts when the intermission starts.
 RackMute	db	0
+* Strobed key (uppercase ASCII) and KEYMOD bit 4 from that press.
+* Held-key polling happens after the strobe is clear.
+KeyAscii	db	0
+KeyPad	db	0
+KeyNow	db	0		; key held this frame
 CreditOn	db	0	; effect channel 1's credit bit has been seen
 HoldTimer	db	0
 SH_HUD	ds	16	; score1 x3, hiscore x3, lives, level, credits, players, score2 x3
