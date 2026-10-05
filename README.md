@@ -1,5 +1,7 @@
 # Ms. Pac-Man → Apple IIgs
 
+THIS PROJECT IS PURELY FOR EDUCATIONAL PURPOSES.
+
 Port arcade Ms. Pac-Man to the **Apple IIgs**.
 
 Phase 0 was: a trustworthy Z80 source pipeline: real assemblable instructions that rebuild **byte-identical** known-good ROMs (`boot1`–`boot6` from MAME’s `mspacmab` set). Once that foundation is solid, the codebase can evolve toward a 65816 / IIgs target (graphics, sound, input).
