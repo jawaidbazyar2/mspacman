@@ -515,6 +515,34 @@ DrawAllSprites
 	inx
 	cpx	#NUM_ACTORS
 	bcc	]d
+* Stork head ($30, act-3 blit 0) shares its Y with the body. Equal Y
+* keeps the lower actor index behind, so the wing would cover the beak.
+* Draw the head once more, on top.
+	ldx	#0
+]hd	phx
+	rep	#$30
+	txa
+	and	#$00FF
+	sta	<R_ACT
+	asl
+	asl
+	asl
+	asl
+	tax
+	lda	>ACTORS+ACT_FLAGS,x
+	and	#$00FF
+	bit	#FLAG_ACT3
+	beq	:nohd
+	lda	>ACTORS+ACT_SPR,x
+	and	#$00FF
+	bne	:nohd
+	lda	<R_ACT
+	jsr	DrawSprite
+:nohd	sep	#$30
+	plx
+	inx
+	cpx	#NUM_ACTORS
+	bcc	]hd
 	plp
 	rts
 
@@ -733,7 +761,44 @@ DrawSprite
 	rts
 :yOk	jsr	ScreenXY
 	jsr	BckXY
-	lda	<R_ACT
+* Act clapper: four sprites $10-$17, on ghost, Ms. Pac and fruit slots.
+	ldx	<R_BASE
+	lda	>ACTORS+ACT_FLAGS,x
+	and	#$00FF
+	bit	#FLAG_CLAPPER
+	beq	:notClap
+	lda	>ACTORS+ACT_SPR,x
+	and	#$0007
+	asl				; slot*2
+	sta	<R_OFF
+	lda	<R_X
+	and	#$0001
+	ora	<R_OFF
+	asl				; word index
+	tax
+	lda	<R_DEST
+	tay
+	jsr	ActBlitGo
+	brl	:blitDone
+* Act 3 stork, sack and junior. ACT_SPR is the Act3BlitTable index.
+:notClap	lda	>ACTORS+ACT_FLAGS,x
+	and	#$00FF
+	bit	#FLAG_ACT3
+	beq	:notAct3
+	lda	>ACTORS+ACT_SPR,x
+	and	#$000F
+	asl				; slot*2
+	sta	<R_OFF
+	lda	<R_X
+	and	#$0001
+	ora	<R_OFF
+	asl				; word index
+	tax
+	lda	<R_DEST
+	tay
+	jsr	Act3BlitGo
+	brl	:blitDone
+:notAct3	lda	<R_ACT
 	cmp	#FRUIT_ACTOR
 	bne	:notFruit
 	brl	:fruitBlit

@@ -29,6 +29,8 @@
 	mx	%00
 	put	compiled_mspac.s
 	mx	%00
+	put	compiled_acts.s
+	mx	%00
 	put	hud_body.s
 	put	palette_data.s
 	put	tile_bank_data.s

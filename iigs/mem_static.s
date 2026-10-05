@@ -15,6 +15,7 @@ BANK_BCK       equ $04
 BANK_WORK      equ $020000
 BANK2          equ $020000
 BUILD_GSOS     equ 0
+GSOS_PROD      equ 0
 
 SHR_PIXELS     equ $012000
 SHR_SCB        equ $019D00
@@ -51,6 +52,9 @@ HISCORE_HI     equ $04A90D
 LIVES          equ $04A90E
 LEVEL          equ $04A90F
 CREDITS        equ $04A910	; BCD credits shown in HUD (arcade #4E6E)
+SCORE2_LO      equ $04A911	; P2 score, BCD lo/mid/hi (arcade #4E84)
+SCORE2_MID     equ $04A912
+SCORE2_HI      equ $04A913
 ROW_ADDR       equ $04AB00
 ROW_BCK        equ $04AD00
 

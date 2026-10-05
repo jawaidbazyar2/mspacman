@@ -12,6 +12,8 @@
 * at descending VRAM addresses); upright we draw left→right.
 HudStr1UP
 	db	$31,$55,$50,$FF		; "1UP"
+HudStr2UP
+	db	$32,$55,$50,$FF		; "2UP"
 HudStrHighScore
 	db	$48,$49,$47,$48,$40	; "HIGH "
 	db	$53,$43,$4F,$52,$45	; "SCORE"
@@ -32,6 +34,9 @@ InitHUD
 	sta	>SCORE_LO
 	sta	>SCORE_MID
 	sta	>SCORE_HI
+	sta	>SCORE2_LO
+	sta	>SCORE2_MID
+	sta	>SCORE2_HI
 	sta	>HISCORE_LO
 	sta	>HISCORE_MID
 	sta	>LEVEL
@@ -168,6 +173,75 @@ DrawScore
 	plp
 	rts
 
+DrawScore2
+	php
+	rep	#$30
+	lda	#COL_DIGIT
+	sta	<R_PEN
+	lda	#HUD_SCORE2_X
+	sta	<R_X
+	lda	#HUD_SCORE2_Y
+	sta	<R_Y
+	ldx	#SCORE2_OFF		; SCORE_LO + 9..11 == SCORE2_LO..HI
+	jsr	DrawScoreBCD
+	plp
+	rts
+
+Draw2UP
+	php
+	rep	#$30
+	lda	#COL_DIGIT
+	sta	<R_PEN
+	lda	#HUD_2UP_X
+	sta	<R_X
+	lda	#HUD_2UP_Y
+	sta	<R_Y
+	ldx	#HudStr2UP
+	jsr	DrawHudString
+	plp
+	rts
+
+* Erase the 2UP label and its six digits. One-player games, and the
+* return from a two-player game, leave this band black.
+Hide2UP
+	php
+	rep	#$30
+	lda	#COL_DIGIT
+	sta	<R_PEN
+	lda	#HUD_2UP_X
+	sta	<R_X
+	lda	#HUD_2UP_Y
+	sta	<R_Y
+	lda	#3
+	jsr	ClearHudGlyphs
+	lda	#HUD_SCORE2_X
+	sta	<R_X
+	lda	#HUD_SCORE2_Y
+	sta	<R_Y
+	lda	#HUD_SCORE_DIGITS
+	jsr	ClearHudGlyphs
+	plp
+	rts
+
+* A = glyph count. R_X/R_Y = origin. Writes that many blank tiles.
+ClearHudGlyphs
+	php
+	rep	#$30
+	sta	<R_ACT
+]cg	lda	#TILE_EMPTY
+	sta	<R_TILE
+	jsr	BlitTileAbs
+	lda	<R_X
+	clc
+	adc	#HUD_GLYPH_W
+	sta	<R_X
+	lda	<R_ACT
+	dec
+	sta	<R_ACT
+	bne	]cg
+	plp
+	rts
+
 DrawHiscore
 	php
 	rep	#$30
@@ -183,7 +257,7 @@ DrawHiscore
 	rts
 
 DrawScoreBCD
-* X = byte offset from SCORE_LO (0=P1, 3=hiscore); R_X/R_Y = origin.
+* X = byte offset from SCORE_LO (0=P1, 3=hiscore, 9=P2); R_X/R_Y = origin.
 * Six digits high→low, blanking up to HUD_BLANK_LEAD leading zeros so a fresh
 * score reads "00" like the arcade (j_2abe / j_2ace).
 	php

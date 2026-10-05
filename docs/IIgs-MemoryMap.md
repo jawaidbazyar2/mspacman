@@ -182,7 +182,8 @@ Base = `$04A400 + index×16`. Indexed in asm as `X = index×16` with `>ACTORS+fi
 | `$04/A90E` | `LIVES` | 1 | Lives shown in HUD (arcade `#4E15`) |
 | `$04/A90F` | `LEVEL` | 1 | Level number, 0 = cherry (arcade `#4E13`) |
 | `$04/A910` | `CREDITS` | 1 | Credits shown in HUD, BCD, `$FF` = free play (arcade `#4E6E`) |
-| `$04/A911`–`$04/A9FF` | — | — | Free |
+| `$04/A911`–`$04/A913` | `SCORE2_LO/MID/HI` | 3 | P2 score, BCD lo/mid/hi (arcade `#4E84`) |
+| `$04/A914`–`$04/A9FF` | — | — | Free |
 | `$04/AB00`–`$04/ACFF` | `ROW_ADDR` | 512 | `ScreenXY` LUT: `[y] = y*S_SHR` |
 | `$04/AD00`–`$04/AEFF` | `ROW_BCK` | 512 | `BckXY` LUT: `[y] = y*S_BCK` |
 

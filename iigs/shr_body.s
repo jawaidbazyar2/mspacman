@@ -13,6 +13,8 @@ InitSHR
 	lda	#$C1
 	sta	>NEWVIDEO
 	sta	>TXTCLR
+	lda	#BRD_VBL
+	sta	>BORDCOLOR
 * Normal SHR shadow on bank $01 (bit3=0). Bit6 clear — IOLC intact;
 * BCK lives at BCK_PIXELS (static $04/2000 or GS/OS segment), not $01/A000.
 * Soft-switches via $E0/$E1.
@@ -129,12 +131,16 @@ BlinkPowerPills
 
 SetBorder
 * A = color 0–15. Prefer $E0/C034 (Mega II path).
+	do	GSOS_PROD
+	rts
+	else
 	php
 	sep	#$20
 	and	#$0F
 	sta	>BORDCOLOR
 	plp
 	rts
+	fin
 
 WaitVBL
 * $E1/C019 bit7=1 during blank (TN #40).

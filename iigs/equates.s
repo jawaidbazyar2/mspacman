@@ -17,7 +17,9 @@ KBDSTRB        equ $E0C010	; read: clear strobe; bit7=AKD (IIe/IIgs); 0–6=key
 BORDCOLOR      equ $E0C034	; low nibble = border
 TXTCLR         equ $E0C050
 * Sound GLU (the DOC's window). SOUNDCTL: bit 7 busy, bit 6 RAM (vs
-* registers), bit 5 auto-increment, bits 3-0 master volume (write-only).
+* registers), bit 5 auto-increment, bits 3-0 amplifier (write-only,
+* read back as $F). A mode write copies the Control Panel nibble at
+* SYS_VOL so the store does not change the amplifier.
 SOUNDCTL       equ $E0C03C
 SOUNDDATA      equ $E0C03D
 SOUNDADRL      equ $E0C03E
@@ -124,6 +126,8 @@ FLAG_DRAWN     equ $01
 FLAG_NODRAW    equ $02		; skip DrawSprite (inactive fruit, tunnel / Y clip)
 FLAG_POINTS    equ $04		; points blit: ghost $28–$2B or fruit $08–$0F
 FLAG_CHAR      equ $08		; cutscene Pac / Ms. Pac on a ghost slot: MsPacBlitTable
+FLAG_CLAPPER   equ $10		; act slate sprites $10-$17: ActBlitTable
+FLAG_ACT3      equ $20		; stork, sack, junior: Act3BlitTable (index in ACT_SPR)
 
 * Ghost blit slots (ACT_COLOR), py/gen_compiled_ghosts.py
 COL_BLINKY     equ 0		; red
@@ -154,6 +158,15 @@ HUD_1UP_X      equ 8
 HUD_1UP_Y      equ 4
 HUD_SCORE_X    equ 8
 HUD_SCORE_Y    equ 12
+* 2UP sits under player 1, same 8px label-to-digits pitch. A one-player
+* game leaves this band empty (lives stay at HUD_LIVES_Y).
+HUD_2UP_X      equ 8
+HUD_2UP_Y      equ 20
+HUD_SCORE2_X   equ 8
+HUD_SCORE2_Y   equ 28
+* SCORE2_LO is the first byte after CREDITS. DrawScoreBCD indexes it
+* from SCORE_LO.
+SCORE2_OFF     equ 9
 HUD_LIVES_X    equ 8
 HUD_LIVES_Y    equ 40
 HUD_LIVES_DX   equ 14		; one sprite cell per life icon

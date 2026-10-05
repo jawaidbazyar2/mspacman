@@ -15,7 +15,8 @@
 *   wave   $5045+5v & 7, * $10 + $80 -> DOC $80+v
 *   freq   nibbles $5050+5v+k        -> DOC $00+v / $20+v (sum of FreqNib,
 *          saturating at $FFFF; voices 1 and 2 have no k = 0 nibble)
-*   vol    $5055+5v * 16, 0 when $5001 bit 0 is clear -> DOC $40+v
+*   vol    $5055+5v * $80 / 15 (15 -> $80), 0 when $5001 bit 0
+*          is clear -> DOC $40+v
 *
 * The oscillators never stop; a silent voice is volume 0.
 *
@@ -28,7 +29,6 @@ DOC_TABLE_PAGES	equ	$10	; 4 KB per wave
 DOC_SIZE_RES	equ	$23	; $C0+o: table size 4 (4 KB) << 3, resolution 3
 WAVE_STRETCH	equ	128	; table bytes per sample
 DOC_OSCS_E1	equ	$06	; $E1: (4 - 1) * 2, the SR of wave_data.s
-VOL_SCALE_SH	equ	4	; DOC volume = WSG volume << 4
 GLU_REGS	equ	$00	; SOUNDCTL: DOC registers, no auto-increment
 GLU_RAM_INC	equ	$60	; SOUNDCTL: DOC RAM, auto-increment
 
@@ -222,17 +222,17 @@ LowerSound
 	rep	#$20
 
 :vol	ldx	<SD_X
-	lda	#0
+	lda	#0			; B = 0, so the nibble zero-extends
 	sep	#$20
 	lda	>G_SOUND_ON
 	and	#$01
 	beq	:setvol
 	lda	>G_VOICE+$15,x
 	and	#$0F
-	asl
-	asl
-	asl
-	asl
+	rep	#$20
+	tay
+	sep	#$20
+	lda	|VolScale,y		; 15 -> $80
 :setvol	ldx	<SD_V
 	cmp	|SndVol,x
 	beq	:wave
@@ -288,7 +288,8 @@ LowerSound
 
 * Volume 0 on oscillators 0-2. They keep running. The shadow is dirtied
 * so the next LowerSound rewrites the DOC instead of matching it and
-* leaving the mute in place.
+* leaving the mute in place. The rack-test skip (Control-S, RackMute)
+* holds that mute until the intermission.
 SoundMute
 	php
 	sei
@@ -336,7 +337,9 @@ SoundOff
 	plp
 	rts
 
-* M=8. SOUNDCTL to DOC registers at the system volume.
+* M=8. Point SOUNDCTL at the DOC registers, no auto-increment.
+* Bits 3-0 are write-only (a read returns $F), so the Control Panel
+* nibble at SYS_VOL is copied in. The game does not choose it.
 GluRegs
 	lda	>SYS_VOL
 	and	#$0F
@@ -362,6 +365,11 @@ DocPoke
 	pla
 	sta	>SOUNDDATA
 	rts
+
+* WSG volume 0-15 -> DOC volume. n * $80 / 15, so 15 is $80.
+VolScale
+	db	$00,$08,$11,$19,$22,$2A,$33,$3B
+	db	$44,$4C,$55,$5D,$66,$6E,$77,$80
 
 * Last values written per oscillator; $FF/$FFFF until SoundInit's
 * first frame writes them all.

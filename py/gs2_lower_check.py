@@ -219,7 +219,8 @@ def doc_expected(rec: bytes) -> list[tuple[int, int, int]]:
         nib = [voice[0x10 + 5 * v + k] for k in range(5)]
         if v:
             nib[0] = 0
-        vol = voice[0x15 + 5 * v] << 4 if on else 0
+        # VolScale in lower_sound.s: linear, WSG 15 -> DOC $80.
+        vol = (voice[0x15 + 5 * v] * 0x80) // 15 if on else 0
         out.append((doc_freq(nib), vol, wave_page(voice[5 + 5 * v]) << 8))
     return out
 

@@ -1,7 +1,7 @@
 *
-* Merlin32 link: GS/OS lowered game -> MSPACLOW.SYS16 (make iigs-lower-gsos)
+* Merlin32 link: GS/OS lowered game -> MSPACMAN.SYS16 (make iigs-lower-gsos)
 *
-	dsk	MSPACLOW.SYS16
+	dsk	MSPACMAN.SYS16
 	typ	$B3			; S16 application
 
 * Segment 1: code (gsos_entry.s's Start is the entry at offset 0)

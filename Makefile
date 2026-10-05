@@ -55,7 +55,7 @@ SDL_LIBS := -L/usr/local/lib -lSDL3 -Wl,-rpath,/usr/local/lib
 
 .PHONY: all clean verify sjasmplus-check gfx gfx-ppm gfx-rom palette maze tiles-preview \
 	iigs iigs-test iigs-demo iigs-game iigs-game-test iigs-game-demo iigs-gsos \
-	iigs-lower lower-iigs-check iigs-lower-demo iigs-lower-gsos \
+	iigs-lower lower-iigs-check iigs-lower-demo iigs-lower-gsos iigs-gsos-prod FORCE \
 	lift lift-check c c-check c-only-check idiom idiom-check idiom-cov \
 	lower lower-check lower-cov lower-only lower-only-check
 
@@ -354,7 +354,8 @@ tiles-preview: maze
 
 # Shared compiled blit deps
 IIGS_COMPILED := $(IIGS_DIR)/compiled_ghosts.s $(IIGS_DIR)/compiled_fruits.s \
-		$(IIGS_DIR)/compiled_points.s $(IIGS_DIR)/compiled_mspac.s
+		$(IIGS_DIR)/compiled_points.s $(IIGS_DIR)/compiled_mspac.s \
+		$(IIGS_DIR)/compiled_acts.s
 
 # Assemble IIgs rail demo → build/iigs/harness.bin
 iigs: palette rails gfx $(IIGS_COMPILED) $(IIGS_BIN)
@@ -384,6 +385,10 @@ $(IIGS_DIR)/compiled_points.s: py/gen_compiled_points.py \
 $(IIGS_DIR)/compiled_mspac.s: py/gen_compiled_mspac.py \
 		$(GFX_DIR)/sprites14x12.bin $(PALETTE_ROM) py/gen_shr_gfx.py py/gen_palette.py
 	python3 py/gen_compiled_mspac.py --gfx $(GFX_DIR) --palette-rom $(PALETTE_ROM) -o $(IIGS_DIR)/compiled_mspac.s
+
+$(IIGS_DIR)/compiled_acts.s: py/gen_compiled_acts.py \
+		$(GFX_DIR)/sprites14x12.bin $(PALETTE_ROM) py/gen_shr_gfx.py py/gen_palette.py
+	python3 py/gen_compiled_acts.py --gfx $(GFX_DIR) --palette-rom $(PALETTE_ROM) -o $(IIGS_DIR)/compiled_acts.s
 
 $(IIGS_DIR)/ghost_work_blit.s: py/gen_ghost_work_blit.py
 	python3 py/gen_ghost_work_blit.py -o $(IIGS_DIR)/ghost_work_blit.s
@@ -518,19 +523,35 @@ lower-iigs-check: iigs-lower
 iigs-lower-demo: iigs-lower
 	PYTHONPATH=$(GS2_PY) python3 py/gs2_lower_check.py --gs2 $(GSSQUARED) --play
 
-# The lowered game as a GS/OS S16 application on its own 800K ProDOS
-# disk: MSPACLOW.SYS16 is the host (code segment) plus data segments for
-# the bank-aligned game bank (ROM image and lower.bin at $A000), the BCK
-# strip, the art and the renderer's work RAM. Mount the disk beside a
-# GS/OS boot disk and open MSPACLOW.SYS16 from the Finder.
+# The lowered game as a GS/OS S16 application, MSPACMAN.SYS16: the host
+# (code segment) plus data segments for the bank-aligned game bank (ROM
+# image and lower.bin at $A000), the BCK strip, the art and the renderer's
+# work RAM. The disk is a copy of $(IIGS_GSOS_TEMPLATE), a minimal GS/OS
+# boot volume (MSPACMAN) with no System:Start and no application of its
+# own. The launcher boots only a root file named *.SYS16, *.SYSTEM or
+# START, so the name must keep .SYS16. Add only the application to the
+# copy; never write the template. It is built in $(IIGS_BUILD)/gsos
+# because the frozen iigs-gsos target owns $(IIGS_GSOS_BIN).
 # IIGS_LOWER_GSOS_INSTALL=1 also copies it onto $(IIGS_GSOS_DISK).
-IIGS_LOWER_GSOS := $(IIGS_BUILD)/MSPACLOW.SYS16
-IIGS_LOWER_DISK ?= $(IIGS_BUILD)/MsPacLower.2mg
+# make iigs-gsos-prod builds the same disk with GSOS_PROD=1: no border
+# phase colors (SetBorder is an RTS).
+IIGS_LOWER_GSOS_DIR := $(IIGS_BUILD)/gsos
+IIGS_LOWER_GSOS := $(IIGS_LOWER_GSOS_DIR)/MSPACMAN.SYS16
+IIGS_LOWER_DISK ?= $(IIGS_BUILD)/MsPacMan.2mg
+IIGS_GSOS_TEMPLATE := assets/template.2mg
 IIGS_LOWER_GSOS_STAGE := $(IIGS_LOWER_STAGE)/gsos
+GSOS_PROD ?= 0
+IIGS_LOWER_GSOS_MODE := $(IIGS_BUILD)/gsos_mode
+
+# Rewritten only when GSOS_PROD changes, so switching modes reassembles.
+$(IIGS_LOWER_GSOS_MODE): FORCE | $(IIGS_BUILD)
+	@echo "GSOS_PROD=$(GSOS_PROD)" | cmp -s - $@ || echo "GSOS_PROD=$(GSOS_PROD)" > $@
+
+FORCE:
 
 $(IIGS_LOWER_GSOS): $(LOWER_ASM) $(LOWER_DIR)/entries.s $(LOWER_DIR)/entry_ids.s \
 		$(wildcard $(IIGS_DIR)/*.s) $(IIGS_WAVE_DATA) $(BIN) $(GFX_BINS) py/omf_fix_align.py \
-		$(MERLIN32) | $(IIGS_BUILD)
+		$(IIGS_LOWER_GSOS_MODE) $(MERLIN32) | $(IIGS_BUILD)
 	rm -rf $(IIGS_LOWER_GSOS_STAGE)
 	mkdir -p $(IIGS_LOWER_GSOS_STAGE)/game $(IIGS_LOWER_GSOS_STAGE)/host
 	cp $(LOWER_DIR)/*.s $(IIGS_LOWER_GSOS_STAGE)/game/
@@ -545,22 +566,30 @@ $(IIGS_LOWER_GSOS): $(LOWER_ASM) $(LOWER_DIR)/entries.s $(LOWER_DIR)/entry_ids.s
 		fi
 	cp $(IIGS_DIR)/*.s $(LOWER_DIR)/entry_ids.s $(BIN) $(GFX_BINS) \
 		$(IIGS_LOWER_GSOS_STAGE)/game/lower_a000.bin $(IIGS_LOWER_GSOS_STAGE)/host/
+	@if [ "$(GSOS_PROD)" = 1 ]; then \
+		sed -i '' 's/^GSOS_PROD      equ 0/GSOS_PROD      equ 1/' $(IIGS_LOWER_GSOS_STAGE)/host/mem_gsos.s && \
+		grep -q '^GSOS_PROD      equ 1' $(IIGS_LOWER_GSOS_STAGE)/host/mem_gsos.s && \
+		echo "GSOS_PROD=1: border profiler off"; \
+	fi
 	$(call merlin_in,$(IIGS_LOWER_GSOS_STAGE)/host,link_gsos_lower.s)
-	python3 py/omf_fix_align.py $(IIGS_LOWER_GSOS_STAGE)/host/MSPACLOW.SYS16 Game=0x10000
-	cp $(IIGS_LOWER_GSOS_STAGE)/host/MSPACLOW.SYS16 $@
-	@echo "MSPACLOW.SYS16 $$(wc -c < $@) bytes"
+	python3 py/omf_fix_align.py $(IIGS_LOWER_GSOS_STAGE)/host/MSPACMAN.SYS16 Game=0x10000
+	mkdir -p $(IIGS_LOWER_GSOS_DIR)
+	cp $(IIGS_LOWER_GSOS_STAGE)/host/MSPACMAN.SYS16 $@
+	@echo "MSPACMAN.SYS16 $$(wc -c < $@) bytes"
 
-iigs-lower-gsos: palette gfx $(IIGS_COMPILED) $(IIGS_LOWER_GSOS)
+iigs-lower-gsos: palette gfx $(IIGS_COMPILED) $(IIGS_LOWER_GSOS) $(IIGS_GSOS_TEMPLATE)
 	rm -f "$(IIGS_LOWER_DISK)"
-	$(CP2) create-disk-image "$(IIGS_LOWER_DISK)" 800k prodos
-	$(CP2) rename "$(IIGS_LOWER_DISK)" : MSPACLOW
-	cd $(IIGS_BUILD) && $(CP2) add --strip-paths "$(abspath $(IIGS_LOWER_DISK))" MSPACLOW.SYS16
-	$(CP2) set-attr "$(IIGS_LOWER_DISK)" type=0xb3,aux=0x0000 MSPACLOW.SYS16
+	cp $(IIGS_GSOS_TEMPLATE) "$(IIGS_LOWER_DISK)"
+	cd $(IIGS_LOWER_GSOS_DIR) && $(CP2) add --strip-paths --no-strip-ext "$(abspath $(IIGS_LOWER_DISK))" MSPACMAN.SYS16
+	$(CP2) set-attr "$(IIGS_LOWER_DISK)" type=0xb3,aux=0x0000 MSPACMAN.SYS16
 	@if [ "$(IIGS_LOWER_GSOS_INSTALL)" = 1 ]; then \
-		cd $(IIGS_BUILD) && $(CP2) add --overwrite --strip-paths "$(IIGS_GSOS_DISK)" MSPACLOW.SYS16 && \
-		$(CP2) set-attr "$(IIGS_GSOS_DISK)" type=0xb3,aux=0x0000 MSPACLOW.SYS16; \
+		cd $(IIGS_LOWER_GSOS_DIR) && $(CP2) add --overwrite --strip-paths --no-strip-ext "$(IIGS_GSOS_DISK)" MSPACMAN.SYS16 && \
+		$(CP2) set-attr "$(IIGS_GSOS_DISK)" type=0xb3,aux=0x0000 MSPACMAN.SYS16; \
 	fi
 	$(CP2) catalog "$(IIGS_LOWER_DISK)"
+
+iigs-gsos-prod:
+	$(MAKE) iigs-lower-gsos GSOS_PROD=1
 
 # Spawn GSSquared, inject harness + assets, dump SHR frame PNG.
 iigs-test: gfx maze iigs

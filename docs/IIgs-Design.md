@@ -501,11 +501,11 @@ The 76 px gutters either side of the playfield carry the chrome the arcade puts 
 
 | Gutter | Contents | Origin |
 |--------|----------|--------|
-| Left | `1UP`, P1 score, life icons, `CREDIT nn` or `FREE PLAY` | `(8,4)` / `(8,12)` / `(8,40)` / `(8,58)` |
+| Left | `1UP`, P1 score, then `2UP` and P2 score in a two-player game, life icons, `CREDIT nn` or `FREE PLAY` | `(8,4)` / `(8,12)` / `(8,20)` / `(8,28)` / `(8,40)` / `(8,58)` |
 | Right | `HIGH SCORE`, high score, level fruit | `(248,4)` / `(248,12)` / `(252,28)` |
 
 - **Text** reuses arcade glyph tiles: score digits `$00–$09`, ASCII `$40–$5B` (`$40` = space). The art is single-ink, so `BlitTileAbs` recolors any nonzero nibble to `R_PEN` (`COL_DIGIT`, pen 1 white, the arcade's bank `#0F`) while blitting the 6×6 cell — one opaque write, so redraws need no clear. Advance is 6 px/glyph.
-- **Scores** are 3 BCD bytes lo/mid/hi like arcade `#4E80` / `#4E88`; `ScoreAdd10` uses 65816 decimal mode where the Z80 chains `add`/`daa` (`j_2a65`). `DrawScoreBCD` blanks up to 4 leading zeros so a fresh score reads `00` (`j_2abe` / `j_2ace`), and `CheckHighScore` copies P1 over the high score on an MSB→LSB win (`j_2a91`).
+- **Scores** are 3 BCD bytes lo/mid/hi like arcade `#4E80` / `#4E84` / `#4E88`; `ScoreAdd10` uses 65816 decimal mode where the Z80 chains `add`/`daa` (`j_2a65`). `DrawScoreBCD` blanks up to 4 leading zeros so a fresh score reads `00` (`j_2abe` / `j_2ace`), and `CheckHighScore` copies P1 over the high score on an MSB→LSB win (`j_2a91`). A one-player game (`num_players` at `#4E70` = 0) shows `1UP` and player 1's score. A two-player game also shows `2UP` and player 2's score; `LowerHud` drops that pair when the game returns to one player.
 - **Life icons** are the compiled Ms. Pac blit (dir W, mouth nearly shut), not tiles; the **level fruit** is the compiled fruit blit clamped at banana like `j_8793`. Both are masked blits over black.
 - **Lowered build fruit row:** `DrawFruitRow` in [`iigs/lower_host.s`](../iigs/lower_host.s) follows `draw_fruit_row` (`$2BEA`): one fruit per level up to seven, cherry first. It starts at the right like the arcade's row, at `(294,28)`, runs left, and wraps after four icons to `(294,40)`. Seven 14 px icons don't fit across the 76 px gutter.
 - **Credits:** the arcade's `show_credits` (`$2BA1`) writes `CREDIT` and the count into the bottom chrome (`$403B`–`$4033`), which `LowerTiles` drops. `LowerHud` diffs `credits` (`$4E6E`) instead and `DrawCredits` repaints the same nine cells in the left gutter: `CREDIT`, a space, the tens digit (blank below 10), the ones digit, or `FREE PLAY` when the count is `$FF`. The digits are text-font glyphs `$30`–`$39`, not the score digits. All nine cells are opaque, so going from 10 to 9 erases the tens digit, which the arcade leaves on screen.
@@ -546,17 +546,17 @@ The lowered build (`make iigs-lower`, `make iigs-lower-gsos`) plays the arcade's
 
 | Item | Value |
 |------|-------|
-| Wave tables | DOC RAM `$8000`–`$FFFF`, one 4 KB table per wave at `$8000 + wave × $1000`: one cycle, each sample repeated 128 times, as `nib × 16 + 8` (`$08`–`$F8`; never `$00`, which halts an oscillator) |
+| Wave tables | DOC RAM `$8000`–`$FFFF`, one 4 KB table per wave at `$8000 + wave × $1000`: one cycle, each sample repeated 128 times, as `$80 + (nib − 8) × 6` (`$50`–`$AA`; never `$00`, which halts an oscillator) |
 | Oscillators | 0, 1, 2 for voices 0, 1, 2. Free-run, no IRQ, channel 0, 4 KB table, resolution 3 (`$C0+o = $23`). Pointer register = `$80 + wave × $10` |
 | Enabled | 4 (`$E1 = $06`), set by `SoundInit`. Scan rate `7159090 / 8 / 6` ≈ 149,148 Hz, above the arcade WSG's 96 kHz. GSSquared resets to one oscillator, so the count is never assumed |
 | Others | All 32 halted at startup, then 0–2 started; 3 stays halted |
-| Master volume | Low nibble of `$C03C` = the system volume at `$E100CA` (Control Panel) |
+| Amplifier | `$C03C` bits 3–0, write-only (a read returns `$F`). Mode writes copy the Control Panel nibble at `$E100CA` so the store does not change the amplifier. Loudness is the oscillator volume |
 
 **Why these choices.** A free-running DOC oscillator wraps one entry short of its table: it subtracts `(size − 1)` from its position, not `size` (MAME, GSSquared, Peter Ferrie's hardware notes). The first version used 256-byte tables holding 8 copies of the wave. It lost one whole sample per pass, a phase hiccup every 8 cycles, heard as a buzz on every sound. With one cycle per 4 KB table, the lost entry is 1/128 of a sample. Its scan rate was 26 kHz with 32 oscillators enabled, so harmonics above 13 kHz (any note above about 820 Hz) folded back as aliasing. With 4 enabled, the folding point is about 75 kHz.
 
 **Frequency.** At resolution R, a table plays `SR × D / 2^(17+R)` cycles a second, whatever its size. So `D = F × 12000 × 2^R / SR` ≈ `F × 0.644` at R = 3. Over the corpus, audible F runs from `$80` (D = 82, within 0.6%) to `$9800` (D = `$61D6`). D saturates at `$FFFF`, which only F above about `$18D00` would reach. F arrives as nibbles, so the 65816 sums five 16-entry lookup tables (24.8 fixed point, plus `$80` to round) and needs no multiply. Playback is nearest-sample, as on the arcade. Changing `SR` (the enabled count), the resolution or the table size means regenerating the tables (`py/gen_wave_data.py` holds all the constants).
 
-**Volume.** DOC volume = WSG volume × 16, or 0 while `$5001` bit 0 is clear. The oscillators never stop; a silent voice has volume 0. The scale is a first guess, to be tuned by ear (`VOL_SCALE_SH`).
+**Volume.** DOC volume is the WSG volume scaled linearly so 15 writes `$80` (`n × $80 / 15`, table `VolScale`), or 0 while `$5001` bit 0 is clear. Three voices sum in the DOC, so one voice at full scale is half of the oscillator register. The oscillators never stop; a silent voice has volume 0.
 
 **Per frame.** `LowerSound` runs right after the game frame, before `FrameDone`. It computes wave page, D and volume per voice, and writes only the DOC registers that differ from its shadow (at most 12 GLU writes a frame), inside `sei`, polling the GLU busy bit. `SoundOff` (on quit) zeroes the volumes and halts oscillators 0–2.
 

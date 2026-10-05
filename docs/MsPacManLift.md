@@ -591,7 +591,7 @@ The I/O page is plain RAM. `read_latch0` reads the interrupt enable back from `$
 
 Checking: `make lower-iigs-check` runs `py/gs2_lower_check.py`. It spawns GSSquared, injects both images, the assets, and the ROM. It loads each session's start record into the game bank, its input stream into bank `$07`, and the stream pointer into `IO_PTR`. Then it breaks at `FrameDone` every frame and compares the game bank with the frame record, masked as in stage 3b, along with how far the input pointer advanced. `LOWER_IIGS_SESSIONS` and `LOWER_IIGS_FRAMES` (default 600; 0 for all) choose the work. `make iigs-lower-demo` boots a fresh game to play by hand.
 
-GS/OS build: `make iigs-lower-gsos` links `MSPACLOW.SYS16`, an S16 application, from `iigs/link_gsos_lower.s`, and puts it on its own 800K ProDOS disk, `build/iigs/MsPacLower.2mg`. Its segments:
+GS/OS build: `make iigs-lower-gsos` links `MSPACMAN.SYS16`, an S16 application, from `iigs/link_gsos_lower.s`, and puts it on `build/iigs/MsPacMan.2mg`, a copy of `assets/template.2mg`. The template is an 800K ProDOS volume, `MSPACMAN`, holding the minimal GS/OS system (ProDOS, `GS.OS`, `Start.GS.OS`, `System.Setup`, the ProDOS and Char FSTs, the 3.5" and console drivers, the tools, `QuitCDA`) with no `System:Start` and no application. GS/OS boots straight into a root `*.SYS16`, so the disk starts the game by itself. That build keeps the border phase profiler. `make iigs-gsos-prod` builds the same disk with `GSOS_PROD=1`, which turns `SetBorder` into an `RTS` so the border stays black. Its segments:
 - **Code:** `gsos_entry.s`, then the host and renderer.
 - **Game bank** (`seg_game_lower.s`): 64 KB, bank-aligned. It holds `build/mspac.bin` at `$0000` and `lower.bin` assembled at `$A000`, so lowered code runs with the game bank as both its program and data bank.
 - **Background strip** for sprite erase.
@@ -650,7 +650,7 @@ The arcade uses Namco's WSG: three voices, each with a 4-bit volume and a freque
 
 The IIgs plays them on the Ensoniq DOC, through the sound GLU (`$C03C`–`$C03F`):
 
-- At startup, load the eight waveforms into DOC RAM. Each 32-nibble wave becomes 8-bit samples, one cycle per 4 KB table, with each sample repeated 128 times. No sample byte may be `$00`, because zero stops a DOC oscillator.
+- At startup, load the eight waveforms into DOC RAM. Each 32-nibble wave becomes 8-bit samples `$80 + (nib − 8) × 6` (`$50`–`$AA`), one cycle per 4 KB table, with each sample repeated 128 times. No sample byte may be `$00`, because zero stops a DOC oscillator.
 - Give each arcade voice one free-running oscillator.
 - After each game frame, beside `LowerTiles`, an adapter reads the voice registers from the game bank. It sets each oscillator's table pointer from the wave select, its frequency from the WSG frequency, and its volume from the 4-bit volume. A voice is silent when its volume is 0 or sound is disabled. Registers are written only when they change, through a shadow, as the tile adapter does.
 - Frequency conversion depends on the DOC scan rate, which depends on how many oscillators are enabled. Take the formula from the IIgs Hardware Reference, check it against GSSquared's ENSONIQ emulation, and use a table or one multiply per voice.
@@ -662,11 +662,9 @@ Status: done (`iigs/lower_sound.s`; design in [IIgs-Design.md](IIgs-Design.md) �
 Answers to the open questions:
 
 - **Nearest sample.** Each wave is stretched over a 4 KB table, one cycle per table. The first version packed 8 cycles into a 256-byte table. A free-running oscillator wraps one entry short of its table, so that layout lost a sample every 8 cycles, which was audible as an extra buzz.
-- **Linear volume:** WSG volume × 16.
+- **Linear volume:** WSG 15 → DOC `$80` (`n × $80 / 15`). Three voices at full scale sum to `$180`.
 - **4 oscillators enabled:** about 149 kHz, set explicitly. The voices use oscillators 0–2, and 3 stays halted. The first version enabled 32 (26 kHz), which aliased any note above about 820 Hz.
 - **Resolution 3:** keeps the lowest game notes (F = `$80`) within 0.6% while the highest (F = `$9800`) fits 16 bits.
-
-Still open: tune the volume by ear against `mspac`.
 
 ### Sprites and colors
 

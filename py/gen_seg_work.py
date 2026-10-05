@@ -142,6 +142,9 @@ SYMBOLS = [
     ("LIVES", 0xA90E, 1),
     ("LEVEL", 0xA90F, 1),
     ("CREDITS", 0xA910, 1),
+    ("SCORE2_LO", 0xA911, 1),
+    ("SCORE2_MID", 0xA912, 1),
+    ("SCORE2_HI", 0xA913, 1),
     ("ROW_ADDR", 0xAB00, 512),
     ("ROW_BCK", 0xAD00, 512),
 ]

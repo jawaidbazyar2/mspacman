@@ -12,7 +12,8 @@
 *            dirty list (color 0 blanks a cell)
 *   sprites  sprite codes and colors at $4C02 plus the actor and fruit
 *            positions, into ACTORS
-*   HUD      the BCD scores, lives, level and credits, into the side HUD
+*   HUD      the BCD scores, lives, level and credits, into the side HUD.
+*            1UP always; 2UP and player 2's score only in a two-player game
 *   input    the keyboard into the IN0/IN1 bytes of the host block
 *   sound    the voice registers at $5040 into DOC oscillators 0-2
 *            (lower_sound.s)
@@ -47,10 +48,13 @@ G_FRUIT_POS	equ	GAME+$4DD2
 G_LEVEL	equ	GAME+$4E13
 G_LIVES	equ	GAME+$4E15
 G_SCORE1	equ	GAME+$4E80	; 3 bytes BCD, low first
+G_SCORE2	equ	GAME+$4E84	; player 2, same layout
 G_HISCORE	equ	GAME+$4E88
+G_PLAYERS	equ	GAME+$4E70	; 0 = one player, nonzero = two
 G_CREDITS	equ	GAME+$4E6E	; BCD, $FF free play
 G_MODE	equ	GAME+$4E00	; game_mode
 G_SUB2	equ	GAME+$4E03	; game_mode_sub2 (press-start step)
+G_LEVEL_STATE	equ	GAME+$4E04	; level_state
 G_EFFNUM	equ	GAME+$4E9C	; effect channel 1 request bits
 G_EFFCUR	equ	GAME+$4E9E	; effect channel 1 bit now playing
 G_HB	equ	GAME+$F000
@@ -123,7 +127,9 @@ MainLoop
 * stays on the sound color. Check mode mirrors the DOC before that
 * breakpoint. In play, CoinSoundGate holds a new credit silent until
 * the push-start blit has finished, so the opening is not stretched
-* across it.
+* across it. Control-S during play (RackMute) zeroes the DOC volumes
+* through the maze flash and board clear. The mute lifts at the
+* intermission, so that tune still plays.
 	sep	#$20
 	jsr	LowerKeys
 	bcc	:run
@@ -133,8 +139,22 @@ MainLoop
 	and	#$00FF
 	beq	:live
 	brl	:frozen
-:live
-	jsr	EraseAllSprites		; purple
+:live	lda	|CheckMode
+	and	#$00FF
+	bne	:draw
+	lda	>G_IN0
+	and	#$0010
+	bne	:draw			; rack switch is active low
+	lda	>G_LEVEL_STATE
+	and	#$00FF
+	cmp	#LEVEL_PLAYING
+	bne	:draw
+	sep	#$20
+	lda	#1
+	sta	|RackMute
+	jsr	SoundMute		; oscillators 0-2 at volume 0
+	rep	#$30
+:draw	jsr	EraseAllSprites		; purple
 	lda	#BRD_TILES
 	jsr	SetBorder
 	jsr	LowerApplyTiles
@@ -151,7 +171,20 @@ MainLoop
 	lda	#BRD_DIFF
 	jsr	SetBorder
 	jsr	LowerTiles
-	jsr	CoinSoundGate
+	lda	|RackMute
+	and	#$00FF
+	beq	:gate
+	lda	>G_LEVEL_STATE
+	and	#$00FF
+	cmp	#LEVEL_INTERMISSION
+	bcc	:held			; flash and clear: leave volume 0
+	sep	#$20
+	stz	|RackMute
+	rep	#$30
+* The voice registers copied this frame are still the pre-act voices.
+* The intermission tune is in them next frame.
+	bra	:held
+:gate	jsr	CoinSoundGate
 	bcs	:held
 	lda	#BRD_SOUND
 	jsr	SetBorder
@@ -358,7 +391,8 @@ LowerInit
 *------------------------------------------------------------------
 * Keyboard -> IN0 / IN1 (active low). Arrows or A/Z steer, 5 or C is
 * coin 1, 1 and 2 are the start buttons, Control-S is the rack test
-* (clears the board), Esc pauses, Q quits (carry set). Directions use
+* (clears the board; the main loop mutes the DOC until the intermission),
+* Esc pauses, Q quits (carry set). Directions use
 * any-key-down so a held key holds the stick.
 *------------------------------------------------------------------
 	mx	%10
@@ -708,6 +742,8 @@ LowerApplyTiles
 	mx	%00
 CREDIT_BIT	equ	$02
 MODE_PRESS_START	equ	2
+LEVEL_PLAYING	equ	3		; level_state while the board is in play
+LEVEL_INTERMISSION	equ	32	; the act, and its tune, after the flash
 CoinSoundGate
 	php
 	sep	#$20
@@ -1164,7 +1200,7 @@ LowerSprites
 	jsr	ActorTunnelVis
 	sep	#$20
 	lda	>ACTORS+ACT_FLAGS,x
-	and	#$FF-FLAG_POINTS-FLAG_CHAR
+	and	#$FF-FLAG_POINTS-FLAG_CHAR-FLAG_CLAPPER-FLAG_ACT3
 	sta	>ACTORS+ACT_FLAGS,x
 	lda	<LS_COLOR
 	bne	:vis
@@ -1180,17 +1216,62 @@ LowerSprites
 	rep	#$20
 	rts
 
+* Codes $10-$17 are one quarter of the act clapper. The scripts paint
+* them with bank #16 (white). 8-bit A = code & $3F, X = actor base.
+* SEC and ACT_SPR = code & 7 when it is one.
+* Act 3's stork ($30 head, $18 body, $2C flap), sack ($07) and junior
+* ($0F) take the same bank. SEC and ACT_SPR = Act3BlitTable index.
+* CLC and A kept when it is neither.
+	mx	%10
+:clapper
+	cmp	#$10
+	bcc	:cno
+	cmp	#$18
+	bcs	:cno
+	and	#$07
+	sta	>ACTORS+ACT_SPR,x
+	lda	>ACTORS+ACT_FLAGS,x
+	ora	#FLAG_CLAPPER
+	sta	>ACTORS+ACT_FLAGS,x
+	sec
+	rts
+* Same order as Act3BlitTable. Index 0 is the head (redrawn on top).
+:cno	ldy	#0
+]a3	cmp	:a3tab,y
+	beq	:a3yes
+	iny
+	cpy	#5
+	bcc	]a3
+	clc
+	rts
+:a3yes	tya
+	sta	>ACTORS+ACT_SPR,x
+	lda	>ACTORS+ACT_FLAGS,x
+	ora	#FLAG_ACT3
+	sta	>ACTORS+ACT_FLAGS,x
+	sec
+	rts
+:a3tab	db	$30,$18,$2C,$07,$0F
+	mx	%00
+
 * Ghost: walking frames $20-$27, eyes, points, or frightened ($1C-$1D):
 * color $11 blue, $12 the flash's white. Body color follows the sprite
 * color byte ($01/$03/$05/$07), and bits 7/6 mirror the frame, so a
 * cutscene ghost on another slot keeps its own color and facing.
 * Pac-Man and Ms. Pac-Man in the acts use these same slots; their codes
 * publish FLAG_CHAR and a pose in MsPacBlitTable.
+	mx	%10
 :ghost	ldx	<LS_BASE
 	sep	#$20
 	lda	<LS_CODE
 	and	#$3F
-	cmp	#$28
+	jsr	:clapper
+	bcc	:gNotClap
+	rep	#$20
+	rts
+:gNotClap
+	mx	%10
+:gbody	cmp	#$28
 	bcs	:pts
 	cmp	#$1C
 	bcs	:chkFright
@@ -1370,9 +1451,18 @@ LowerSprites
 * Ms. Pac-Man: the pose for her direction, closed or one of the open
 * mouths. While she is dying, codes $34-$3F are the spin. The ROM
 * stores that as south, west, north, east, repeated, and $3F holds
-* north. An index below $20 is a cutscene prop on her slot (the act
-* clapper); hide it.
+* north. Anything below $20 other than the clapper stays hidden.
 :pac	ldx	<LS_BASE
+	sep	#$20
+	lda	<LS_CODE
+	and	#$3F
+	jsr	:clapper
+	bcc	:pNotClap
+	rep	#$20
+	rts
+:pNotClap
+	mx	%00
+:pbody	rep	#$20
 	lda	<LS_CODE
 	and	#$003F
 	cmp	#$0020
@@ -1441,11 +1531,18 @@ LowerSprites
 
 * Fruit: codes $00-$07. Eat-fruit score is fruit_points+2 → $08-$0F
 * (100/200/500/700/1000/2000/5000); FLAG_POINTS selects those blits.
+	mx	%10
 :fruit	ldx	<LS_BASE
 	sep	#$20
 	lda	<LS_CODE
 	and	#$3F
-	cmp	#8
+	jsr	:clapper
+	bcc	:fNotClap
+	rep	#$20
+	rts
+:fNotClap
+	mx	%10
+:fbody	cmp	#8
 	bcc	:fok
 	cmp	#$10
 	bcs	:fgone
@@ -1462,8 +1559,8 @@ LowerSprites
 	jmp	:hide
 
 *------------------------------------------------------------------
-* Side HUD: player 1's score, the high score, lives, level and credits,
-* redrawn when they change.
+* Side HUD: player 1's score, player 2's score when two are playing, the
+* high score, lives, level and credits, redrawn when they change.
 *------------------------------------------------------------------
 LowerHud
 	php
@@ -1474,7 +1571,7 @@ LowerHud
 	bne	:score
 	dex
 	bpl	]s
-	bra	:hi
+	bra	:players
 :score	ldx	#2
 ]sc	lda	>G_SCORE1,x
 	sta	|SH_HUD,x
@@ -1483,6 +1580,39 @@ LowerHud
 	bpl	]sc
 	rep	#$30
 	jsr	DrawScore
+	sep	#$30
+* num_players ($4E70): 0 shows 1UP only. Nonzero shows 2UP and P2's score.
+:players	lda	>G_PLAYERS
+	cmp	|SH_HUD+9
+	beq	:p2same
+	sta	|SH_HUD+9
+	cmp	#0
+	beq	:p2hide
+	rep	#$30
+	jsr	Draw2UP
+	sep	#$30
+	bra	:p2draw
+:p2hide	rep	#$30
+	jsr	Hide2UP
+	sep	#$30
+	bra	:hi
+:p2same	lda	|SH_HUD+9
+	beq	:hi
+	ldx	#2
+]p2	lda	>G_SCORE2,x
+	cmp	|SH_HUD+10,x
+	bne	:p2draw
+	dex
+	bpl	]p2
+	bra	:hi
+:p2draw	ldx	#2
+]p2c	lda	>G_SCORE2,x
+	sta	|SH_HUD+10,x
+	sta	>SCORE2_LO,x
+	dex
+	bpl	]p2c
+	rep	#$30
+	jsr	DrawScore2
 	sep	#$30
 :hi	ldx	#2
 ]h	lda	>G_HISCORE,x
@@ -1637,9 +1767,12 @@ FULL_REDRAW	dw	0	; redraw every cell next pass
 * redraw is requested. 2 mute until that redraw is applied. 3 skip the
 * stale voice-register mirror on the release frame.
 SoundHold	db	0
+* Control-S during play. The DOC stays at volume 0 through the maze
+* flash and board clear, and lifts when the intermission starts.
+RackMute	db	0
 CreditOn	db	0	; effect channel 1's credit bit has been seen
 HoldTimer	db	0
-SH_HUD	ds	16	; score1 x3, hiscore x3, lives, level, credits
+SH_HUD	ds	16	; score1 x3, hiscore x3, lives, level, credits, players, score2 x3
 SH_TILE	ds	$400	; last tile codes seen, 896 used
 SH_COLOR	ds	$400	; last colors seen
 MazeBank	dw	$FFFF	; LowerMazeBank: this level's maze bank (none yet)
