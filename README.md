@@ -4,7 +4,10 @@ Port arcade Ms. Pac-Man to the **Apple IIgs**.
 
 Phase 0 was: a trustworthy Z80 source pipeline: real assemblable instructions that rebuild **byte-identical** known-good ROMs (`boot1`–`boot6` from MAME’s `mspacmab` set). Once that foundation is solid, the codebase can evolve toward a 65816 / IIgs target (graphics, sound, input).
 
-This code is in the "iigs" folder, and was an attempt to get the LLM to convert Z80 directly to 65816. It wasn't terrible, but it was constant Whack-a-Mole finding and fixing logic errors. Very slow grind, and I could tell it would not resolve to an accurate solution without a great deal of human effort.
+The original hand-disassembly is in ~/mspac.asm
+The byte-exact assemblable Ms PacMan is in src/mspac.asm.
+
+The first attempt to get LLM to port the src/mspac.asm Z80 directly to 65816 is in the "iigs" folder. It wasn't terrible, but it was constant Whack-a-Mole finding and fixing logic errors. Very slow grind, and I could tell it would not resolve to an accurate solution without a great deal of human effort.
 
 However at this point I shifted strategy and went to test-driven development that did not involve me being a communication middleman between game and Agent. In my recent experience, given the sufficient and the right type of test data, Agents can rapidly converge on correct solutions. (This part always feels like Genetic Programming to me - an interesting concept from the mid 90s).
 
@@ -18,11 +21,23 @@ The recording was not just my input, but the state of all RAM, video memory and 
 
 My goal was to ensure algorithmic identity with the original arcade version, and, the way to verify that is to ensure identity of all input AND output. We don't care about the *rendering* of the output, so we compared the functional output - variables, the video buffer (tiles) memory and sprite locations and parameters.
 
+I also cleaned up the Z80 code at this point, replacing bare addresses with human-readable labels for variables in RAM etc.
+
 ## Phase 2: Lift to C
 
-I then converted the Z80 to C in two passes, the first, where the C still 'thought' in terms of Z80 registers, and the second, which converted that to “idiomatic C” i.e. the logic was function based instead of register-side-effect based.
+I then converted the Z80 to C in two passes. The first, where the C still 'thought' in terms of Z80 registers and structure. Reading this code, you can see how the C routines are communicating through a "write memory" interface, and reading and storing values into a struct containing the Z80 registers.
 
-The Z80-focused C is in the source folder "c". The idiomatic C is in the folder "idiom".
+We modified one routine at a time, and there was cross-calling between emulated Z80 and C until the process was complete.
+
+The Z80-focused C is in the source folder "c".
+
+# Phase 2.5: Lift to Idiomatic C
+
+The second converted that to “idiomatic C” i.e. the logic was function based instead of register-side-effect based. During this phase, again, there was a combo of old and new routines and we modified one routine at a time.
+
+I kept the RAM layout identical, because otherwise the tests wouldn't work. So the RAM was modeled as a large C struct that was unioned with the bare RAM buffer. 
+
+The idiomatic C is in the folder "idiom".
 
 At this point I had to decouple registers out of the test data and made new recordings;
 but this C version was provably identical to the emulated Z80 version.
@@ -39,7 +54,7 @@ I then have a chunk of code that reinterprets the video RAM and renders on the G
 
 We know the 65816 version is generating exactly the same output the original Z80 game does: the RAM, Video buffer, and machine state were compared identical to the recordings done in Phase 2. 
 
-Then we render that to the GS screen.
+Then we render that to the GS screen through a "iigs host" layer.
 
 # Rendering
 
@@ -50,6 +65,8 @@ All coordinates of the monsters, PacMan, motion etc are calculated using origina
 The sprites are all compiled, so instead of trying to copy pixel data, it’s just a 816 subroutine that writes a sprite to RAM
 
 The graphics scaling is 6/8, which if I did my math right provides same aspect ratio as the original game. But it does mean I can write whole bytes and not mess with 4-bit updates which would be S L O W.
+
+Credit to fatdog for cleaning up the rescaled tiles and sprites.
 
 ## Audio
 
@@ -181,4 +198,61 @@ IIgs display / tile-scale decisions: [docs/IIgs-Design.md](docs/IIgs-Design.md).
 ## Status
 
 `make` + `make verify` currently produce a byte-identical rebuild of `boot1`–`boot6`. The Apple IIgs port itself is not started yet; the Z80 reassembly pipeline is the foundation for that work. Early IIgs design notes (tile scale, HUD layout) live in `docs/IIgs-Design.md`.
+
+## Make targets
+
+Each stage of the port has a build target and a check target. Hosts that play or replay (`lift`, `c`, `idiom`, `lower`) need SDL3. The 65816 targets need [Merlin32](https://brutaldeluxe.fr/products/crossdevtools/merlin/). Playing or checking the IIgs build needs [GSSquared](https://github.com/). The GS/OS disk also needs `cp2` and `assets/template.2mg`.
+
+### Z80 and the C hosts
+
+| Target | What it does |
+|--------|----------------|
+| `make` / `make all` | Assemble `src/mspac.asm` → `build/mspac.bin` |
+| `make verify` | Byte-compare that image to `boot1`–`boot6` |
+| `make sjasmplus-check` | Confirm the vendored SjASMPlus binary and print its version |
+| `make lift` | Phase 1 Z80 host → `build/lift/mspac-lift` |
+| `make lift-check` | Run that host’s 600-frame self-check |
+| `make c` | Phase 2 host → `build/c/mspac-c` |
+| `make c-check` | Replay `testplay2` |
+| `make c-only-check` | Replay with no Z80 instructions executed |
+| `make idiom` | Idiomatic C host → `build/idiom/mspac-idiom` |
+| `make idiom-check` | Replay every `corpus/c-*` session |
+| `make idiom-cov` | Coverage report in `build/idiom/cov/report.txt` |
+
+### 65816 game logic
+
+| Target | What it does |
+|--------|----------------|
+| `make lower` | Assemble `lower/*.s` → `build/lower/lower.bin`, and build the shadow harness `build/lower/mspac-lower` |
+| `make lower-check` | Shadow-compare every lowered function against `corpus/c-*` |
+| `make lower-only` | 65816-only harness `build/lower/mspac-lower-only` (no game-logic C linked) |
+| `make lower-only-check` | Replay the corpus on that harness and summarize cycles |
+| `make lower-cov` | Coverage report in `build/lower/cov/report.txt` |
+
+### Graphics
+
+Art comes from `assets/tiles_6x6_clean.ppm` and `assets/sprites_14x12_clean.ppm`. Palette and sound data come from the PROMs under `mspacman/` (`82s123.7f`, `82s126.4a`, `82s126.1m`).
+
+| Target | What it does |
+|--------|----------------|
+| `make gfx` | 6×6 tiles and 14×12 sprites in `build/gfx/`, plus the palette |
+| `make gfx-ppm` | The same, and PPM contact sheets under `build/gfx/ppm/` |
+| `make palette` | SHR palette and tile color banks → `iigs/palette_data.s`, `iigs/tile_bank_data.s` |
+| `make maze` | Level-1 28×31 tilemap (needs `boot1`–`boot6`) |
+| `make tiles-preview` | Native 8×8 sheets to check rotate and flip (`COMPARE=native,cw,upright`) |
+| `make gfx-rom` | ROM-scaled sheets from `mspacman/5e` and `5f` under `build/gfx/rom/`, for reference |
+
+### Apple IIgs
+
+`make iigs-lower` is the game: lowered 65816 logic plus the SHR renderer. It writes `build/iigs/lower_game.bin` and `build/iigs/lower_host.bin`.
+
+| Target | What it does |
+|--------|----------------|
+| `make iigs-lower` | Build those two images (art, compiled sprites, palette, and `build/mspac.bin` included) |
+| `make iigs-lower-demo` | Boot them in GSSquared and leave the game running |
+| `make lower-iigs-check` | Replay corpus sessions in GSSquared and compare each frame. `LOWER_IIGS_SESSIONS` picks the sessions (default `c-shakedown`, `c-attract`, `c-play1`); `LOWER_IIGS_FRAMES` caps frames per session (default 600, `0` for all) |
+| `make iigs-lower-gsos` | GS/OS application `build/iigs/gsos/MSPACMAN.SYS16` on a bootable copy of the template, `build/iigs/MsPacMan.2mg`. `IIGS_LOWER_GSOS_INSTALL=1` also copies it onto `IIGS_GSOS_DISK` |
+| `make iigs-gsos-prod` | The same disk with the border phase colors turned off |
+
+`make clean` removes `build/`.
 
