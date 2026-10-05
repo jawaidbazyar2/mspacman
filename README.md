@@ -60,7 +60,7 @@ Then we render that to the GS screen through a "iigs host" layer.
 
 ## Video
 
-All coordinates of the monsters, PacMan, motion etc are calculated using original-game-pixels, then scaled to IIgs coordinates. So the timing of movement is identical to original.
+All coordinates of the monsters, PacMan, motion etc are calculated using original-game-pixels, then scaled to IIgs coordinates. So the timing of movement is identical to original, with the exception that original was 60Hz and the IIgs is of course 59.9226Hz. 
 
 The sprites are all compiled, so instead of trying to copy pixel data, it’s just a 816 subroutine that writes a sprite to RAM
 
